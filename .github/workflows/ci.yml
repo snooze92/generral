@@ -54,6 +54,41 @@ jobs:
           path: TestResults
           if-no-files-found: ignore
 
+  frontend:
+    name: Frontend (typecheck, lint, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm check:translations
+      - run: pnpm build
+
+      - name: Vendored Sonarr files are unmodified
+        run: |
+          revision=$(node -e "import('./scripts/sonarr-revision.mjs').then(m => console.log(m.SONARR_REVISION))")
+          git init -q /tmp/sonarr
+          git -C /tmp/sonarr fetch -q --depth 1 https://github.com/Sonarr/Sonarr.git "$revision"
+          git -C /tmp/sonarr checkout -q FETCH_HEAD
+          node scripts/vendor-sonarr.mjs /tmp/sonarr --check
+          node scripts/update-reuse.mjs --check
+
   licensing:
     name: Licensing (REUSE)
     runs-on: ubuntu-latest
