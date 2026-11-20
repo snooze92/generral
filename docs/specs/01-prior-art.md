@@ -82,11 +82,22 @@ Third-party libraries (non-exhaustive, all permissive or GPL-compatible):
 
 ## Licensing
 
-Sonarr, Prowlarr and Sportarr are **GPL-3.0**. Porting their code makes Generral a derivative work, so
-Generral **MUST** be released as **GPL-3.0-or-later**, and:
+Sonarr and Sportarr are licensed **GPL-3.0-or-later**; Prowlarr is GPL-3.0 (its notices don't say "or
+later"). Porting their code makes Generral a derivative work, so Generral **MUST** be released as
+**GPL-3.0-or-later**, and:
 
-- Every ported file keeps its original copyright header and gets a `Ported from <project>@<commit>`
-  note.
-- `COPYRIGHT.md` lists the upstream projects and their copyright holders.
+- Generral follows the [REUSE](https://reuse.software) specification. `reuse lint` runs in CI, so every
+  file has machine-readable copyright and licence information.
+- Every **ported** source file keeps its upstream copyright as an `SPDX-FileCopyrightText` line and gets
+  a `Ported from <project>@<commit> <path>` note. Sonarr's own files carry no per-file headers, so
+  there is no original header text to preserve; the SPDX line is the retained notice.
+- Upstream code **vendored as a whole directory** (e.g. Sonarr's generic UI components, see
+  [10](10-ui.md#implementation-approach)) is attributed per directory in `REUSE.toml` instead of
+  per file, together with the upstream commit it was copied from, so that the files stay
+  byte-identical to upstream (or minimally patched) and are easy to re-sync.
+- `COPYRIGHT.md` lists the upstream projects, their copyright holders and the revisions used.
+- **Prowlarr caveat:** because Prowlarr doesn't grant "or later", code taken from it could restrict the
+  combined work to GPL-3.0-only. Before porting Prowlarr files (notably Cardigann for `http-html`),
+  check their provenance; prefer Sonarr's equivalent, or reimplement the documented YAML format.
 - Trademarks/logos of Sonarr/Plex/etc. are not used as Generral branding. Generral has its own
   name, logo and accent colour (see [10](10-ui.md#branding)).
