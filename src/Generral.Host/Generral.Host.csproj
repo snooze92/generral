@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <AssemblyName>Generral.Host</AssemblyName>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Generral.Core\Generral.Core.csproj" />
+    <ProjectReference Include="..\Generral.Http\Generral.Http.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Generral": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "GENERRAL__CONFIGDIR": "../../config",
+        "GENERRAL__UIDIR": "../../frontend/dist"
+      }
+    }
+  }
+}
