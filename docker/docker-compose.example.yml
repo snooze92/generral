@@ -1,0 +1,31 @@
+# Example stack from docs/specs/12-deployment.md. Copy, adjust paths/ids, then `docker compose up -d`.
+services:
+  generral:
+    image: ghcr.io/snooze92/generral:develop
+    container_name: generral
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+    volumes:
+      - ./config/generral:/config
+      - /srv/data:/data # /data/torrents/generral, /data/media/sports
+    ports:
+      - 8990:8990
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    environment: [PUID=1000, PGID=1000, TZ=Europe/London]
+    volumes: [./config/prowlarr:/config]
+    ports: [9696:9696]
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    environment: [PUID=1000, PGID=1000, TZ=Europe/London, WEBUI_PORT=8080]
+    volumes:
+      - ./config/qbittorrent:/config
+      - /srv/data/torrents:/data/torrents # same path as seen by Generral → no remote path mapping
+    ports: [8080:8080, 6881:6881, 6881:6881/udp]
+    restart: unless-stopped

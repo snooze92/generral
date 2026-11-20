@@ -24,6 +24,19 @@ identifiable events can be turned into a series.
 [`docs/specs/README.md`](docs/specs/README.md). Progress is tracked against the
 [roadmap](docs/specs/13-roadmap.md).
 
+## Running with Docker
+
+```sh
+docker run -d --name generral -p 8990:8990 \
+  -e PUID=1000 -e PGID=1000 -e TZ=Europe/London \
+  -v ./config:/config -v /srv/data:/data \
+  ghcr.io/snooze92/generral:develop
+docker logs generral   # first start: the initial user's password
+```
+
+See [12 – Deployment](docs/specs/12-deployment.md) and
+[`docker/docker-compose.example.yml`](docker/docker-compose.example.yml).
+
 ## Development
 
 Requirements: the [.NET SDK](https://dotnet.microsoft.com/download) pinned in `global.json`

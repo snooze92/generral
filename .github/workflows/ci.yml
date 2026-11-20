@@ -60,3 +60,33 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: fsfe/reuse-action@v6
+
+  docker:
+    name: Docker image (amd64 build + smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: generral:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          docker run -d --name generral -p 8990:8990 -e PUID=1001 -e PGID=1001 generral:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8990/ping; then
+              docker exec generral ps -o user,args | grep -q '^generral' && exit 0
+              echo "Generral is not running as the unprivileged user"; exit 1
+            fi
+            sleep 2
+          done
+          docker logs generral
+          exit 1
