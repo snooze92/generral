@@ -1,0 +1,14 @@
+{
+  "name": "Generral",
+  "icons": [
+    {
+      "src": "../favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "start_url": "../",
+  "theme_color": "#0f766e",
+  "background_color": "#1b1f26",
+  "display": "standalone"
+}
