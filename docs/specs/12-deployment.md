@@ -66,12 +66,23 @@ the UI.
 | `GENERRAL__URLBASE` | `urlBase` | empty (e.g. `/generral` behind a reverse proxy) |
 | `GENERRAL__BINDADDRESS` | `bindAddress` | `*` |
 | `GENERRAL__APIKEY` | `apiKey` | generated on first start |
-| `GENERRAL__AUTHMETHOD` | `authenticationMethod` | `Forms` (`Basic`, `External` for SSO proxies) |
+| `GENERRAL__AUTHMETHOD` | `authenticationMethod` | `Forms` (`External` for SSO proxies; Sonarr's deprecated `Basic` is not supported) |
 | `GENERRAL__AUTHREQUIRED` | `authenticationRequired` | `Enabled` (`DisabledForLocalAddresses`) |
 | `GENERRAL__LOGLEVEL` | `logLevel` | `info` |
 | `GENERRAL__DB__TYPE` / `__CONNECTIONSTRING` | `database.*` | `sqlite` / `/config/generral.db` |
 | `GENERRAL__ALLOWSCRIPTSOURCES` | `allowScriptSources` | `false` |
 | `GENERRAL__INSTANCENAME` | `instanceName` | `Generral` |
+| `GENERRAL__CONFIGDIR` | n/a | `/config` in Docker, `~/.config/Generral` otherwise |
+| `GENERRAL__UIDIR` | n/a | `<app>/UI` (the built SPA; for development, point it at `frontend/dist`) |
+| `GENERRAL__AUTH__USERNAME` / `__PASSWORD` | n/a (first start only) | `generral` / random, printed once to the log |
+
+Invalid values (e.g. `GENERRAL__PORT=abc`) stop the process at startup with a message naming the
+variable. Settings fixed by an environment variable are shown read-only in *Settings → General*.
+
+On first start with Forms authentication, Generral creates the single user from
+`GENERRAL__AUTH__USERNAME`/`GENERRAL__AUTH__PASSWORD`, or `generral` with a random password written
+to the log (Sonarr does the same since v4.0.17). After 5 failed sign-ins from one address within
+10 minutes, that address is locked out for 5 minutes.
 
 ## Example `docker-compose.yml`
 
@@ -137,7 +148,7 @@ generral/
 ├── presets/                  # shipped presets (YAML) + tests with recorded source fixtures
 ├── docker/                   # entrypoint.sh, s6/compose examples
 ├── Dockerfile
-├── COPYRIGHT.md  LICENSE (GPL-3.0)
+├── COPYRIGHT.md  LICENSE (GPL-3.0)  LICENSES/  REUSE.toml
 └── .github/workflows/        # ci.yml, docker.yml, presets.yml
 ```
 
@@ -145,6 +156,6 @@ generral/
 
 | Workflow | Trigger | Steps |
 |----------|---------|-------|
-| `ci.yml` | PR, push | `dotnet build/test` (unit + integration with Testcontainers), `pnpm lint/typecheck/test`, preset fixture tests |
+| `ci.yml` | PR, push to `main` | `dotnet build`, `dotnet format --verify-no-changes`, pending-migration check, `dotnet test` (unit + integration; Testcontainers from M2), `pnpm lint/typecheck/test`, preset fixture tests (M1), `reuse lint` |
 | `docker.yml` | push to `main` (→ `develop`), tag `v*` (→ `X.Y.Z`, `X.Y`, `latest`) | `docker/setup-qemu` + `setup-buildx`, multi-arch `build-push-action` with GHA cache, push to GHCR, SBOM + provenance attestations, Trivy scan |
 | `presets.yml` | nightly | Run every shipped preset against the **live** source (not fixtures) and open an issue when one breaks (layout change detection) |

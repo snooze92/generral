@@ -40,7 +40,7 @@ For this to work, Generral MUST implement the subset of the Sonarr v3 API that P
 | `POST /api/v3/indexer[?forceSave=true]` | Create. If validation fails (e.g. caps unreachable), return 400. Prowlarr retries with `forceSave=true`, which MUST bypass validation. |
 | `PUT /api/v3/indexer/{id}[?forceSave=true]` | Update; same semantics. Unknown fields Prowlarr doesn't manage MUST be preserved. |
 | `DELETE /api/v3/indexer/{id}` | Delete. |
-| Auth | `X-Api-Key` header (and `?apikey=` query). Optional HTTP Basic. |
+| Auth | `X-Api-Key` header (and `?apikey=` query, or `Authorization: Bearer`). |
 
 Newznab-implementation indexers that Prowlarr pushes (Usenet) are stored but disabled, with a
 health warning ("Usenet not supported yet"), until Usenet support lands. This keeps Prowlarr sync
