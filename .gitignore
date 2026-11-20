@@ -4,10 +4,12 @@ obj/
 *.user
 .vs/
 TestResults/
+/artifacts/
 
 # Frontend
 node_modules/
 frontend/dist/
+frontend/src/**/*.module.css.d.ts
 
 # Local runtime data
 /config/

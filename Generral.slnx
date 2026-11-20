@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Generral.Core.Test/Generral.Core.Test.csproj" />
+    <Project Path="src/Generral.Core/Generral.Core.csproj" />
+    <Project Path="src/Generral.Host/Generral.Host.csproj" />
+    <Project Path="src/Generral.Http/Generral.Http.csproj" />
+    <Project Path="src/Generral.Integration.Test/Generral.Integration.Test.csproj" />
+  </Folder>
+</Solution>
