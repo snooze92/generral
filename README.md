@@ -20,7 +20,27 @@ identifiable events can be turned into a series.
 
 ## Status
 
-**Specification phase.** No code yet. Start reading at [`docs/specs/README.md`](docs/specs/README.md).
+**Early development (M0 – skeleton).** The specs are the source of truth; start reading at
+[`docs/specs/README.md`](docs/specs/README.md). Progress is tracked against the
+[roadmap](docs/specs/13-roadmap.md).
+
+## Development
+
+Requirements: the [.NET SDK](https://dotnet.microsoft.com/download) pinned in `global.json`
+(10.0.x).
+
+```sh
+dotnet test Generral.slnx                      # unit + integration tests
+dotnet run --project src/Generral.Host         # http://localhost:8990
+```
+
+`dotnet run` uses `src/Generral.Host/Properties/launchSettings.json`, which keeps runtime data in
+`./config/` (git-ignored). On first start Generral writes `config/config.yaml` with a new API key and
+logs the password of the initial `generral` user. Health check: `GET /ping`.
+
+Before pushing, run `dotnet format Generral.slnx` and, if available, `reuse lint`
+([REUSE](https://reuse.software)); CI checks both. After changing entities, add a migration with
+`dotnet tool restore && dotnet ef migrations add <Name> --project src/Generral.Core --output-dir Datastore/Migrations`.
 
 ## Specs at a glance
 
@@ -45,5 +65,6 @@ Worked mapping examples live in [`docs/specs/examples/`](docs/specs/examples/).
 
 ## License
 
-Intended license: **GPL-3.0-or-later**, so that UI/logic from Sonarr, Prowlarr and Sportarr (all GPL-3.0)
-can be studied and borrowed with attribution. See [01 – Prior art](docs/specs/01-prior-art.md#licensing).
+Generral is free software, licensed under the **GNU General Public License v3.0 or later**
+([`LICENSE`](LICENSE)). It reuses code from Sonarr (GPL-3.0-or-later) with attribution; see
+[`COPYRIGHT.md`](COPYRIGHT.md) and [01 – Prior art § Licensing](docs/specs/01-prior-art.md#licensing).
