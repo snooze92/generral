@@ -1,0 +1,21 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Frontend
+node_modules/
+frontend/dist/
+
+# Local runtime data
+/config/
+*.db
+*.db-shm
+*.db-wal
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,63 @@
+# Preset: World Rugby Sevens Series / HSBC SVNS (UC4).
+# Each tournament leg (Dubai, Cape Town, …) is an event. Each event expands into parts taken from
+# the data (its knockout stages). Only Cup semi-finals and the final are monitored by default.
+# Result in Plex:
+#   HSBC SVNS/Season 2025/HSBC SVNS - S2025E03 - Dubai - Cup Final [WEBDL-1080p].mkv
+schema: generral/preset@1
+id: svns
+name: HSBC SVNS (World Rugby Sevens Series)
+requires: { generral: ">=0.2" }
+tags: [sport, rugby, sevens]
+
+source:
+  name: SVNS legs (static)
+  # Tournament legs are announced once per season, so a `static` source maintained by hand (or by
+  # a community preset feed) is the most reliable option. Swap for an `ical` or `http-json` source
+  # if you have one.
+  type: static
+  settings:
+    timezone: UTC
+    events:
+      - { key: svns-2025-dubai,     title: Dubai,     start: 2024-11-30T14:00:00Z, season: "2024-25", leg: 1 }
+      - { key: svns-2025-capetown,  title: Cape Town, start: 2024-12-07T14:00:00Z, season: "2024-25", leg: 2 }
+      - { key: svns-2025-perth,     title: Perth,     start: 2025-01-25T08:00:00Z, season: "2024-25", leg: 3 }
+      - { key: svns-2025-vancouver, title: Vancouver, start: 2025-02-22T22:00:00Z, season: "2024-25", leg: 4 }
+      - { key: svns-2025-hongkong,  title: Hong Kong, start: 2025-03-28T06:00:00Z, season: "2024-25", leg: 5 }
+      - { key: svns-2025-singapore, title: Singapore, start: 2025-04-05T08:00:00Z, season: "2024-25", leg: 6 }
+
+series:
+  title: HSBC SVNS
+  genres: [Sport, Rugby]
+  monitor: future
+  qualityProfile: HD-1080p
+
+mapping:
+  name: SVNS legs × knockout stages
+  vars:
+    seasonYear: '{{ event.fields.season | string.split "-" | array.last | string.to_int + 2000 }}'
+  parts:
+    - { key: cup-qf,    title: Cup Quarter-Finals, monitored: false, airOffset: 0h }
+    - { key: cup-sf,    title: Cup Semi-Finals,    monitored: true,  airOffset: 3h }
+    - { key: cup-final, title: Cup Final,          monitored: true,  airOffset: 6h }
+  season:  { strategy: field, value: '{{ vars.seasonYear }}', title: '{{ event.fields.season }}' }
+  episode: { strategy: sequential, order: '{{ event.fields.leg }}' }
+  title:   '{{ event.title }} - {{ part.title }}'
+  airDate: '{{ event.start | date.add part.airOffset }}'
+  runtime: 120
+
+  search:
+    queries:
+      - 'SVNS {{ event.title }} {{ vars.seasonYear }}'
+      - 'Sevens {{ event.title }} {{ vars.seasonYear }}'
+    must:
+      - '\b(svns|sevens|7s)\b'
+      - '\b{{ event.title | regex.escape }}\b'
+    mustNot: ['\bwomen''?s?\b']
+    dateWindow: { before: 6h, after: 60d }
+    parts:
+      cup-qf:    { must: ['\bquarter ?finals?\b|\bqf\b'] }
+      cup-sf:    { must: ['\bsemi ?finals?\b|\bsf\b'] }
+      cup-final: { must: ['\bfinal\b'], mustNot: ['\b(quarter|semi) ?finals?\b', '\bbronze\b'] }
+    pack:
+      must: ['\b(day ?3|finals ?day|full ?day)\b']
+      covers: all-parts

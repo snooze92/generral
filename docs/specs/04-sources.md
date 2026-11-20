@@ -1,0 +1,159 @@
+# 04 – Sources
+
+A **Source** fetches data from somewhere and turns it into a list of **Events** (see
+[03](03-domain-model.md#event)). Sources know nothing about series or episodes; that is what
+mapping does.
+
+## Source type plugins
+
+Each type is a plugin with a settings schema (rendered as a Sonarr-style provider form, the same
+`fields[]` mechanism used for indexers/download clients), a `Test` action, and a `Fetch` action that
+returns events.
+
+| Type | MVP | Purpose |
+|------|-----|---------|
+| `thesportsdb` | MVP | Built-in client for TheSportsDB (league → seasons → events). Handles API key, v1/v2, rate limit, image URLs. |
+| `http-json` | MVP | Any JSON (or XML-as-JSON) HTTP API. JSONPath to select items, field extractors per item. Optional pagination. |
+| `http-html` | MVP | Scrape an HTML page (e.g. a Wikipedia table). CSS selectors + Cardigann-style filters. |
+| `ical` | MVP | ICS/webcal feed. `VEVENT` → event (`UID` key, `SUMMARY` title, `DTSTART`/`DTEND`, `LOCATION`, `DESCRIPTION`, `CATEGORIES`). |
+| `rss` | Later | RSS/Atom items → events. |
+| `static` | MVP | Events typed/pasted by the user (YAML/CSV) in the UI. For one-off tournaments or fixing a source's gaps. |
+| `script` | Later | Run an executable in the container that prints events JSON to stdout. Escape hatch. Off unless `GENERRAL__ALLOWSCRIPTSOURCES=true`. |
+| `generral-preset-feed` | Later | Subscribe to a shared URL serving a static events list maintained by the community. |
+
+All types share common settings:
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `refreshInterval` | `12h` | Minimum `15m`. |
+| `requestDelay` | type default (`thesportsdb`: 2 s, others 1 s) | Between HTTP requests within one fetch. |
+| `headers` | `{}` | Extra headers (e.g. auth). Values may reference secrets: `{{ secret.MY_TOKEN }}`. |
+| `cookies` | none | Optional raw cookie string. |
+| `flaresolverr` | off | Optional: route requests via a FlareSolverr instance (Prowlarr-style proxy tag). |
+| `timezone` | `UTC` | Applied to date strings that lack an offset. |
+| `keepGoneEvents` | `true` | Events missing from a refresh are kept and marked `gone`, not deleted. |
+
+## Extraction model (shared by `http-json`, `http-html`, `rss`, `static`)
+
+A fetch has three steps:
+
+1. **Requests**: one or more URLs. URLs are templates and can loop over variables
+   (e.g. years). Optional pagination.
+2. **Items**: select the repeated element (JSONPath for JSON, CSS selector for HTML).
+3. **Fields**: for each item, extract named fields, each with an optional filter pipeline.
+
+```yaml
+# http-json example: generic JSON API
+type: http-json
+requests:
+  - url: "https://api.example.org/events?league=ufc&year={{ year }}"
+    foreach:
+      year: "{{ (date.now.year - 1)..(date.now.year + 1) }}"   # 3 requests
+    pagination:                       # optional
+      next: "$.links.next"            # JSONPath to next URL, or:
+      # page_param: page, start: 1, until_empty: true
+items: "$.data[*]"
+fields:
+  key:    { path: "$.id" }
+  title:  { path: "$.name" }
+  start:  { path: "$.starts_at", filters: [ { name: dateparse, args: "o" } ] }
+  venue:  { path: "$.venue.name" }
+  number: { path: "$.name", filters: [ { name: regexp, args: "^UFC (\\d+)" } ] }
+  poster: { path: "$.images.poster" }
+```
+
+```yaml
+# http-html example: Wikipedia "List of UFC events" scheduled-events table
+type: http-html
+requests:
+  - url: "https://en.wikipedia.org/wiki/List_of_UFC_events"
+items: "table#Scheduled_events tbody tr:has(td)"
+fields:
+  title:  { selector: "td:nth-child(1)" }
+  date:   { selector: "td:nth-child(2)" }
+  venue:  { selector: "td:nth-child(3)" }
+  key:    { text: "{{ title | string.slugify }}" }        # no natural id: derive one
+  start:  { text: "{{ date }}", filters: [ { name: dateparse, args: "MMM d, yyyy" } ] }
+  number: { text: "{{ title }}", filters: [ { name: regexp, args: "^UFC (\\d+)" } ], optional: true }
+```
+
+### Field extractor
+
+| Property | Meaning |
+|----------|---------|
+| `path` | JSONPath (JSON sources). |
+| `selector` | CSS selector relative to the item (HTML). Comma-separated alternatives take the first match. `xpath:` prefix for an XPath expression instead (e.g. `xpath:preceding::h3[1]` to read the section heading above a match box). `attribute: href` reads an attribute instead of text. `remove: "sup, .reference"` strips sub-elements first (useful on Wikipedia). |
+| `text` | A Scriban template over the fields extracted *so far* (fields are evaluated in order). |
+| `filters` | Pipeline, applied in order. |
+| `optional` | Missing value → null instead of an item error. |
+| `default` | Value used if missing. |
+
+### Filters
+
+Same names and semantics as Prowlarr Cardigann where they exist:
+`replace`, `re_replace`, `regexp` (first capture group), `split`, `trim`, `prepend`, `append`,
+`tolower`, `toupper`, `urldecode`, `urlencode`, `htmldecode`, `dateparse` (.NET/Go layout),
+`timeago`/`fuzzytime`, `querystring`, `validate`, `diacritics`, `jsonjoinarray`, plus Generral
+additions `toint`, `tofloat`, `slugify`, `timezone` (re-interpret a local date in an IANA tz).
+
+### Reserved fields
+
+After extraction, these fields fill the event's core attributes. Everything else stays in
+`event.fields`.
+
+| Field | Required | Maps to |
+|-------|----------|---------|
+| `key` | **yes** | `Event.key`. Items with no key are rejected (shown as errors in preview). |
+| `title` | **yes** | `Event.title` |
+| `start`, `end` | no | `Event.start/end` (UTC after timezone handling) |
+| `status` | no | `Event.status` (values normalised: `cancelled`/`canceled`, `postponed`, `ft`/`finished` → `completed`, …) |
+| `poster`, `fanart`, `thumb`, `banner`, `logo` | no | `Event.images` |
+
+## `thesportsdb` source
+
+Purpose-built because it covers a lot of sport and its free tier has awkward limits.
+
+| Setting | Notes |
+|---------|-------|
+| `apiKey` | Default `123` (free). Premium key enables v2 and larger limits. |
+| `leagueId` | e.g. `4443` (UFC), `4574` (Rugby World Cup). There is a search box in the UI (`search_all_leagues` / v2 `search/league`). |
+| `seasons` | `all`, `current`, or a list (`2024`, `2025`, `2024-2025`). |
+| `includePast`/`includeFuture` | Use `eventspastleague` / `eventsnextleague` to top up the current season between full refreshes. |
+
+Output fields: everything in the TheSportsDB event object (`idEvent`, `strEvent`, `strSeason`,
+`intRound`, `dateEvent`, `strTime`, `strTimestamp`, `strVenue`, `strCity`, `strCountry`,
+`strHomeTeam`, `strAwayTeam`, `strPoster`, `strThumb`, `strFanart`, `strBanner`, `strDescriptionEN`,
+`strStatus`, …), plus reserved fields: `key = idEvent`, `title = strEvent`,
+`start = strTimestamp` (or `dateEvent + strTime`, UTC).
+
+Free-tier caveats (documented in the UI help text): a season schedule returns at most 15 events on
+the free key, which is not enough for a full rugby world cup. The plugin warns when the returned
+count equals the known cap, and suggests premium or combining with another source.
+
+League/series images (`strPoster`, `strFanart`, `strBanner`, `strLogo`, `strBadge`) are available
+to the mapping as `source.meta.*` so a series can take its artwork from the league.
+
+## Fetch semantics
+
+- **Upsert** by `(sourceId, key)`. A changed `hash` sets `lastChanged` and creates an event revision
+  (kept for 30 days) so that the UI can show "title changed from *UFC 322: TBD vs TBD* to
+  *UFC 322: Della Maddalena vs Makhachev*".
+- **Gone** events: not returned by N=3 consecutive successful refreshes → `status = gone` (kept).
+  A failed fetch (non-2xx, parse error, zero items when there were items before) **never** marks
+  events gone. It records `lastError` and raises a health warning after 24 h.
+- **Zero-item guard:** if a refresh returns 0 items but the previous one returned > 0, treat it as a
+  failure (protects against layout changes on scraped pages).
+- **Caching:** conditional GET, plus a raw-response cache (per URL, 1 h) so that editing a mapping
+  and previewing doesn't refetch.
+- **Concurrency:** one fetch per source at a time; global max 4 concurrent source fetches.
+
+## Source editor UI
+
+See also [10 – UI](10-ui.md#sources).
+
+- Form (or "Advanced: YAML") on the left. On the right, a **live preview** with three tabs:
+  *Raw response* (pretty-printed, with selectors/paths highlighted on hover), *Items* (table of
+  extracted fields per item, errors in red), *Events* (normalised core fields).
+- *Test* button = fetch + extract without saving.
+- *Pick* helper for HTML: click an element in a sandboxed render of the page to get a CSS selector
+  (`Later`).

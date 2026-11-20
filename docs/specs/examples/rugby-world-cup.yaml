@@ -1,0 +1,76 @@
+# Preset: Rugby World Cup (UC3) – every match of an edition as one season.
+# Result in Plex:
+#   Rugby World Cup/Season 2023/Rugby World Cup - S2023E48 - Final - New Zealand vs South Africa [HDTV-1080p].mkv
+#
+# Uses a scraped HTML source because TheSportsDB's free tier caps a season at 15 events
+# (a Rugby World Cup has 48 matches). A `thesportsdb` source with a premium key works too.
+schema: generral/preset@1
+id: rugby-world-cup
+name: Rugby World Cup
+requires: { generral: ">=0.1" }
+tags: [sport, rugby]
+
+parameters:
+  - { name: edition, label: Edition year, default: "2027" }
+
+source:
+  name: "Wikipedia – {{ edition }} Rugby World Cup"
+  type: http-html
+  settings:
+    timezone: UTC
+    requests:
+      - url: "https://en.wikipedia.org/wiki/{{ edition }}_Rugby_World_Cup"
+      - url: "https://en.wikipedia.org/wiki/{{ edition }}_Rugby_World_Cup_knockout_stage"
+    # Wikipedia match boxes: <div class="vevent"> with home/away/date/venue cells.
+    items: "div.vevent"
+    fields:
+      date:   { selector: ".fdate, .dtstart", remove: "sup" }
+      time:   { selector: ".ftime", optional: true }
+      home:   { selector: ".fhome", remove: "sup, .flagicon" }
+      away:   { selector: ".faway", remove: "sup, .flagicon" }
+      venue:  { selector: ".fright .location, .fright", optional: true }
+      stage:  { selector: "xpath:preceding::h3[1]", optional: true,
+                filters: [ { name: re_replace, args: ["\\[edit\\]", ""] }, { name: trim } ] }
+      key:    { text: "{{ date | string.slugify }}-{{ home | string.slugify }}-{{ away | string.slugify }}" }
+      title:  { text: "{{ home }} vs {{ away }}" }
+      start:  { text: "{{ date }} {{ time }}", filters: [ { name: dateparse, args: "d MMMM yyyy HH:mm" } ] }
+  refreshInterval: 6h
+
+series:
+  title: Rugby World Cup
+  overview: Every match of the Rugby World Cup.
+  genres: [Sport, Rugby]
+  monitor: all
+  qualityProfile: HD-1080p
+
+mapping:
+  name: "RWC {{ edition }}"
+  filter:
+    - '{{ event.fields.home != "" && event.fields.away != "" }}'
+  vars:
+    stage: '{{ event.fields.stage ?? "Pool" }}'
+    homeCode: '{{ event.fields.home | sport.country_code }}'
+    awayCode: '{{ event.fields.away | sport.country_code }}'
+  season:  { strategy: fixed, value: '{{ edition }}', title: '{{ edition }}' }
+  episode: { strategy: sequential, order: '{{ event.start }}', onInsert: renumber-unlocked }
+  title:    '{{ vars.stage }} - {{ event.fields.home }} vs {{ event.fields.away }}'
+  overview: '{{ vars.stage }}, {{ event.fields.venue }}'   # spoiler-free: no score
+  airDate:  '{{ event.start }}'
+  runtime:  120
+
+  search:
+    categories: [5000, 5060]
+    queryMode: all
+    queries:
+      - 'Rugby World Cup {{ edition }} {{ event.fields.home }} {{ event.fields.away }}'
+      - 'RWC {{ edition }} {{ vars.homeCode }} {{ vars.awayCode }}'
+    must:
+      - '\b(rugby ?world ?cup|rwc)\b'
+      - '\b{{ edition }}\b'
+      # both teams, either by name or code, in any order
+      - '\b({{ event.fields.home | string.normalize_team | regex.escape }}|{{ vars.homeCode }})\b'
+      - '\b({{ event.fields.away | string.normalize_team | regex.escape }}|{{ vars.awayCode }})\b'
+    mustNot:
+      - '\b(highlights?|extended ?highlights|preview|review)\b'
+      - '\bwomen''?s?\b'
+    dateWindow: { before: 3h, after: 120d }

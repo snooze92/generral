@@ -1,0 +1,85 @@
+# Preset: UFC numbered events (UC1), with optional card parts (UC2).
+# Result in Plex:  UFC/Season 2025/UFC - S2025E04 - UFC 314 - Volkanovski vs. Lopes - Main Card [WEBDL-1080p].mkv
+schema: generral/preset@1
+id: ufc-numbered-parts
+name: UFC – Numbered events (with card parts)
+description: >
+  Every numbered UFC event (UFC 300, 301, …) as a year-based season. Each event becomes three
+  episodes (Early Prelims, Prelims, Main Card); only Main Card is monitored by default.
+requires: { generral: ">=0.1" }
+tags: [sport, mma, ufc]
+
+parameters:                         # prompted on import
+  - { name: tsdbKey, label: TheSportsDB API key, default: "123", secret: true }
+  - { name: firstYear, label: First season to include, default: "{{ date.now.year }}" }
+
+source:
+  name: TheSportsDB – UFC
+  type: thesportsdb
+  settings:
+    apiKey: "{{ secret.tsdbKey }}"
+    leagueId: 4443
+    seasons: "{{ firstYear }}..current"
+    includePast: true
+    includeFuture: true
+  refreshInterval: 12h
+
+series:
+  title: UFC
+  overview: Numbered UFC pay-per-view events.
+  network: UFC
+  genres: [Sport, MMA]
+  images:
+    poster: "{{ source.meta.strPoster }}"
+    fanart: "{{ source.meta.strFanart1 }}"
+    banner: "{{ source.meta.strBanner }}"
+    logo:   "{{ source.meta.strLogo }}"
+  monitor: future
+  qualityProfile: HD-1080p
+  seasonFolder: true
+
+mapping:
+  name: UFC numbered events
+  filter:
+    - '{{ event.title | regex.match "^UFC \\d+\\b" }}'
+    - '{{ event.status != "cancelled" }}'
+
+  vars:
+    number:   '{{ (event.title | regex.match "^UFC (\\d+)")[1] | string.to_int }}'
+    headline: '{{ event.title | regex.replace "^UFC \\d+:?\\s*" "" }}'
+
+  parts:
+    - { key: early-prelims, title: Early Prelims, monitored: false, airOffset: -3h, runtime: 90 }
+    - { key: prelims,       title: Prelims,       monitored: false, airOffset: -2h, runtime: 120 }
+    - { key: main-card,     title: Main Card,     monitored: true,                  runtime: 180 }
+
+  season:  { strategy: year }
+  episode: { strategy: sequential, order: '{{ event.start }}', onInsert: renumber-unlocked }
+
+  absolute: '{{ vars.number }}'
+  title:    'UFC {{ vars.number }}{{ if vars.headline != "" }}: {{ vars.headline }}{{ end }} - {{ part.title }}'
+  overview: '{{ [event.fields.strVenue, event.fields.strCity, event.fields.strCountry] | array.compact | array.join ", " }}'
+  airDate:  '{{ event.start | date.add part.airOffset }}'
+  runtime:  '{{ part.runtime }}'
+  images:
+    thumb: '{{ event.images.thumb ?? event.images.poster }}'
+
+  search:
+    categories: [5000, 5060]
+    queries:
+      - 'UFC {{ vars.number }}'
+      - 'UFC{{ vars.number }}'
+    must:
+      - '\bUFC ?{{ vars.number }}\b'
+    mustNot:
+      - '\bfight ?night\b'
+      - '\b(countdown|embedded|weigh ?ins?|press ?conference|ufc ?{{ vars.number }} ?(post|pre))\b'
+    dateWindow: { before: 6h, after: 90d }
+    parts:
+      early-prelims: { must: ['\bearly ?prelims?\b'] }
+      prelims:       { must: ['\bprelims?\b'], mustNot: ['\bearly ?prelims?\b'] }
+      main-card:     { mustNot: ['\bprelims?\b'] }
+    pack:
+      # e.g. "UFC 314 Full Event 1080p" containing prelims + main card files
+      must: ['\bUFC ?{{ vars.number }}\b', '\b(full ?event|complete|all ?cards?)\b']
+      covers: all-parts
