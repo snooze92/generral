@@ -11,48 +11,25 @@
   `/data` (recommended single mount containing both `torrents/` and `media/`, so hardlinks work,
   following the [TRaSH Guides](https://trash-guides.info/File-and-Folder-Structure/) layout).
 - **Healthcheck:** `GET /ping` (unauthenticated, returns `{"status":"OK"}`).
-- **Runs as** `PUID:PGID` via a small entrypoint (`su-exec`/`gosu`), and never as root after start.
+- **Runs as** `PUID:PGID` (default `1000:1000`) via a small entrypoint (`su-exec`), and never as root after start.
 - **Size target:** < 150 MB compressed.
 
-### Dockerfile (outline)
+### Dockerfile
 
-```dockerfile
-# syntax=docker/dockerfile:1.7
+See [`Dockerfile`](../../Dockerfile) and [`docker/entrypoint.sh`](../../docker/entrypoint.sh). Stages:
 
-# --- frontend ---
-FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
-WORKDIR /src/frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
-COPY frontend/ ./
-RUN pnpm build                                   # → /src/frontend/dist
+1. **frontend** (`node:24-alpine`, build platform): `pnpm install --frozen-lockfile && pnpm build`.
+   If the context has no `frontend/`, the image is API-only.
+2. **backend** (`dotnet/sdk:10.0`, build platform): `dotnet publish` framework-dependent with
+   `UseAppHost=false`, so one architecture-neutral build serves every platform and the SDK stage
+   isn't run under emulation.
+3. **runtime** (`dotnet/aspnet:10.0-alpine`): `tzdata icu-libs su-exec`, user `generral` (1000:1000),
+   `/app` (binaries), `/app/UI` (SPA), `LICENSE` + `COPYRIGHT.md`, `HEALTHCHECK` on `/ping`,
+   `CMD ["dotnet", "/app/Generral.Host.dll"]`. `ffmpeg` (ffprobe for MediaInfo) is added when
+   MediaInfo lands (`Later`), to keep the image small until then.
 
-# --- backend ---
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
-ARG TARGETARCH
-WORKDIR /src
-COPY src/ ./src/
-COPY Directory.Build.props global.json ./
-RUN dotnet publish src/Generral.Host/Generral.Host.csproj \
-      -c Release -a $TARGETARCH --self-contained false \
-      -p:Version=${VERSION:-0.0.0} -o /app
-
-# --- runtime ---
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
-RUN apk add --no-cache tzdata icu-libs su-exec sqlite-libs ffmpeg   # ffprobe for MediaInfo (Later)
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    GENERRAL__PORT=8990 \
-    GENERRAL__CONFIGDIR=/config
-COPY --from=backend /app /app
-COPY --from=frontend /src/frontend/dist /app/UI
-COPY presets/ /app/presets/
-COPY docker/entrypoint.sh /entrypoint.sh
-VOLUME ["/config"]
-EXPOSE 8990
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:8990/ping || exit 1
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/app/Generral.Host"]
-```
+The entrypoint re-maps `generral` to `PUID`/`PGID`, applies `UMASK`, `chown`s only Generral's own
+files in `/config` (never `/data`), then `exec su-exec`s the app.
 
 ## Configuration
 
@@ -85,6 +62,8 @@ to the log (Sonarr does the same since v4.0.17). After 5 failed sign-ins from on
 10 minutes, that address is locked out for 5 minutes.
 
 ## Example `docker-compose.yml`
+
+Also in [`docker/docker-compose.example.yml`](../../docker/docker-compose.example.yml).
 
 ```yaml
 services:
@@ -157,5 +136,6 @@ generral/
 | Workflow | Trigger | Steps |
 |----------|---------|-------|
 | `ci.yml` | PR, push to `main` | `dotnet build`, `dotnet format --verify-no-changes`, pending-migration check, `dotnet test` (unit + integration; Testcontainers from M2), `pnpm lint/typecheck/test`, preset fixture tests (M1), `reuse lint` |
-| `docker.yml` | push to `main` (→ `develop`), tag `v*` (→ `X.Y.Z`, `X.Y`, `latest`) | `docker/setup-qemu` + `setup-buildx`, multi-arch `build-push-action` with GHA cache, push to GHCR, SBOM + provenance attestations, Trivy scan |
+| `ci.yml` → `docker` job | PR, push to `main` | amd64-only image build (GHA cache) and a `/ping` + non-root smoke test, so Dockerfile breakage shows up on the PR without paying for multi-arch builds |
+| `docker.yml` | push to `main` (→ `develop`, `sha-<short>`), tag `v*` (→ `X.Y.Z`, `X.Y`, `latest`), manual | `docker/setup-qemu` + `setup-buildx`, multi-arch `build-push-action` with GHA cache, push to GHCR, SBOM + provenance attestations, smoke test, Trivy scan (report only) |
 | `presets.yml` | nightly | Run every shipped preset against the **live** source (not fixtures) and open an issue when one breaks (layout change detection) |
