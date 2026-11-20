@@ -1,0 +1,31 @@
+# Licensing metadata in the REUSE format (https://reuse.software). `reuse lint` runs in CI.
+#
+# Source files carry SPDX headers where practical. This file covers everything else, and the
+# upstream code that is vendored into the repository without per-file headers (see COPYRIGHT.md).
+version = 1
+
+[[annotations]]
+path = [
+  "**/*.md",
+  "**/*.json",
+  "**/*.slnx",
+  "**/*.csproj",
+  "**/*.props",
+  "**/*.yml",
+  "**/*.yaml",
+  ".editorconfig",
+  ".gitignore",
+  ".gitattributes",
+  ".dockerignore",
+  "Dockerfile",
+  "docker/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "The Generral contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = ["src/**/*.cs"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "The Generral contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
