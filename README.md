@@ -27,11 +27,17 @@ identifiable events can be turned into a series.
 ## Development
 
 Requirements: the [.NET SDK](https://dotnet.microsoft.com/download) pinned in `global.json`
-(10.0.x).
+(10.0.x), Node.js 24 and pnpm (`corepack enable`).
 
 ```sh
 dotnet test Generral.slnx                      # unit + integration tests
-dotnet run --project src/Generral.Host         # http://localhost:8990
+dotnet run --project src/Generral.Host         # API + built UI on http://localhost:8990
+
+cd frontend
+pnpm install
+pnpm build                                     # → frontend/dist, served by the backend
+pnpm dev                                       # or: Vite on http://localhost:8991, proxying the API to :8990
+pnpm typecheck && pnpm lint && pnpm test
 ```
 
 `dotnet run` uses `src/Generral.Host/Properties/launchSettings.json`, which keeps runtime data in
@@ -39,7 +45,9 @@ dotnet run --project src/Generral.Host         # http://localhost:8990
 logs the password of the initial `generral` user. Health check: `GET /ping`.
 
 Before pushing, run `dotnet format Generral.slnx` and, if available, `reuse lint`
-([REUSE](https://reuse.software)); CI checks both. After changing entities, add a migration with
+([REUSE](https://reuse.software)); CI checks both. The UI reuses Sonarr's components: see
+[10 – UI § Implementation approach](docs/specs/10-ui.md#implementation-approach) before editing
+anything listed in `frontend/scripts/sonarr-files.txt`. After changing entities, add a migration with
 `dotnet tool restore && dotnet ef migrations add <Name> --project src/Generral.Core --output-dir Datastore/Migrations`.
 
 ## Specs at a glance
