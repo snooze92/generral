@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="Generral" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/Content/manifest.json" crossorigin="use-credentials" />
+    <link rel="stylesheet" type="text/css" href="/Content/Fonts/fonts.css" />
+
+    <script>
+      window.Generral = {
+        urlBase: '__URL_BASE__'.indexOf('__') === 0 ? '' : '__URL_BASE__',
+      };
+
+      (function () {
+        var theme = '__THEME__';
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var resolved = theme === 'dark' || ((theme === 'auto' || theme.indexOf('__') === 0) && dark) ? 'dark' : 'light';
+
+        document.documentElement.dataset.theme = resolved;
+      })();
+    </script>
+
+    <title>__INSTANCE_NAME__</title>
+
+    <style>
+      .root {
+        overflow: hidden;
+        height: 100%;
+      }
+
+      @media only screen and (max-width: 768px) {
+        .root {
+          display: flex;
+          flex-direction: column;
+          overflow: clip;
+          min-height: 100%;
+          height: auto;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="portal-root"></div>
+    <div id="root" class="root"></div>
+    <script type="module" src="/src/index.ts"></script>
+  </body>
+</html>
