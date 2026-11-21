@@ -27,6 +27,7 @@ Series *───1 QualityProfile, *───* Tag, 1───1 RootFolder
 | `refreshInterval` | duration | Default 12 h. |
 | `enabled` | bool | |
 | `lastRefresh`, `lastSuccess`, `lastError` | timestamps / string | Shown in UI and used by health checks. |
+| `meta` | JSON | Source-level data from the last successful fetch (e.g. TheSportsDB league), `source.meta` in mappings. |
 | `tags` | int[] | |
 
 ## Event

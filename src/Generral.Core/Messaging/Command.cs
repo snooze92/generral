@@ -91,9 +91,13 @@ public interface ICommandHandler
     Task<string?> ExecuteAsync(JsonObject body, CommandContext context, CancellationToken cancellationToken);
 }
 
-public sealed class CommandContext(Command command)
+public sealed class CommandContext(Command command, CommandQueue queue)
 {
     public CommandTrigger Trigger => command.Trigger;
+
+    /// <summary>Queues a follow-up command with the same trigger.</summary>
+    /// <exception cref="InvalidCommandException">Unknown name or invalid body.</exception>
+    public CommandSnapshot Enqueue(string name, JsonObject? body = null) => queue.Enqueue(name, body, command.Trigger);
 
     public void Progress(string message) => command.SetMessage(message);
 }

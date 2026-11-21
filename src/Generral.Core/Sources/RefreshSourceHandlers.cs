@@ -1,13 +1,17 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Generral.Core.Datastore;
+using Generral.Core.Mappings;
 using Generral.Core.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Generral.Core.Sources;
 
-/// <summary><c>RefreshSources</c>: every enabled source that is due, or with <c>{ force: true }</c> every enabled source.</summary>
+/// <summary>
+/// <c>RefreshSources</c>: every enabled source that is due, or with <c>{ force: true }</c> every enabled source.
+/// Then queues <c>ApplyMappings</c> for the mappings of the sources that refreshed successfully.
+/// </summary>
 public sealed class RefreshSourcesHandler(SourceRefreshService refresh, IServiceScopeFactory scopes, TimeProvider time) : ICommandHandler
 {
     public const string CommandName = "RefreshSources";
@@ -39,6 +43,7 @@ public sealed class RefreshSourcesHandler(SourceRefreshService refresh, IService
         }));
 
         var done = results.OfType<SourceRefreshResult>().ToList();
+        await ApplyMappingsHandler.EnqueueForSourcesAsync(scopes, context, done.Where(r => r.Success).Select(r => r.SourceId).ToList(), cancellationToken);
         var failed = done.Count(r => !r.Success);
         return failed == 0
             ? $"Refreshed {done.Count} source(s)"
@@ -46,8 +51,8 @@ public sealed class RefreshSourcesHandler(SourceRefreshService refresh, IService
     }
 }
 
-/// <summary><c>RefreshSource { sourceId }</c>: one source, due or not.</summary>
-public sealed class RefreshSourceHandler(SourceRefreshService refresh) : ICommandHandler
+/// <summary><c>RefreshSource { sourceId }</c>: one source, due or not, then <c>ApplyMappings</c> for its mappings.</summary>
+public sealed class RefreshSourceHandler(SourceRefreshService refresh, IServiceScopeFactory scopes) : ICommandHandler
 {
     public const string CommandName = "RefreshSource";
 
@@ -70,6 +75,12 @@ public sealed class RefreshSourceHandler(SourceRefreshService refresh) : IComman
             throw new CommandFailedException(e.Message);
         }
 
-        return result.Success ? result.Summary : throw new CommandFailedException(result.Summary);
+        if (!result.Success)
+        {
+            throw new CommandFailedException(result.Summary);
+        }
+
+        await ApplyMappingsHandler.EnqueueForSourcesAsync(scopes, context, [result.SourceId], cancellationToken);
+        return result.Summary;
     }
 }

@@ -300,6 +300,10 @@ namespace Generral.Core.Datastore.Migrations
                     b.Property<DateTime?>("LastSuccess")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Meta")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT")

@@ -66,6 +66,7 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
             source.HasIndex(s => s.Name).IsUnique();
             source.Property(s => s.Name).UseCollation("NOCASE");
             source.Property(s => s.Settings).HasJsonConversion();
+            source.Property(s => s.Meta).HasJsonConversion();
             source.Property(s => s.Tags).HasJsonConversion();
         });
 

@@ -132,6 +132,7 @@ public sealed class SourceRefreshService(IServiceScopeFactory scopes, SourceType
         source.LastRefresh = now;
         source.LastSuccess = now;
         source.LastError = null;
+        source.Meta = fetched.Meta;
         await db.SaveChangesAsync(cancellationToken);
 
         var cutoff = now - RevisionRetention;

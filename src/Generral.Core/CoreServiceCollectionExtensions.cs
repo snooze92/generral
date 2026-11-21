@@ -2,6 +2,7 @@ using Generral.Core.Authentication;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Lifecycle;
+using Generral.Core.Mappings;
 using Generral.Core.Messaging;
 using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
@@ -37,6 +38,9 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<CommandQueue>();
         services.AddSingleton<ICommandHandler, RefreshSourcesHandler>();
         services.AddSingleton<ICommandHandler, RefreshSourceHandler>();
+        services.AddSingleton<MappingEngine>();
+        services.AddSingleton<ApplyMappingsService>();
+        services.AddSingleton<ICommandHandler, ApplyMappingsHandler>();
         services.AddHostedService<CommandWorker>();
         services.AddHostedService<ScheduledTaskService>();
 
