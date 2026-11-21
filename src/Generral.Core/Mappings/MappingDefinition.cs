@@ -61,7 +61,10 @@ public enum EpisodeStrategy
     Sequential,
     Field,
 
-    /// <summary>No episode number (stored as 0); the series becomes daily and episodes are identified by air date.</summary>
+    /// <summary>
+    /// The series becomes daily: files and Plex use the air date. Episodes still get an internal number, assigned like
+    /// <see cref="Sequential"/>, because <c>(season, episode)</c> is unique.
+    /// </summary>
     Date,
 }
 
