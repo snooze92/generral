@@ -58,7 +58,18 @@ public static class ExtractionDefinitionParser
             _ => throw Error("requests", "at least one request is required"),
         };
 
-        var fields = AsObject(root["fields"] ?? throw Error("fields", "is required"), "fields")
+        return new ExtractionDefinition
+        {
+            Requests = requests,
+            Items = RequiredString(root, "items", "items"),
+            Fields = FieldsFromJson(root["fields"] ?? throw Error("fields", "is required")),
+        };
+    }
+
+    /// <summary>Reads the <c>fields</c> mapping (field name → extractor) on its own.</summary>
+    public static IReadOnlyList<FieldDefinition> FieldsFromJson(JsonNode? node)
+    {
+        var fields = AsObject(node, "fields")
             .Select(f => ParseField(f.Key, f.Value))
             .ToList();
         if (fields.Count == 0)
@@ -66,12 +77,7 @@ public static class ExtractionDefinitionParser
             throw Error("fields", "at least one field is required");
         }
 
-        return new ExtractionDefinition
-        {
-            Requests = requests,
-            Items = RequiredString(root, "items", "items"),
-            Fields = fields,
-        };
+        return fields;
     }
 
     private static RequestDefinition ParseRequest(JsonNode? node, string location)

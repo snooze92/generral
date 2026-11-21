@@ -25,8 +25,9 @@ public sealed record ExtractedEvent
 }
 
 /// <param name="Index">Position of the item across all fetched documents.</param>
+/// <param name="Url">The document the item came from, if any.</param>
 /// <param name="Event">Null when the item has errors.</param>
-public sealed record ExtractedItem(int Index, Uri Url, JsonObject Fields, ExtractedEvent? Event, IReadOnlyList<string> Errors);
+public sealed record ExtractedItem(int Index, Uri? Url, JsonObject Fields, ExtractedEvent? Event, IReadOnlyList<string> Errors);
 
 public sealed record ExtractionResult(IReadOnlyList<ExtractedItem> Items, IReadOnlyList<Uri> Urls, IReadOnlyList<string> Warnings)
 {

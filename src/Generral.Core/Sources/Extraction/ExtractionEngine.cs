@@ -74,6 +74,15 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         return new ExtractionResult(run.Items, run.Urls, run.Warnings);
     }
 
+    /// <summary>Extracts the items of an in-memory document (no requests, no pagination).</summary>
+    /// <param name="url">Relative image URLs are resolved against it; null when the document has no URL.</param>
+    public ExtractionResult Extract(CompiledExtraction extraction, JsonNode? document, Uri? url = null, ExtractionOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var run = new Run(options ?? new ExtractionOptions());
+        AddItems(extraction, SelectItems(extraction.Items, document), url, new Dictionary<string, object?>(), run, cancellationToken);
+        return new ExtractionResult(run.Items, run.Urls, run.Warnings);
+    }
+
     private async Task FetchPagesAsync(CompiledExtraction extraction, CompiledRequest request, Uri firstUrl, IReadOnlyDictionary<string, object?> vars, IDocumentFetcher fetcher, Run run, CancellationToken cancellationToken)
     {
         var pagination = request.Definition.Pagination;
@@ -98,18 +107,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             var document = await fetcher.FetchAsync(url, cancellationToken);
             var root = ParseDocument(document);
             var items = SelectItems(extraction.Items, root);
-            foreach (var item in items)
-            {
-                if (run.Items.Count >= run.Options.MaxItems)
-                {
-                    run.Warnings.Add($"Stopped at {run.Options.MaxItems} items");
-                    return;
-                }
-
-                run.Items.Add(ExtractItem(extraction, item, run.Items.Count, document.Url, vars, run, cancellationToken));
-            }
-
-            if (pagination is null)
+            if (!AddItems(extraction, items, document.Url, vars, run, cancellationToken) || pagination is null)
             {
                 return;
             }
@@ -143,7 +141,23 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         }
     }
 
-    private ExtractedItem ExtractItem(CompiledExtraction extraction, JsonNode? item, int index, Uri url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
+    private bool AddItems(CompiledExtraction extraction, List<JsonNode?> items, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
+    {
+        foreach (var item in items)
+        {
+            if (run.Items.Count >= run.Options.MaxItems)
+            {
+                run.Warnings.Add($"Stopped at {run.Options.MaxItems} items");
+                return false;
+            }
+
+            run.Items.Add(ExtractItem(extraction, item, run.Items.Count, url, vars, run, cancellationToken));
+        }
+
+        return true;
+    }
+
+    private ExtractedItem ExtractItem(CompiledExtraction extraction, JsonNode? item, int index, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
     {
         var values = new Dictionary<string, object?>();
         var fields = new JsonObject();
@@ -203,12 +217,12 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         return new ExtractedItem(index, url, fields, extracted, errors);
     }
 
-    private static object? RenderText(CompiledTemplate template, Dictionary<string, object?> values, IReadOnlyDictionary<string, object?> vars, Uri url, CancellationToken cancellationToken)
+    private static object? RenderText(CompiledTemplate template, Dictionary<string, object?> values, IReadOnlyDictionary<string, object?> vars, Uri? url, CancellationToken cancellationToken)
     {
         var model = new Dictionary<string, object?>
         {
             ["vars"] = vars,
-            ["request"] = new Dictionary<string, object?> { ["url"] = url.AbsoluteUri },
+            ["request"] = new Dictionary<string, object?> { ["url"] = url?.AbsoluteUri },
         };
         foreach (var (name, value) in values)
         {
