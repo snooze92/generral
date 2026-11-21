@@ -116,14 +116,12 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
         {
             mapping.HasOne(m => m.Series).WithMany().HasForeignKey(m => m.SeriesId).OnDelete(DeleteBehavior.Cascade);
             mapping.HasOne(m => m.Source).WithMany().HasForeignKey(m => m.SourceId).OnDelete(DeleteBehavior.Restrict);
-            mapping.Property(m => m.Definition).HasJsonConversion();
         });
 
         modelBuilder.Entity<MappingVersion>(version =>
         {
             version.HasIndex(v => new { v.MappingId, v.Version }).IsUnique();
             version.HasOne(v => v.Mapping).WithMany().HasForeignKey(v => v.MappingId).OnDelete(DeleteBehavior.Cascade);
-            version.Property(v => v.Definition).HasJsonConversion();
         });
 
         modelBuilder.Entity<EpisodeLink>(link =>

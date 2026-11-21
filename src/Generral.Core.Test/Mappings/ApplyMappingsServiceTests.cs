@@ -59,7 +59,7 @@ public class ApplyMappingsServiceTests
         db.Database.Migrate();
         var source = new Source { Name = "Fake", Type = "static", Meta = new JsonObject { ["league"] = "UFC" } };
         var series = new Series { Title = "UFC", SortTitle = "ufc", CleanTitle = "ufc", TitleSlug = "ufc", Path = "/tv/UFC", RootFolderPath = "/tv" };
-        var mapping = new Mapping { Name = "UFC", Series = series, Source = source, Definition = (JsonObject)YamlJsonDefinition() };
+        var mapping = new Mapping { Name = "UFC", Series = series, Source = source, Definition = Definition };
         db.Mappings.Add(mapping);
         db.Events.AddRange(Ev(source, "402", Utc(2026, 6, 1)), Ev(source, "401", Utc(2026, 5, 1)), Ev(source, "399", Utc(2025, 12, 1)));
         db.SaveChanges();
@@ -83,8 +83,7 @@ public class ApplyMappingsServiceTests
             db.Events.Add(Ev(db.Sources.Single(), "400", Utc(2026, 4, 1)));
             db.Events.Single(e => e.Key == "399").Status = EventStatus.Cancelled;
             var mapping = db.Mappings.Single();
-            mapping.Definition = (JsonObject)mapping.Definition.DeepClone();
-            mapping.Definition["overview"] = "Live";
+            mapping.Definition += "\noverview: Live";
             db.SaveChanges();
         }
 
@@ -112,7 +111,7 @@ public class ApplyMappingsServiceTests
             Assert.That(check.Episodes.Single(e => e.EpisodeNumber == 3).SearchTerms.ToJsonString(), Is.EqualTo("""{"queries":["402"]}"""));
             Assert.That(check.Seasons.OrderBy(s => s.SeasonNumber).Select(s => $"{s.SeasonNumber} {s.Title}"), Is.EqualTo(new[] { "2025 Year 2025", "2026 Year 2026" }));
             Assert.That(check.Mappings.Single().Version, Is.EqualTo(2));
-            Assert.That(check.MappingVersions.OrderBy(v => v.Version).Select(v => v.Definition.ContainsKey("overview")), Is.EqualTo(new[] { false, true }));
+            Assert.That(check.MappingVersions.OrderBy(v => v.Version).Select(v => v.Definition.Contains("overview", StringComparison.Ordinal)), Is.EqualTo(new[] { false, true }));
         });
     }
 
@@ -143,8 +142,6 @@ public class ApplyMappingsServiceTests
             Assert.That(commands[0].Message, Does.StartWith("UFC: 4 added"), "the 3 seeded events are not gone yet");
         });
     }
-
-    private static JsonNode YamlJsonDefinition() => YamlJson.Parse(Definition)!;
 
     private GenerralDbContext Db() => _services.CreateScope().ServiceProvider.GetRequiredService<GenerralDbContext>();
 

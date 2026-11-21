@@ -215,13 +215,13 @@ public class CatalogueModelTests
     [Test]
     public void Mapping_and_versions_round_trip()
     {
+        const string definition = "season: { strategy: year }";
         using (var db = NewContext())
         {
-            var definition = new JsonObject { ["season"] = new JsonObject { ["strategy"] = "year" } };
             var mapping = new Mapping { Name = "UFC", Series = NewSeries(), Source = NewSource(), Priority = 1, Definition = definition, Version = 2 };
             db.Mappings.Add(mapping);
-            db.MappingVersions.Add(new MappingVersion { Mapping = mapping, Version = 1, Definition = new JsonObject() });
-            db.MappingVersions.Add(new MappingVersion { Mapping = mapping, Version = 2, Definition = definition.DeepClone().AsObject() });
+            db.MappingVersions.Add(new MappingVersion { Mapping = mapping, Version = 1, Definition = "" });
+            db.MappingVersions.Add(new MappingVersion { Mapping = mapping, Version = 2, Definition = definition });
             db.SaveChanges();
         }
 
@@ -232,11 +232,11 @@ public class CatalogueModelTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(mapping.Definition["season"]!["strategy"]!.GetValue<string>(), Is.EqualTo("year"));
+                Assert.That(mapping.Definition, Is.EqualTo(definition));
                 Assert.That(mapping.Priority, Is.EqualTo(1));
                 Assert.That(mapping.Version, Is.EqualTo(2));
                 Assert.That(versions.Select(v => v.Version), Is.EqualTo(new[] { 1, 2 }));
-                Assert.That(versions[1].Definition.ToJsonString(), Is.EqualTo(mapping.Definition.ToJsonString()));
+                Assert.That(versions[1].Definition, Is.EqualTo(definition));
             });
 
             db.MappingVersions.Add(new MappingVersion { MappingId = mapping.Id, Version = 2 });

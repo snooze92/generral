@@ -285,7 +285,7 @@ public class SeriesApiTests
         var source = new Source { Name = "Cup source", Type = "static" };
         var events = new[] { "semi", "final", "gone" }.Select(k => new Event { Source = source, Key = k, Title = k, Hash = k }).ToArray();
         var mapping = new Mapping { Name = "Cup", SeriesId = seriesId, Source = source };
-        db.MappingVersions.Add(new MappingVersion { Mapping = mapping, Version = 1, Definition = [] });
+        db.MappingVersions.Add(new MappingVersion { Mapping = mapping, Version = 1 });
         var episodes = new[]
         {
             new Episode
