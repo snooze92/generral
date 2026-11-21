@@ -59,6 +59,34 @@ Source, event and command resources (M1a):
   also works for a tag in use: it removes the id from every source and series in one transaction.
   `source.tags` must reference existing tags (400 on `tags` otherwise).
 
+Series and episode resources (M1b):
+
+- `series`: Sonarr's SeriesResource without metadata-provider ids: `{ id, title, sortTitle,
+  cleanTitle, titleSlug, status, ended, overview, network, year (0 = none), genres, images[],
+  seasons[], path, rootFolderPath, qualityProfileId, seasonFolder, monitored, monitorNewItems,
+  seriesType, tags, added, nextAiring, previousAiring, statistics, guid, searchSettings }`.
+  `sortTitle`/`cleanTitle` are derived from the title (Sonarr's rules); `titleSlug` is generated
+  (unique, `-2` suffix) when empty and kept on rename. `POST` needs `path` or `rootFolderPath` (the
+  path then is root + series folder name, spec 08). `images[]` are Sonarr's `{ coverType, url,
+  remoteUrl }` (`poster`, `banner`, `fanart`, `screenshot` = thumb, `clearlogo`); `images` and
+  `searchSettings` omitted on `PUT` keep the stored values. `seasons[]` is `{ seasonNumber, title,
+  monitored, statistics, images }`; `POST` creates them, `PUT` only applies `monitored` to existing
+  seasons and, like Sonarr, sets it on all of that season's episodes. `statistics` follow Sonarr's
+  counting (`episodeCount` = monitored aired episodes + those with a file; `seasonCount` excludes
+  specials); orphaned episodes without a file are not counted. Validation (400): title required and
+  unique case-insensitively, slug format/unique, absolute path unique, root folder absolute,
+  distinct non-negative season numbers, existing tags. `DELETE` → 204; seasons, episodes, mappings
+  (and versions) and links cascade. Root folders and quality profiles are not validated yet.
+- `episode`: Sonarr's EpisodeResource (`seriesId, episodeFileId, seasonNumber, episodeNumber,
+  absoluteEpisodeNumber, title, airDate, airDateUtc, lastSearchTime, runtime, overview, hasFile,
+  monitored, unverifiedSceneNumbering: false, grabbed: false, images`) plus `numberLocked`,
+  `source` (`mapping`/`manual`), `status` (`active`/`orphaned`) and `links[] { mappingId, eventId,
+  partKey }`. `GET /episode` needs `seriesId` (optionally `seasonNumber`) or `episodeIds`, else 400;
+  orphaned episodes without a file are hidden unless `includeOrphaned=true`. `PUT /episode/{id}`
+  reads `monitored` only; `PUT /episode/monitor { episodeIds[], monitored }` returns the episodes
+  (unknown ids ignored, empty list → 400); `PUT /episode/{id}/lock { numberLocked }` locks or
+  unlocks the number.
+
 SignalR hub `/signalr/messages` broadcasts `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
 for `series`, `episode`, `episodefile`, `queue`, `command`, `health`, `source`, `event`,
 `mapping` (Sonarr's message format).
