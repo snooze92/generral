@@ -8,6 +8,7 @@ public class CleanseLogMessageTests
     [TestCase("https://tracker.example/announce/0123456789abcdef0123", "announce/(removed)")]
     [TestCase("POST login password=hunter2&user=me", "password=(removed)")]
     [TestCase("Header X-Api-Key: 0123456789abcdef0123456789abcdef", "X-Api-Key: (removed)")]
+    [TestCase("GET https://www.thesportsdb.com/api/v1/json/s3cr3tkey/eventsseason.php?id=1", "json/(removed)/eventsseason")]
     [TestCase("Config at /home/julien/.config/Generral", "/home/(removed)/")]
     [TestCase("https://discord.com/api/webhooks/123/secret-token", "webhooks/(removed)/(removed)")]
     public void Secrets_are_removed(string message, string expected)

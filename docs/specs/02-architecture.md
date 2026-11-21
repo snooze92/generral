@@ -118,5 +118,9 @@ in the UI's activity spinner. Scheduled tasks enqueue commands.
 - **Security:** auth required by default (Forms), with an optional "disabled for local addresses"
   setting. API key for programmatic access. Scriban templates run sandboxed (no I/O, CPU/time/loop
   limits). SSRF note: sources may fetch arbitrary URLs. This is by design for a self-hosted admin
-  tool, but fetching link-local/metadata IPs (169.254.0.0/16) is blocked by default.
+  tool, but fetching link-local/metadata IPs (169.254.0.0/16, fe80::/10) is blocked by default:
+  literal IPs are rejected before the request, and host names are resolved in the `Source` client's
+  connect callback, which only connects to allowed addresses (so DNS rebinding and redirects are
+  covered too). The `Source` client has a 30 s timeout, follows up to 5 redirects and buffers at
+  most 10 MiB.
 - **Backups:** zip of DB + `config.yaml` to `/config/Backups`, scheduled and manual, restore from UI.

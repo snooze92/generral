@@ -29,6 +29,8 @@ public sealed partial class GenerralTestHost : IAsyncDisposable
 
     public string UiFolder { get; }
 
+    public IServiceProvider Services => _app.Services;
+
     public string ApiKey => _app.Services.GetRequiredService<IHostConfigProvider>().Current.ApiKey;
 
     public static async Task<GenerralTestHost> StartAsync(Dictionary<string, string?>? settings = null, IPAddress? remoteAddress = null)

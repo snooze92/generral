@@ -2,8 +2,13 @@ using Generral.Core.Authentication;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Lifecycle;
+using Generral.Core.Sources.Extraction;
+using Generral.Core.Sources.Http;
+using Generral.Core.Sources.Types;
+using Generral.Core.Templating;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Generral.Core;
 
@@ -21,6 +26,28 @@ public static class CoreServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<InitialUserService>();
         services.AddScoped<IUiSettingsService, UiSettingsService>();
+
+        services.AddSourceTypes();
+
+        return services;
+    }
+
+    public static IServiceCollection AddSourceTypes(this IServiceCollection services)
+    {
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<TemplateRenderer>(_ => new TemplateRenderer());
+        services.TryAddSingleton(sp => new ExtractionEngine(sp.GetRequiredService<TemplateRenderer>(), sp.GetRequiredService<TimeProvider>()));
+
+        services.AddHttpClient(SourceFetcherFactory.ClientName, SourceFetcherFactory.ConfigureClient)
+            .ConfigurePrimaryHttpMessageHandler(SourceFetcherFactory.CreateHandler);
+        services.AddSingleton<SourceResponseCache>();
+        services.AddSingleton<SourceFetcherFactory>();
+
+        services.AddSingleton<ISourceType, TheSportsDbSourceType>();
+        services.AddSingleton<ISourceType, HttpJsonSourceType>();
+        services.AddSingleton<ISourceType, IcalSourceType>();
+        services.AddSingleton<ISourceType, StaticSourceType>();
+        services.AddSingleton<SourceTypeRegistry>();
 
         return services;
     }

@@ -1,0 +1,12 @@
+{"events": [
+  {"idEvent": "2001", "strEvent": "UFC 330: Alpha vs Beta", "strSeason": "2026", "intRound": "330",
+   "dateEvent": "2026-04-11", "strTime": "22:00:00", "strTimestamp": "2026-04-11T22:00:00",
+   "strVenue": "T-Mobile Arena", "strCity": "Las Vegas", "strCountry": "United States",
+   "strPoster": "https://r2.thesportsdb.com/images/media/event/poster/330.jpg",
+   "strThumb": "https://r2.thesportsdb.com/images/media/event/thumb/330.jpg",
+   "strFanart": null, "strBanner": "", "strStatus": "Match Finished"},
+  {"idEvent": "2002", "strEvent": "UFC Fight Night: Gamma vs Delta", "strSeason": "2026",
+   "dateEvent": "2026-04-18", "strTime": "19:30:00", "strTimestamp": null, "strStatus": "Not Started"},
+  {"idEvent": "2003", "strEvent": "UFC 331", "strSeason": "2026", "dateEvent": "2026-05-02", "strTime": null, "strTimestamp": ""},
+  {"idEvent": "", "strEvent": "Broken", "strSeason": "2026"}
+]}

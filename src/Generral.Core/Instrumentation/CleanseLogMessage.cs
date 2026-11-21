@@ -27,6 +27,7 @@ public static class CleanseLogMessage
         new(@"(getnzb|rss)(?:(?!getnzb|rss).)*?(?<=\?|&)(r)=(?<secret>[^&=]+?)(?= |&|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout),
         new(@"\b(\w*)?(_?(?<!use|get_)token|username|passwo?rd)=(?<secret>[^&=]+?)(?= |&|$|;)", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout),
         new(@"-hd.me/torrent/[a-z0-9-]\.[0-9]+\.(?<secret>[0-9a-z]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout),
+        new(@"thesportsdb\.com/api/v[0-9]+/json/(?<secret>[^/\s""]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout),
 
         // Trackers Announce Keys; Designed for Qbit Json; should work for all in theory
         new(@"announce(\.php)?(/|%2f|%3fpasskey%3d)(?<secret>[a-z0-9]{16,})|(?:(?<![a-z0-9])|(?<=%2f))(?<secret>[a-z0-9]{16,})(/|%2f)announce", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout),

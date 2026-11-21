@@ -33,6 +33,25 @@ All types share common settings:
 | `timezone` | `UTC` | Applied to date strings that lack an offset. |
 | `keepGoneEvents` | `true` | Events missing from a refresh are kept and marked `gone`, not deleted. |
 
+Implementation notes (M1a):
+
+- A plugin (`ISourceType`) exposes `id`, `fields[]` (Sonarr shape: `name`, `label`, `type`, `value`
+  = default, `helpText`, `advanced`, `selectOptions`), `Validate(settings)` → `{ propertyName,
+  errorMessage }[]`, and `Fetch(settings)` → `{ events, itemErrors, responses, meta, warnings }`.
+  `responses` are summaries for the preview (URL, status, content type, body truncated at 64 KiB,
+  from cache). A failed fetch throws, carrying the responses seen so far.
+- `requestDelay` is a number of seconds or a duration (`500ms`, `2s`), at most 1 min. `headers` is
+  an object or Sonarr's key/value list. Types without requests (`static`) only have `timezone`;
+  `thesportsdb` has no `timezone` (its times are UTC). `refreshInterval` and `keepGoneEvents` live on
+  the source, not in the type settings. `cookies` and `flaresolverr` are not implemented yet.
+- `static`: `format` (`yaml`/`json`/`csv` with a header row), `events` text (≤ 1 MiB), optional
+  `items` (JSONPath; default the root list, or the root object's `events` list) and `fields`
+  (extractors as in `http-json`). Without `fields`, every property is a field as is.
+- `ical`: `url` (`webcal://` is fetched over https). Recurrences are not expanded; an overridden
+  instance (`RECURRENCE-ID`) gets the key `UID/<recurrence-id UTC>`. Floating times and all-day
+  dates use the source timezone. Fields: `uid`, `summary`, `location`, `description`, `categories`,
+  `url`, `status`, `allDay`; `_raw` holds the properties. Meta: `name` (`X-WR-CALNAME`).
+
 ## Extraction model (shared by `http-json`, `http-html`, `rss`, `static`)
 
 A fetch has three steps:
@@ -146,7 +165,7 @@ Purpose-built because it covers a lot of sport and its free tier has awkward lim
 |---------|-------|
 | `apiKey` | Default `123` (free). Premium key enables v2 and larger limits. |
 | `leagueId` | e.g. `4443` (UFC), `4574` (Rugby World Cup). There is a search box in the UI (`search_all_leagues` / v2 `search/league`). |
-| `seasons` | `all`, `current`, or a list (`2024`, `2025`, `2024-2025`). |
+| `seasons` | `all`, `current`, or a list (`2024`, `2025`, `2024-2025`). A range `2023..current` (or `2023..2025`) selects the league's seasons whose first year is in the range. `all` and ranges read `search_all_seasons`. At most 50 seasons. |
 | `includePast`/`includeFuture` | Use `eventspastleague` / `eventsnextleague` to top up the current season between full refreshes. |
 
 Output fields: everything in the TheSportsDB event object (`idEvent`, `strEvent`, `strSeason`,
@@ -162,6 +181,12 @@ count equals the known cap, and suggests premium or combining with another sourc
 League/series images (`strPoster`, `strFanart`, `strBanner`, `strLogo`, `strBadge`) are available
 to the mapping as `source.meta.*` so a series can take its artwork from the league.
 
+v1 endpoints used: `lookupleague.php?id=` (meta; the whole league object, `strFanart` defaulting to
+`strFanart1`), `eventsseason.php?id=&s=`, and `eventspastleague.php` / `eventsnextleague.php`
+(`includePast`/`includeFuture`, default on). Events are de-duplicated by `idEvent`, the season
+schedule winning. Images: `strPoster`, `strFanart`, `strThumb`, `strBanner`. v2 (premium) is not
+implemented yet. The API key is part of the URL path and is redacted from logs.
+
 ## Fetch semantics
 
 - **Upsert** by `(sourceId, key)`. A changed `hash` sets `lastChanged` and creates an event revision
@@ -173,7 +198,9 @@ to the mapping as `source.meta.*` so a series can take its artwork from the leag
 - **Zero-item guard:** if a refresh returns 0 items but the previous one returned > 0, treat it as a
   failure (protects against layout changes on scraped pages).
 - **Caching:** conditional GET, plus a raw-response cache (per URL, 1 h) so that editing a mapping
-  and previewing doesn't refetch.
+  and previewing doesn't refetch. *(M1a: in-memory, keyed by URL + extra headers, 2xx only, at most
+  256 entries; bypassable per fetch, e.g. for scheduled refreshes. Conditional GET is not
+  implemented yet.)*
 - **Concurrency:** one fetch per source at a time; global max 4 concurrent source fetches.
 
 ## Source editor UI

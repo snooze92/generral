@@ -1,0 +1,9 @@
+{"leagues": [{
+  "idLeague": "4443", "strLeague": "UFC", "strSport": "Fighting", "strCurrentSeason": "2026",
+  "strPoster": "https://r2.thesportsdb.com/images/media/league/poster/ufc.jpg",
+  "strFanart": null,
+  "strFanart1": "https://r2.thesportsdb.com/images/media/league/fanart/ufc1.jpg",
+  "strBanner": "https://r2.thesportsdb.com/images/media/league/banner/ufc.jpg",
+  "strBadge": "https://r2.thesportsdb.com/images/media/league/badge/ufc.png",
+  "strLogo": "https://r2.thesportsdb.com/images/media/league/logo/ufc.png"
+}]}
