@@ -5,6 +5,7 @@ import NotFound from 'Components/NotFound';
 import PlaceholderPage, { Milestone } from 'Components/Page/PlaceholderPage';
 import GeneralSettings from 'Settings/General/GeneralSettings';
 import Settings from 'Settings/Settings';
+import TagSettings from 'Settings/Tags/TagSettings';
 import UISettings from 'Settings/UI/UISettings';
 import Sources from 'Sources/Index/Sources';
 import Status from 'System/Status/Status';
@@ -94,7 +95,6 @@ const PLACEHOLDERS: PlaceholderRoute[] = [
     title: () => translate('Metadata'),
     milestone: 'M3',
   },
-  { path: '/settings/tags', scope: () => translate('Settings'), title: () => translate('Tags'), milestone: 'M1' },
   { path: '/system/tasks', scope: () => translate('System'), title: () => translate('Tasks'), milestone: 'M3' },
   {
     path: '/system/backups',
@@ -141,6 +141,8 @@ export function appRouteElements() {
       <Route path="/settings" element={<Settings />} />
 
       <Route path="/settings/general" element={<GeneralSettings />} />
+
+      <Route path="/settings/tags" element={<TagSettings />} />
 
       <Route path="/settings/ui" element={<UISettings />} />
 

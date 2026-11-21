@@ -45,6 +45,20 @@ describe('App', () => {
     expect(screen.getByDisplayValue('admin')).toBeTruthy();
   });
 
+  it('renders Settings → Tags', async () => {
+    mockApi({
+      '/api/v1/tag': [{ id: 1, label: 'sports' }],
+      '/api/v1/tag/detail': [
+        { id: 1, label: 'sports', sourceIds: [], seriesIds: [] },
+      ],
+      '/api/v1/source': [],
+    });
+    renderApp('/settings/tags');
+
+    expect(await screen.findByText('sports')).toBeTruthy();
+    expect(screen.getByLabelText('Add Tag')).toBeTruthy();
+  });
+
   it('renders the not found page for unknown routes', async () => {
     renderApp('/nope');
 
