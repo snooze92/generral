@@ -110,6 +110,13 @@ Mapping resources (M1b):
   episodes, new, changed, unchanged, orphaned, filtered, errors, renumbered }`, and `errors[]` lists
   the row errors as `key: message`. An invalid definition, series or source → 400. The rendered
   path column is not returned yet (naming is not implemented).
+  With `parts`, there is one row per event and part, with `partKey`, `partTitle` and `monitored`;
+  `duplicateOf` names the higher-priority mapping for `change: duplicate` rows (summary
+  `duplicates`).
+- `GET /series/{id}/renumber-preview` → `{ episodes[{ episodeId, mappingId, eventKey, partKey,
+  title, seasonNumber, episodeNumber, newSeasonNumber, newEpisodeNumber }], errors[] }` (404 for an
+  unknown series); nothing is stored. Command `Renumber { seriesId }` applies it (see
+  [05](05-mapping.md#renumber)).
 
 SignalR hub `/signalr/messages` broadcasts `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
 for `series`, `episode`, `episodefile`, `queue`, `command`, `health`, `source`, `event`,
