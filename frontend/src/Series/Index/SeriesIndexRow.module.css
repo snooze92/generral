@@ -1,0 +1,42 @@
+.status {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 70px;
+  white-space: nowrap;
+}
+
+.statusIcon {
+  margin: 0 3px;
+}
+
+.title {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  min-width: 200px;
+}
+
+.titleLink {
+  color: var(--ink);
+  font-weight: 500;
+  text-align: left;
+}
+
+.seriesType,
+.seasonCount {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 100px;
+}
+
+.episodeProgress {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 150px;
+}
+
+.tags {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 240px;
+  max-width: 240px;
+}

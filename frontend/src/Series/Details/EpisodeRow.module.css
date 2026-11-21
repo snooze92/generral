@@ -1,0 +1,62 @@
+.row {
+  composes: row from 'Components/Table/TableRow.module.css';
+}
+
+.orphaned {
+  composes: row;
+
+  opacity: 0.55;
+}
+
+.monitored {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 42px;
+}
+
+.episodeNumber {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 80px;
+  white-space: nowrap;
+}
+
+.number {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.lockButton {
+  composes: button from 'Components/Link/IconButton.module.css';
+
+  margin-left: 4px;
+  color: var(--inkMuted);
+  opacity: 0.4;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.isLocked {
+  color: var(--ink);
+  opacity: 1;
+}
+
+.title {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+}
+
+.airDateUtc {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 180px;
+  white-space: nowrap;
+}
+
+.status {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 100px;
+}

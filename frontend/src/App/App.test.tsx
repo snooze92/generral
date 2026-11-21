@@ -25,7 +25,7 @@ describe('App', () => {
   });
 
   it('renders the shell with the sidebar and header', async () => {
-    renderApp('/series');
+    renderApp('/calendar');
 
     expect(await screen.findByText('Generral')).toBeTruthy();
     expect(

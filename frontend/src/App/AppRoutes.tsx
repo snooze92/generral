@@ -3,6 +3,8 @@ import React from 'react';
 import { Navigate, Route } from 'react-router-dom';
 import NotFound from 'Components/NotFound';
 import PlaceholderPage, { Milestone } from 'Components/Page/PlaceholderPage';
+import SeriesDetailsPage from 'Series/Details/SeriesDetailsPage';
+import SeriesIndex from 'Series/Index/SeriesIndex';
 import GeneralSettings from 'Settings/General/GeneralSettings';
 import Settings from 'Settings/Settings';
 import TagSettings from 'Settings/Tags/TagSettings';
@@ -20,7 +22,6 @@ interface PlaceholderRoute {
 
 // Pages that later milestones will build (docs/specs/13-roadmap.md).
 const PLACEHOLDERS: PlaceholderRoute[] = [
-  { path: '/series', title: () => translate('Series'), milestone: 'M1' },
   { path: '/add/new', scope: () => translate('Series'), title: () => translate('AddNew'), milestone: 'M1' },
   { path: '/calendar', title: () => translate('Calendar'), milestone: 'M1' },
   {
@@ -135,6 +136,10 @@ export function appRouteElements() {
           }
         />
       ))}
+
+      <Route path="/series" element={<SeriesIndex />} />
+
+      <Route path="/series/:titleSlug" element={<SeriesDetailsPage />} />
 
       <Route path="/sources" element={<Sources />} />
 

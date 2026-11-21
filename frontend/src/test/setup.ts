@@ -28,6 +28,15 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 
+// Nor ResizeObserver, which the series tags and path use to detect overflow.
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 // Modals, menus and tooltips render into #portal-root (index.html), looked up when they're imported.
 const portalRoot = document.createElement('div');
 portalRoot.id = 'portal-root';

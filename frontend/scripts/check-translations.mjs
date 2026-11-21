@@ -48,8 +48,9 @@ for (const file of sourceFiles(srcRoot)) {
   const text = readFileSync(file, 'utf8');
 
   for (const call of translateCalls(text)) {
-    // The key argument: string literals before the tokens object (covers `cond ? 'A' : 'B'`).
-    const keyPart = call.split('{')[0];
+    // The key argument: string literals before the tokens object (covers `cond ? 'A' : 'B'`),
+    // minus the ones a condition compares against (`state === 'error' ? 'A' : 'B'`).
+    const keyPart = call.split('{')[0].replace(/[!=]==?\s*'[^']*'/g, '');
 
     for (const [, key] of keyPart.matchAll(/'([A-Za-z][A-Za-z0-9]*)'/g)) {
       if (!used.has(key)) used.set(key, path.relative(srcRoot, file));
