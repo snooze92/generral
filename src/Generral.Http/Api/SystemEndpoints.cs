@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Lifecycle;
@@ -14,6 +15,10 @@ public sealed record SystemStatusResource
     public required string InstanceName { get; init; }
 
     public required string Version { get; init; }
+
+    /// <summary>Only on the Sonarr shim, whose <see cref="Version"/> is a Sonarr-compatible one.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GenerralVersion { get; init; }
 
     public string? Commit { get; init; }
 
@@ -74,7 +79,7 @@ public static class SystemEndpoints
         });
     }
 
-    private static SystemStatusResource GetStatus(
+    internal static SystemStatusResource GetStatus(
         IHostConfigProvider config,
         IAppFolders folders,
         IRuntimeInfo runtime,

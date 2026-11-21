@@ -1,3 +1,4 @@
+using Generral.Core.Indexers;
 using Generral.Core.Mappings;
 using Generral.Core.Sources;
 using Generral.Core.Tags;
@@ -31,6 +32,8 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
     public DbSet<EpisodeLink> EpisodeLinks => Set<EpisodeLink>();
 
     public DbSet<Tag> Tags => Set<Tag>();
+
+    public DbSet<Indexer> Indexers => Set<Indexer>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -68,6 +71,14 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
             source.Property(s => s.Settings).HasJsonConversion();
             source.Property(s => s.Meta).HasJsonConversion();
             source.Property(s => s.Tags).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<Indexer>(indexer =>
+        {
+            indexer.HasIndex(i => i.Name).IsUnique();
+            indexer.Property(i => i.Name).UseCollation("NOCASE");
+            indexer.Property(i => i.Settings).HasJsonConversion();
+            indexer.Property(i => i.Tags).HasJsonConversion();
         });
 
         modelBuilder.Entity<Event>(ev =>
