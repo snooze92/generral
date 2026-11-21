@@ -191,6 +191,7 @@ Components/Scroller/Scroller.module.css
 Components/Scroller/Scroller.tsx
 Components/SectionHeading.module.css
 Components/SectionHeading.tsx
+Components/SeriesTagList.tsx
 Components/SettingsCard/AddCard.tsx
 Components/SettingsCard/SettingsCard.module.css
 Components/SettingsCard/SettingsCard.tsx
@@ -245,6 +246,8 @@ Components/Table/VirtualTableRowButton.module.css
 Components/Table/VirtualTableRowButton.tsx
 Components/Table/VirtualTableSelectAllHeaderCell.module.css
 Components/Table/VirtualTableSelectAllHeaderCell.tsx
+Components/TagList.module.css
+Components/TagList.tsx
 Components/Tooltip/Popover.module.css
 Components/Tooltip/Popover.tsx
 Components/Tooltip/Tooltip.module.css
@@ -292,6 +295,17 @@ Helpers/Props/sortDirections.ts
 Helpers/Props/tooltipPositions.ts
 Helpers/createPersist.ts
 Helpers/scrollPositions.ts
+Series/Details/SeasonInfo.module.css
+Series/Details/SeasonInfo.tsx
+Series/Details/SeriesDetails.module.css
+Series/Details/SeriesDetailsPath.module.css
+Series/Details/SeriesDetailsPath.tsx
+Series/Details/SeriesDetailsSeason.module.css
+Series/Index/SeriesIndexTags.module.css
+Series/Index/SeriesIndexTags.tsx
+Series/Index/Table/SeriesStatusCell.module.css
+Series/NoSeries.module.css
+Series/SeriesMovePending.tsx
 Settings/AdvancedSettingsButton.module.css
 Settings/AdvancedSettingsButton.tsx
 Settings/Settings.module.css
@@ -350,6 +364,7 @@ Utilities/Number/formatUnit.ts
 Utilities/Number/padNumber.ts
 Utilities/Number/roundNumber.ts
 Utilities/Object/isEmpty.ts
+Utilities/Series/getProgressBarKind.ts
 Utilities/String/combinePath.ts
 Utilities/String/enumToTitle.ts
 Utilities/String/isString.ts
