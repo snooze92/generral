@@ -80,8 +80,10 @@ public class MappingDefinitionParserTests
         });
     }
 
-    [TestCase("parts: [{ key: main }]", "mapping: 'parts' is not supported yet")]
-    [TestCase("dedupe: '{{ event.key }}'", "mapping: 'dedupe' is not supported yet")]
+    [TestCase("parts: { from: '{{ event.fields.stages }}' }", "parts: 'from' is not supported yet")]
+    [TestCase("parts: [{ key: a }, { key: a }]", "parts[1].key: 'a' is used twice")]
+    [TestCase("parts: [{ key: 'a b' }]", "parts[0].key: must be letters")]
+    [TestCase("parts: [{ key: a }]\nsearch: { parts: { b: { must: [x] } } }", "search.parts: unknown part 'b'")]
     [TestCase("search: { pack: { must: [x] } }", "search: 'pack' is not supported yet")]
     [TestCase("titel: x", "mapping: unknown property 'titel'")]
     [TestCase("season: { strategy: weekly }", "season.strategy: unknown value 'weekly' (expected year, field, fixed, sequential)")]

@@ -185,7 +185,7 @@ public class MappingApiTests
             Assert.That((string)semi["change"]!, Is.EqualTo("new"));
             Assert.That(semi["errors"]!.AsArray(), Is.Empty);
             Assert.That(fresh["summary"]!.ToJsonString(), Is.EqualTo("""
-                {"events":3,"kept":2,"episodes":2,"new":2,"changed":0,"unchanged":0,"orphaned":0,"filtered":1,"errors":0,"renumbered":0}
+                {"events":3,"kept":2,"episodes":2,"new":2,"changed":0,"unchanged":0,"orphaned":0,"filtered":1,"errors":0,"renumbered":0,"duplicates":0}
                 """.Trim()));
             Assert.That((string)fresh["seasons"]![0]!["seasonNumber"]!.ToString(), Is.EqualTo("2027"));
             Assert.That(fresh["errors"]!.AsArray(), Is.Empty);

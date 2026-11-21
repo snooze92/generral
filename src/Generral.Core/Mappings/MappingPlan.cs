@@ -25,11 +25,25 @@ public sealed record MappingInput
     /// <summary>The links of this mapping.</summary>
     public IReadOnlyList<EpisodeLink> Links { get; init; } = [];
 
+    /// <summary>
+    /// Series → Renumber: unlocked episodes take their ideal number (as with <c>onInsert: renumber-unlocked</c>), whatever
+    /// the mapping's <c>onInsert</c>. Episodes of <c>field</c>-strategy mappings keep their numbers.
+    /// </summary>
+    public bool Renumber { get; init; }
+
+    /// <summary>The <c>dedupe</c> keys the series' other mappings produce.</summary>
+    public IReadOnlyList<DedupeClaim> Claims { get; init; } = [];
+
     public required DateTime Now { get; init; }
 
     /// <summary>Series timezone: gives <c>Episode.AirDate</c> and the year of <see cref="SeasonStrategy.Year"/> seasons.</summary>
     public TimeZoneInfo Timezone { get; init; } = TimeZoneInfo.Local;
 }
+
+/// <summary>An event (part) another mapping of the series keeps, by <c>dedupe</c> key.</summary>
+/// <param name="HigherPriority">The other mapping wins: this mapping skips the event.</param>
+/// <param name="EpisodeId">The episode the other mapping links, if any: a lower-priority one is taken over.</param>
+public sealed record DedupeClaim(string Key, string PartKey, string MappingName, bool HigherPriority, int? EpisodeId);
 
 public enum MappingChange
 {
@@ -48,6 +62,9 @@ public enum MappingChange
 
     /// <summary>The event could not be mapped (see <see cref="MappingPlanRow.Errors"/>); its episode, if any, is left as is.</summary>
     Error,
+
+    /// <summary>A higher-priority mapping of the series keeps an event with the same <c>dedupe</c> key: the event is skipped.</summary>
+    Duplicate,
 }
 
 /// <summary>What the mapping does with one event.</summary>
@@ -55,16 +72,36 @@ public sealed class MappingPlanRow
 {
     private readonly List<string> _errors = [];
 
-    internal MappingPlanRow(Event ev, Episode? existing)
+    internal MappingPlanRow(Event ev, string? partKey, Episode? existing)
     {
         Event = ev;
+        PartKey = partKey;
         EpisodeId = existing?.Id;
+        IsLinked = existing is not null;
     }
 
     public Event Event { get; }
 
-    /// <summary>The episode already linked to the event, if any.</summary>
-    public int? EpisodeId { get; }
+    /// <summary>The part this row is about, or null when the mapping does not expand parts (or the event was not expanded).</summary>
+    public string? PartKey { get; }
+
+    /// <summary>Rendered <c>part.title</c>.</summary>
+    public string? PartTitle { get; internal set; }
+
+    /// <summary>The episode linked to the event (and part), if any; or the episode taken over from another link (see <see cref="IsLinked"/>).</summary>
+    public int? EpisodeId { get; internal set; }
+
+    /// <summary>
+    /// False when <see cref="EpisodeId"/> is taken over from a lower-priority mapping's link with the same <c>dedupe</c> key
+    /// and part: applying moves that link to this mapping.
+    /// </summary>
+    public bool IsLinked { get; internal set; }
+
+    /// <summary>Rendered <c>dedupe</c> key.</summary>
+    public string? DedupeKey { get; internal set; }
+
+    /// <summary>The higher-priority mapping that keeps the same event (<see cref="MappingChange.Duplicate"/>).</summary>
+    public string? DuplicateOf { get; internal set; }
 
     public bool Kept { get; internal set; }
 
@@ -95,12 +132,18 @@ public sealed class MappingPlanRow
 
     public bool NumberLocked { get; internal set; }
 
+    /// <summary>Monitored state for a new episode (the part's <c>monitored</c>); null keeps the default.</summary>
+    public bool? Monitored { get; internal set; }
+
     public IReadOnlyList<string> Errors => _errors;
 
     public MappingChange Change { get; internal set; }
 
     /// <summary>Kept, without errors: the episode is created or updated.</summary>
-    public bool IsApplied => Kept && _errors.Count == 0;
+    public bool IsApplied => Kept && _errors.Count == 0 && DuplicateOf is null;
+
+    /// <summary>The link this row is stored as.</summary>
+    public string LinkPartKey => PartKey ?? EpisodeLink.NoPart;
 
     /// <summary>Copies the planned values to the event's episode (new or existing) and marks it active.</summary>
     public void ApplyTo(Episode episode)
@@ -125,7 +168,17 @@ public sealed class MappingPlanRow
     }
 
     internal void AddError(string error) => _errors.Add(error);
+
+    /// <summary>Event-level outcome (filter, vars) shared by the rows of an event's parts.</summary>
+    internal void CopyStateFrom(MappingPlanRow other)
+    {
+        Kept = other.Kept;
+        RejectedBy = other.RejectedBy;
+        DedupeKey = other.DedupeKey;
+        _errors.AddRange(other._errors);
+    }
 }
 
+/// <param name="Rows">One row per event, or per event and part (including parts that are no longer produced).</param>
 /// <param name="Seasons">Season number → display name (<c>season.title</c>), for every season an applied row uses.</param>
 public sealed record MappingPlan(IReadOnlyList<MappingPlanRow> Rows, SeriesType SeriesType, IReadOnlyDictionary<int, string?> Seasons);

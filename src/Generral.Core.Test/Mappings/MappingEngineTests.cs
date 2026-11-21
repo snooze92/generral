@@ -36,6 +36,7 @@ public class MappingEngineTests
     private readonly List<Event> _events = [];
     private readonly List<Episode> _episodes = [];
     private readonly List<EpisodeLink> _links = [];
+    private readonly List<DedupeClaim> _claims = [];
 
     [Test]
     public void Ufc_events_get_year_seasons_and_sequential_numbers()
@@ -272,6 +273,74 @@ public class MappingEngineTests
         });
     }
 
+    [Test]
+    public void Parts_expand_an_event_into_episodes_with_their_own_dates_monitoring_and_search()
+    {
+        const string parts = """
+            vars: { number: '{{ (event.title | regex.match "^UFC (\\d+)")[1] }}' }
+            parts:
+              - { key: early-prelims, title: Early Prelims, monitored: false, airOffset: -3h, when: '{{ event.fields.early }}' }
+              - { key: prelims, title: Prelims, monitored: false, airOffset: -2h, runtime: 120 }
+              - { key: main-card, title: Main Card, monitored: true }
+            title: 'UFC {{ vars.number }} - {{ part.title }}'
+            airDate: '{{ event.start | date.add part.airOffset }}'
+            runtime: 180
+            search:
+              must: ['\bUFC ?{{ vars.number }}\b']
+              parts:
+                prelims: { must: ['\bprelims?\b'] }
+                main-card: { mustNot: ['\bprelims?\b'] }
+            """;
+        AddEvent("401", "UFC 401", Utc(2026, 5, 2, 22), new JsonObject { ["early"] = true });
+        AddEvent("402", "UFC 402", Utc(2026, 6, 6, 22), new JsonObject { ["early"] = false });
+
+        var plan = Run(parts);
+        var rerun = Run(parts);
+
+        var prelims = _episodes.Single(e => e.Title == "UFC 401 - Prelims");
+        Assert.Multiple(() =>
+        {
+            Assert.That(_episodes.OrderBy(e => e.EpisodeNumber).Select(e => $"E{e.EpisodeNumber} {e.Title} {e.Monitored}"), Is.EqualTo(new[]
+            {
+                "E1 UFC 401 - Early Prelims False",
+                "E2 UFC 401 - Prelims False",
+                "E3 UFC 401 - Main Card True",
+                "E4 UFC 402 - Prelims False",
+                "E5 UFC 402 - Main Card True",
+            }));
+            Assert.That(_links.Select(l => l.PartKey), Has.Member("main-card"));
+            Assert.That(plan.Rows.Where(r => r.Event.Key == "402").Select(r => r.PartKey), Is.EqualTo(new[] { "prelims", "main-card" }), "excluded parts have no row");
+            Assert.That(prelims.AirDateUtc, Is.EqualTo(Utc(2026, 5, 2, 20)));
+            Assert.That(prelims.Runtime, Is.EqualTo(120));
+            Assert.That(_episodes.Single(e => e.Title == "UFC 401 - Main Card").Runtime, Is.EqualTo(180));
+            Assert.That(prelims.SearchTerms.ToJsonString(), Is.EqualTo("""{"must":["\\bUFC ?401\\b","\\bprelims?\\b"]}"""));
+            Assert.That(plan.Rows.First(r => r.Event.Key == "401").PartTitle, Is.EqualTo("Early Prelims"));
+            Assert.That(rerun.Rows.Select(r => r.Change), Is.All.EqualTo(MappingChange.Unchanged));
+        });
+    }
+
+    [Test]
+    public void Dedupe_skips_events_kept_by_a_higher_priority_mapping_and_takes_over_lower_priority_episodes()
+    {
+        AddEvent("a", "UFC 401", Utc(2026, 5, 1));
+        AddEvent("b", "UFC 402", Utc(2026, 6, 1));
+        _episodes.Add(new Episode { Id = 50, SeriesId = _series.Id, SeasonNumber = 2026, EpisodeNumber = 7, Title = "old" });
+        _claims.Add(new DedupeClaim("401", EpisodeLink.NoPart, "Primary", true, null));
+        _claims.Add(new DedupeClaim("402", EpisodeLink.NoPart, "Patch", false, 50));
+
+        var plan = Run("dedupe: '{{ event.title | string.remove \"UFC \" }}'", apply: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Row(plan, "a").Change, Is.EqualTo(MappingChange.Duplicate));
+            Assert.That(Row(plan, "a").DuplicateOf, Is.EqualTo("Primary"));
+            Assert.That(Row(plan, "b").Change, Is.EqualTo(MappingChange.Changed));
+            Assert.That(Row(plan, "b").EpisodeId, Is.EqualTo(50));
+            Assert.That(Row(plan, "b").IsLinked, Is.False);
+            Assert.That(Row(plan, "b").EpisodeNumber, Is.EqualTo(7), "the taken-over episode keeps its number");
+        });
+    }
+
     private MappingPlan Run(string yaml, InsertPolicy onInsert = InsertPolicy.Append, TimeZoneInfo? timezone = null, bool apply = true)
     {
         var definition = MappingDefinitionParser.FromYaml(yaml.Replace("ONINSERT", onInsert == InsertPolicy.Append ? "append" : "renumber-unlocked", StringComparison.Ordinal));
@@ -283,6 +352,7 @@ public class MappingEngineTests
             Events = _events,
             Episodes = _episodes,
             Links = _links,
+            Claims = _claims,
             Now = Now,
             Timezone = timezone ?? TimeZoneInfo.Utc,
         });
@@ -305,9 +375,9 @@ public class MappingEngineTests
             {
                 if (existing is null)
                 {
-                    existing = new Episode { Id = _episodes.Count + 1, SeriesId = _series.Id, Title = "" };
+                    existing = new Episode { Id = _episodes.Count + 1, SeriesId = _series.Id, Title = "", Monitored = row.Monitored ?? true };
                     _episodes.Add(existing);
-                    _links.Add(new EpisodeLink { EventId = row.Event.Id, EpisodeId = existing.Id });
+                    _links.Add(new EpisodeLink { EventId = row.Event.Id, PartKey = row.LinkPartKey, EpisodeId = existing.Id });
                 }
 
                 row.ApplyTo(existing);
