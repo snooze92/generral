@@ -88,6 +88,22 @@ fields:
 | `optional` | Missing value → null instead of an item error. |
 | `default` | Value used if missing. |
 
+Engine details (decided in M1):
+
+- `requests` entries are a URL string or `{ url, foreach, pagination }`. `foreach` variables are
+  templates returning a value, an array or a range; one request per combination (cartesian product).
+- `pagination` sets either `next` (JSONPath to an absolute or relative URL, stops on null or an
+  already-seen URL) or `page_param` (`start`, default 1; `until_empty`, default true). `max_pages`
+  (default 10, max 100) caps the pages per request. One extraction is capped at 50 requests.
+- A `path` that matches several nodes yields a JSON array; one match yields the scalar.
+- `text` templates see the previous fields by name, `vars` (the `foreach` variables) and `request.url`.
+- `filters` entries are `{ name, args }` (args a string or a list) or just the filter name.
+  An unknown filter or invalid arguments is a definition error. A filter failing on a value is an
+  item error (or null for `optional` fields).
+- Unparseable documents, invalid URLs and the request cap fail the whole fetch. Item problems
+  (missing key/title, bad date, duplicate key) are collected per item and do not fail the fetch.
+- Every event keeps the item JSON under `fields._raw` (truncated to 16 KB).
+
 ### Filters
 
 Same names and semantics as Prowlarr Cardigann where they exist:
@@ -95,6 +111,16 @@ Same names and semantics as Prowlarr Cardigann where they exist:
 `tolower`, `toupper`, `urldecode`, `urlencode`, `htmldecode`, `dateparse` (.NET/Go layout),
 `timeago`/`fuzzytime`, `querystring`, `validate`, `diacritics`, `jsonjoinarray`, plus Generral
 additions `toint`, `tofloat`, `slugify`, `timezone` (re-interpret a local date in an IANA tz).
+
+- `dateparse` takes .NET formats (one or a list, tried in order). No args, `o` or `iso` = any ISO /
+  common format. Values with an offset become UTC; values without one stay local and are converted
+  with the source `timezone` (or the `timezone` filter). Go layouts are not supported.
+- `regexp` returns the first capture group (the whole match if there is no group), null if no match.
+- `split` takes `[separator, index]`; a negative index counts from the end.
+- `validate` keeps the comma-separated values that appear in the allowed list (case-insensitive).
+- `jsonjoinarray` takes `[jsonpath, separator]`.
+- `timeago` parses `now`, `today`, `yesterday`, `2 hours ago`, `in 3 days`, …; `fuzzytime` also
+  accepts absolute dates.
 
 ### Reserved fields
 
@@ -107,7 +133,10 @@ After extraction, these fields fill the event's core attributes. Everything else
 | `title` | **yes** | `Event.title` |
 | `start`, `end` | no | `Event.start/end` (UTC after timezone handling) |
 | `status` | no | `Event.status` (values normalised: `cancelled`/`canceled`, `postponed`, `ft`/`finished` → `completed`, …) |
-| `poster`, `fanart`, `thumb`, `banner`, `logo` | no | `Event.images` |
+| `poster`, `fanart`, `thumb`, `banner`, `logo` | no | `Event.images` (relative URLs resolved against the request URL; non-HTTP(S) dropped) |
+
+`start`/`end` accept a parsed date, an ISO-like string or a Unix timestamp (seconds or
+milliseconds). Keys must be unique within a fetch; later duplicates are item errors.
 
 ## `thesportsdb` source
 
