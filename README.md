@@ -20,9 +20,10 @@ identifiable events can be turned into a series.
 
 ## Status
 
-**Early development (M0 – skeleton).** The specs are the source of truth; start reading at
+**Early development, not usable yet.** The specs are the source of truth; start reading at
 [`docs/specs/README.md`](docs/specs/README.md). Progress is tracked against the
-[roadmap](docs/specs/13-roadmap.md).
+[roadmap](docs/specs/13-roadmap.md). Issues and pull requests are closed until the first release;
+see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Running with Docker
 
