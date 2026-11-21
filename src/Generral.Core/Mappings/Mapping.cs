@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Generral.Core.Sources;
 using Generral.Core.Tv;
 
@@ -22,8 +21,11 @@ public class Mapping
     /// <summary>Lower wins when two mappings want the same slot.</summary>
     public int Priority { get; set; }
 
-    /// <summary><c>filter</c>, <c>vars</c>, <c>parts</c>, <c>season</c>, <c>episode</c>, <c>title</c>, …, <c>search</c>.</summary>
-    public JsonObject Definition { get; set; } = [];
+    /// <summary>
+    /// YAML (or JSON) as authored, kept verbatim: <c>filter</c>, <c>vars</c>, <c>season</c>, <c>episode</c>, <c>title</c>, …, <c>search</c>.
+    /// Read with <see cref="MappingDefinitionParser.FromYaml"/>.
+    /// </summary>
+    public string Definition { get; set; } = "";
 
     public bool Enabled { get; set; } = true;
 

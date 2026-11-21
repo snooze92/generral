@@ -17,6 +17,10 @@ public sealed class MappingEngine(TemplateRenderer renderer)
 {
     public const string GoneReason = "event is gone";
 
+    /// <summary>Compiles every template of the definition.</summary>
+    /// <exception cref="MappingDefinitionException">A template has syntax errors.</exception>
+    public void Validate(MappingDefinition definition) => _ = new Templates(renderer, definition);
+
     /// <exception cref="MappingDefinitionException">A template has syntax errors.</exception>
     public MappingPlan Evaluate(MappingInput input, CancellationToken cancellationToken = default)
     {

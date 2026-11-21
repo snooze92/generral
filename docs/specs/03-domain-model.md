@@ -137,7 +137,7 @@ See [05 – Mapping](05-mapping.md) for full semantics.
 | `seriesId` | int | Target series. A series may have several mappings (e.g. two sources feeding one series). |
 | `sourceId` | int | |
 | `priority` | int | When two mappings want the same slot (season+episode), the lower number wins and the loser gets a health warning. |
-| `definition` | YAML/JSON | `filter`, `parts`, `season`, `episode`, `title`, …, `search`. |
+| `definition` | YAML/JSON text | `filter`, `parts`, `season`, `episode`, `title`, …, `search`. Stored verbatim as authored (comments and layout kept), parsed on use. |
 | `enabled` | bool | |
 | `version` | int | Incremented on change. Every version is kept for diff/rollback in **MappingVersion** (`mappingId`, `version`, `definition`, `created`; unique on `(mappingId, version)`). |
 
@@ -146,8 +146,8 @@ its seasons, episodes, mappings and links. Events cascade from their Source.
 
 ### Storage notes
 
-JSON-shaped values (`settings`, `fields`, `images`, `definition`, `tags`, `genres`, `searchSettings`,
-`searchTerms`) are TEXT columns holding camelCase JSON. Enums are stored as their names. All
+JSON-shaped values (`settings`, `fields`, `images`, `tags`, `genres`, `searchSettings`, `searchTerms`)
+are TEXT columns holding camelCase JSON; `Mapping.definition` is TEXT holding the YAML as authored. Enums are stored as their names. All
 timestamps are UTC. `Series.titleSlug` and `Series.guid` are unique; `Source.name` and `Tag.label`
 are unique case-insensitively.
 

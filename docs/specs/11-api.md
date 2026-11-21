@@ -87,6 +87,30 @@ Series and episode resources (M1b):
   (unknown ids ignored, empty list → 400); `PUT /episode/{id}/lock { numberLocked }` locks or
   unlocks the number.
 
+Mapping resources (M1b):
+
+- `mapping`: `{ id, name, seriesId, sourceId, priority, enabled, definition, version }`. `definition`
+  is the YAML (or JSON) text as authored and is returned verbatim. `GET /mapping?seriesId=` filters
+  by series. Validation (400): name required, series and source exist (and cannot change on `PUT`),
+  definition parses and its templates compile (parser/YAML errors, with the line when known, on
+  `definition`). `POST`/`PUT` record a new version when the definition text differs from the last
+  one and, for enabled mappings, queue `ApplyMappings { mappingId }`. `DELETE` → 204; versions and
+  links cascade and the episodes no other mapping links become `orphaned`.
+- `GET /mapping/{id}/versions`: `[{ version, definition, created }]`, newest first.
+  `POST /mapping/{id}/apply` queues `ApplyMappings { mappingId }` and returns the command (201).
+- `POST /mapping/preview { id?, seriesId?, sourceId, definition }` evaluates an unsaved definition
+  against the source's stored events (no fetch) and stores nothing. With `seriesId` the series'
+  episodes count (numbers in use are not reused); with `id` (a saved mapping, same series and
+  source) its links count too, so `change` is what an apply would do. Without either it is a
+  fresh series. Returns `{ rows[], summary, seriesType, seasons[{ seasonNumber, title }], errors[] }`;
+  a row is `{ event { id, key, title, start, status }, kept, rejectedBy, episodeId,
+  currentSeasonNumber, currentEpisodeNumber, seasonNumber, episodeNumber, absoluteEpisodeNumber,
+  title, overview, airDate, airDateUtc, runtime, thumb, searchTerms, numberLocked, renumbered,
+  change (new|changed|unchanged|orphaned|filtered|error), errors[] }`, `summary` is `{ events, kept,
+  episodes, new, changed, unchanged, orphaned, filtered, errors, renumbered }`, and `errors[]` lists
+  the row errors as `key: message`. An invalid definition, series or source → 400. The rendered
+  path column is not returned yet (naming is not implemented).
+
 SignalR hub `/signalr/messages` broadcasts `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
 for `series`, `episode`, `episodefile`, `queue`, `command`, `health`, `source`, `event`,
 `mapping` (Sonarr's message format).

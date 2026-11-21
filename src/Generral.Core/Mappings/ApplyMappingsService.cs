@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.Json.Nodes;
 using Generral.Core.Datastore;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +56,7 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
                       ?? throw new KeyNotFoundException($"Mapping {mappingId} not found");
         var series = mapping.Series!;
 
-        await RecordVersionAsync(db, mapping, cancellationToken);
+        await MappingHistory.RecordAsync(db, mapping, cancellationToken);
 
         MappingPlan plan;
         try
@@ -65,7 +64,7 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
             plan = engine.Evaluate(
                 new MappingInput
                 {
-                    Definition = MappingDefinitionParser.FromJson(mapping.Definition),
+                    Definition = MappingDefinitionParser.FromYaml(mapping.Definition),
                     Series = series,
                     Source = mapping.Source!,
                     SourceMeta = mapping.Source!.Meta,
@@ -157,22 +156,5 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
         }
 
         await db.SaveChangesAsync(cancellationToken);
-    }
-
-    /// <summary>Bumps <see cref="Mapping.Version"/> and keeps a <see cref="MappingVersion"/> whenever the definition differs from the last one kept.</summary>
-    private static async Task RecordVersionAsync(GenerralDbContext db, Mapping mapping, CancellationToken cancellationToken)
-    {
-        var last = await db.MappingVersions.Where(v => v.MappingId == mapping.Id).OrderByDescending(v => v.Version).FirstOrDefaultAsync(cancellationToken);
-        if (last is not null && JsonNode.DeepEquals(last.Definition, mapping.Definition))
-        {
-            return;
-        }
-
-        if (last is not null)
-        {
-            mapping.Version = Math.Max(mapping.Version, last.Version + 1);
-        }
-
-        db.MappingVersions.Add(new MappingVersion { MappingId = mapping.Id, Version = mapping.Version, Definition = (JsonObject)mapping.Definition.DeepClone() });
     }
 }
