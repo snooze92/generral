@@ -10,4 +10,9 @@
     <ProjectReference Include="..\Generral.Http\Generral.Http.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Shipped presets: <app>/presets (docs/specs/05-mapping.md § Presets). -->
+    <Content Include="..\..\presets\*.yaml" LinkBase="presets" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

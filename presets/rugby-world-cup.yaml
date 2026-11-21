@@ -1,0 +1,66 @@
+# Preset: Rugby World Cup (UC3), every match of an edition as one season.
+# Result in Plex:
+#   Rugby World Cup/Season 2027/Rugby World Cup - S2027E52 - Knockout - New Zealand vs South Africa [HDTV-1080p].mkv
+#
+# Uses fixturedownload.com's free JSON feed (all matches, no key). TheSportsDB's free key caps a
+# season at 15 events, a Rugby World Cup has 48 (2027: 52).
+schema: generral/preset@1
+id: rugby-world-cup
+name: Rugby World Cup
+description: >
+  Every match of one Rugby World Cup edition as a season, from fixturedownload.com. Knockout
+  matches show "To be announced" until the teams are known; their numbers don't change.
+requires: { generral: ">=0.1" }
+tags: [sport, rugby]
+
+parameters:
+  - { name: edition, label: Edition year, default: "2027" }
+
+source:
+  name: "fixturedownload – Rugby World Cup {{ edition }}"
+  type: http-json
+  settings:
+    requests:
+      - url: "https://fixturedownload.com/feed/json/rugby-world-cup-{{ edition }}"
+    items: "$[*]"
+    fields:
+      key:   { path: "$.MatchNumber" }
+      home:  { path: "$.HomeTeam" }
+      away:  { path: "$.AwayTeam" }
+      start: { path: "$.DateUtc" }
+      round: { path: "$.RoundNumber", optional: true }
+      pool:  { path: "$.Group", optional: true }
+      venue: { path: "$.Location", optional: true }
+      title: { text: "{{ home }} vs {{ away }}" }
+  refreshInterval: 6h
+
+series:
+  title: Rugby World Cup
+  overview: Every match of the Rugby World Cup.
+  genres: [Sport, Rugby]
+
+mapping:
+  name: "RWC {{ edition }}"
+  vars:
+    stage: '{{ event.fields.pool ?? "Knockout" }}'
+  season:  { strategy: fixed, value: '{{ edition }}', title: '{{ edition }}' }
+  episode: { strategy: sequential, order: '{{ event.start }}', onInsert: renumber-unlocked }
+  title:    '{{ vars.stage }} - {{ event.fields.home }} vs {{ event.fields.away }}'
+  overview: '{{ [vars.stage, event.fields.venue] | array.compact | array.join ", " }}'
+  airDate:  '{{ event.start }}'
+  runtime:  120
+  search:
+    categories: [5000, 5060]
+    queryMode: all
+    queries:
+      - 'Rugby World Cup {{ season }} {{ event.fields.home }} {{ event.fields.away }}'
+      - 'RWC {{ season }} {{ event.fields.home }} {{ event.fields.away }}'
+    must:
+      - '\b(rugby[ ._-]?world[ ._-]?cup|rwc)\b'
+      - '\b{{ season }}\b'
+      - '\b{{ event.fields.home | string.normalize_team | regex.escape }}\b'
+      - '\b{{ event.fields.away | string.normalize_team | regex.escape }}\b'
+    mustNot:
+      - '\b(highlights?|preview|review)\b'
+      - '\bwomen''?s?\b'
+    dateWindow: { before: 3h, after: 120d }

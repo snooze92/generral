@@ -139,6 +139,7 @@ public static partial class SeriesEndpoints
         series.MapPut("/{id:int}", Update);
         series.MapDelete("/{id:int}", Delete);
         series.MapGet("/{id:int}/renumber-preview", RenumberPreview);
+        series.MapPost("/{id:int}/export", PresetEndpoints.Export);
     }
 
     /// <summary>What <c>Renumber { seriesId }</c> would change (docs/specs/05-mapping.md § Renumber). Nothing is stored.</summary>
@@ -185,6 +186,13 @@ public static partial class SeriesEndpoints
             return ValidationFailure.BadRequest([.. failures]);
         }
 
+        var series = await AddAsync(resource, db, time);
+        return Results.Created($"series/{series.Id}", await ToResourceAsync(db, series, time));
+    }
+
+    /// <summary>Stores a validated new series (see <see cref="ValidateAsync"/>) and its seasons.</summary>
+    internal static async Task<Series> AddAsync(SeriesResource resource, GenerralDbContext db, TimeProvider time)
+    {
         var title = resource.Title!.Trim();
         var rootFolderPath = Blank(resource.RootFolderPath) ? System.IO.Path.GetDirectoryName(TrimPath(resource.Path!))! : TrimPath(resource.RootFolderPath!);
         var series = new Series
@@ -216,7 +224,7 @@ public static partial class SeriesEndpoints
         }
 
         await db.SaveChangesAsync();
-        return Results.Created($"series/{series.Id}", await ToResourceAsync(db, series, time));
+        return series;
     }
 
     /// <summary>Like Sonarr, changing a season's <c>monitored</c> sets it on all of the season's episodes. Seasons are not added or removed here.</summary>
@@ -274,7 +282,7 @@ public static partial class SeriesEndpoints
     private static async Task<IResult> Delete(int id, GenerralDbContext db) =>
         await db.Series.Where(s => s.Id == id).ExecuteDeleteAsync() > 0 ? Results.NoContent() : Results.NotFound();
 
-    private static async Task<List<ValidationFailure>> ValidateAsync(SeriesResource resource, int? id, GenerralDbContext db, TagService tags)
+    internal static async Task<List<ValidationFailure>> ValidateAsync(SeriesResource resource, int? id, GenerralDbContext db, TagService tags)
     {
         var failures = new List<ValidationFailure>();
         var others = await db.Series.AsNoTracking().Where(s => s.Id != id).Select(s => new { s.Title, s.TitleSlug, s.Path }).ToListAsync();
@@ -375,7 +383,7 @@ public static partial class SeriesEndpoints
         return candidate;
     }
 
-    private static async Task<SeriesResource> ToResourceAsync(GenerralDbContext db, Series series, TimeProvider time)
+    internal static async Task<SeriesResource> ToResourceAsync(GenerralDbContext db, Series series, TimeProvider time)
     {
         var seasons = await db.Seasons.AsNoTracking().Where(s => s.SeriesId == series.Id).ToListAsync();
         return ToResource(series, seasons, await EpisodeStatsAsync(db, [series.Id]), time.GetUtcNow().UtcDateTime);

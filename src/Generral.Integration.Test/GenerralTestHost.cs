@@ -34,7 +34,7 @@ public sealed partial class GenerralTestHost : IAsyncDisposable
 
     public string ApiKey => _app.Services.GetRequiredService<IHostConfigProvider>().Current.ApiKey;
 
-    public static async Task<GenerralTestHost> StartAsync(Dictionary<string, string?>? settings = null, IPAddress? remoteAddress = null)
+    public static async Task<GenerralTestHost> StartAsync(Dictionary<string, string?>? settings = null, IPAddress? remoteAddress = null, Action<IServiceCollection>? services = null)
     {
         var configFolder = Path.Combine(Path.GetTempPath(), "generral-it-" + Guid.NewGuid().ToString("N"));
         var uiFolder = Path.Combine(configFolder, "UI");
@@ -62,6 +62,7 @@ public sealed partial class GenerralTestHost : IAsyncDisposable
         {
             builder.Configuration.AddInMemoryCollection(configuration);
             builder.WebHost.UseTestServer();
+            services?.Invoke(builder.Services);
 
             if (remoteAddress != null)
             {
