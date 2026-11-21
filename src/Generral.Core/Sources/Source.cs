@@ -13,7 +13,9 @@ public class Source
 
     public JsonObject Settings { get; set; } = [];
 
-    public TimeSpan RefreshInterval { get; set; } = TimeSpan.FromHours(12);
+    public static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromHours(12);
+
+    public TimeSpan RefreshInterval { get; set; } = DefaultRefreshInterval;
 
     public bool Enabled { get; set; } = true;
 

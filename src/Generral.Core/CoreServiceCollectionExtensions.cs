@@ -2,6 +2,8 @@ using Generral.Core.Authentication;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Lifecycle;
+using Generral.Core.Messaging;
+using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Http;
 using Generral.Core.Sources.Types;
@@ -28,6 +30,13 @@ public static class CoreServiceCollectionExtensions
         services.AddScoped<IUiSettingsService, UiSettingsService>();
 
         services.AddSourceTypes();
+        services.AddSingleton<SourceRefreshService>();
+
+        services.AddSingleton<CommandQueue>();
+        services.AddSingleton<ICommandHandler, RefreshSourcesHandler>();
+        services.AddSingleton<ICommandHandler, RefreshSourceHandler>();
+        services.AddHostedService<CommandWorker>();
+        services.AddHostedService<ScheduledTaskService>();
 
         return services;
     }

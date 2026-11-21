@@ -70,6 +70,16 @@ Like Sonarr, every long-running action is a **Command** (with a name, body, stat
 message, start/end time), executed by a bounded worker pool and visible under *System → Tasks* and
 in the UI's activity spinner. Scheduled tasks enqueue commands.
 
+*(M1a: the queue is **in memory**: commands are lost on restart and only the last 100 are kept,
+queued and running ones always. Unlike Sonarr, nothing is persisted, because every command is
+idempotent and the scheduler re-derives what is due from the database (e.g. `Source.lastRefresh`).
+Persistence can be added with `System → Tasks` history if needed. A command has a name, body,
+status `queued`/`started`/`completed`/`failed`, message, queued/started/ended times and trigger
+`manual`/`scheduled`; an identical command (same name and body) that is still queued is not queued
+twice. 3 commands run at a time. The scheduler checks every 5 min and enqueues `RefreshSources` when
+an enabled source is due; it is disabled with `GENERRAL__SCHEDULER__ENABLED=false` (the integration
+tests do this). Only `RefreshSources` and `RefreshSource` exist so far.)*
+
 | Task | Default interval | Sonarr equivalent |
 |------|------------------|-------------------|
 | `RefreshSources` | 12 h (per-source override) | Refresh Series |
