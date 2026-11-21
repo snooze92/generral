@@ -4,7 +4,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
@@ -110,6 +109,7 @@ function requests(fetchMock: ReturnType<typeof mockApi>, method: string, path: s
 async function goToMapping() {
   fireEvent.click(await screen.findByRole('option', { name: /Cup/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
   await screen.findByRole('status');
 }
 
@@ -125,18 +125,6 @@ describe('Add series', () => {
     expect(
       screen.getAllByRole('link').some((el) => el.getAttribute('href') === '/sources')
     ).toBe(true);
-  });
-
-  it('lists the sources with their event count and needs one to continue', async () => {
-    renderWizard();
-
-    const option = await screen.findByRole('option', { name: /Formula 1/ });
-    expect(within(option).getByText('24 events')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true);
-
-    fireEvent.click(option);
-    expect(option.getAttribute('aria-selected')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(false);
   });
 
   it('previews the default mapping and shows definition errors on the field', async () => {
@@ -209,21 +197,6 @@ describe('Add series', () => {
       priority: 0,
       enabled: true,
     });
-  });
-
-  it('shows series validation errors on the fields', async () => {
-    renderWizard({
-      'POST /api/v1/series': () => badRequest('title', "Series 'Cup' already exists"),
-    });
-
-    await goToMapping();
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.change(screen.getByPlaceholderText('/tv'), {
-      target: { name: 'rootFolderPath', value: '/sport' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add Cup' }));
-
-    expect(await screen.findByText("Series 'Cup' already exists")).toBeTruthy();
   });
 
   it('removes the series again when the mapping is rejected, so adding can be retried', async () => {

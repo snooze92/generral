@@ -14,8 +14,6 @@ import { InputChanged } from 'typings/inputs';
 import translate from 'Utilities/String/translate';
 import styles from './AddSeries.module.css';
 
-export const PREVIEW_DELAY = 750;
-
 interface MappingStepProps {
   sourceId: number;
   definition: string;
@@ -29,19 +27,12 @@ function MappingStep({
   onDefinitionChange,
   onPreview,
 }: MappingStepProps) {
-  // Previews automatically once typing pauses; the button previews right away.
-  const [previewed, setPreviewed] = useState(definition);
+  // Previews the definition as of the last Preview press.
+  const [previewed, setPreviewed] = useState<string>();
 
-  useEffect(() => {
-    const timeout = setTimeout(() => setPreviewed(definition), PREVIEW_DELAY);
-
-    return () => clearTimeout(timeout);
-  }, [definition]);
-
-  const { data, error, isFetching, refetch } = useMappingPreview({
-    sourceId,
-    definition: previewed,
-  });
+  const { data, error, isFetching, refetch } = useMappingPreview(
+    previewed === undefined ? undefined : { sourceId, definition: previewed }
+  );
 
   const handlePreviewPress = () => {
     if (previewed === definition) {

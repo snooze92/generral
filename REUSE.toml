@@ -115,6 +115,7 @@ path = [
   "frontend/src/Components/Form/Select/UMaskInput.tsx",
   "frontend/src/Components/Form/SelectInput.module.css",
   "frontend/src/Components/Form/SelectInput.tsx",
+  "frontend/src/Components/Form/Tag/SeriesTagInput.tsx",
   "frontend/src/Components/Form/Tag/TagInput.module.css",
   "frontend/src/Components/Form/Tag/TagInput.tsx",
   "frontend/src/Components/Form/Tag/TagInputInput.module.css",
