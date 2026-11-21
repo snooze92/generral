@@ -133,14 +133,17 @@ public static partial class SeriesEndpoints
         series.MapDelete("/{id:int}", Delete);
     }
 
-    private static async Task<List<SeriesResource>> GetAll(GenerralDbContext db, TimeProvider time)
+    private static async Task<List<SeriesResource>> GetAll(GenerralDbContext db, TimeProvider time) =>
+        await ToResourcesAsync(db, await db.Series.AsNoTracking().OrderBy(s => s.SortTitle).ToListAsync(), time);
+
+    internal static async Task<List<SeriesResource>> ToResourcesAsync(GenerralDbContext db, List<Series> series, TimeProvider time)
     {
-        var all = await db.Series.AsNoTracking().OrderBy(s => s.SortTitle).ToListAsync();
-        var seasons = (await db.Seasons.AsNoTracking().ToListAsync()).ToLookup(s => s.SeriesId);
-        var episodes = (await EpisodeStatsAsync(db, null)).ToLookup(e => e.SeriesId);
+        var ids = series.Select(s => s.Id).ToList();
+        var seasons = (await db.Seasons.AsNoTracking().Where(s => ids.Contains(s.SeriesId)).ToListAsync()).ToLookup(s => s.SeriesId);
+        var episodes = (await EpisodeStatsAsync(db, ids)).ToLookup(e => e.SeriesId);
         var now = time.GetUtcNow().UtcDateTime;
 
-        return all.Select(s => ToResource(s, seasons[s.Id], episodes[s.Id], now)).ToList();
+        return series.Select(s => ToResource(s, seasons[s.Id], episodes[s.Id], now)).ToList();
     }
 
     private static async Task<IResult> Get(int id, GenerralDbContext db, TimeProvider time)
@@ -350,7 +353,7 @@ public static partial class SeriesEndpoints
     private static async Task<SeriesResource> ToResourceAsync(GenerralDbContext db, Series series, TimeProvider time)
     {
         var seasons = await db.Seasons.AsNoTracking().Where(s => s.SeriesId == series.Id).ToListAsync();
-        return ToResource(series, seasons, await EpisodeStatsAsync(db, series.Id), time.GetUtcNow().UtcDateTime);
+        return ToResource(series, seasons, await EpisodeStatsAsync(db, [series.Id]), time.GetUtcNow().UtcDateTime);
     }
 
     private static SeriesResource ToResource(Series series, IEnumerable<Season> seasons, IEnumerable<EpisodeStat> episodes, DateTime now)
@@ -416,9 +419,9 @@ public static partial class SeriesEndpoints
     private sealed record EpisodeStat(int SeriesId, int SeasonNumber, bool Monitored, DateTime? AirDateUtc, bool HasFile);
 
     /// <summary>Orphaned episodes without a file are hidden, so they are not counted.</summary>
-    private static Task<List<EpisodeStat>> EpisodeStatsAsync(GenerralDbContext db, int? seriesId) =>
+    private static Task<List<EpisodeStat>> EpisodeStatsAsync(GenerralDbContext db, List<int> seriesIds) =>
         db.Episodes.AsNoTracking()
-            .Where(e => seriesId == null || e.SeriesId == seriesId)
+            .Where(e => seriesIds.Contains(e.SeriesId))
             .Where(e => e.Status == EpisodeStatus.Active || e.EpisodeFileId != null)
             .Select(e => new EpisodeStat(e.SeriesId, e.SeasonNumber, e.Monitored, e.AirDateUtc, e.EpisodeFileId != null))
             .ToListAsync();

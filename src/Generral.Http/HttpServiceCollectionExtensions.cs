@@ -125,8 +125,11 @@ public static partial class HttpServiceCollectionExtensions
         api.MapSeriesEndpoints();
         api.MapEpisodeEndpoints();
         api.MapMappingEndpoints();
+        api.MapCalendarEndpoints();
         api.MapCommandEndpoints();
         api.MapOpenApi("/openapi.json");
+
+        app.MapGroup("/feed/v1").RequireAuthorization(AuthSchemes.UiPolicy).MapCalendarFeedEndpoints();
 
         app.MapFrontend();
 
@@ -137,6 +140,7 @@ public static partial class HttpServiceCollectionExtensions
     {
         var request = context.Request;
         var isApi = request.Path.StartsWithSegments("/api") ||
+                    request.Path.StartsWithSegments("/feed") ||
                     request.Path.StartsWithSegments("/initialize.json") ||
                     string.Equals(request.Headers.XRequestedWith, "XMLHttpRequest", StringComparison.Ordinal) ||
                     request.Headers.Accept.Any(a => a?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true);
