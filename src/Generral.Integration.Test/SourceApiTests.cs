@@ -171,7 +171,7 @@ public class SourceApiTests
             Assert.That(update.IsSuccessStatusCode, Is.True);
             Assert.That((string)updated["name"]!, Is.EqualTo("World Cup"));
             Assert.That((int)updated["refreshInterval"]!, Is.EqualTo(60));
-            Assert.That(delete.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(delete.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
             Assert.That(afterDelete.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
         });
     }

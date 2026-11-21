@@ -42,7 +42,7 @@ Source, event and command resources (M1a):
   returned as `********`, and sending that value back keeps the stored one. `GET /source/schema`
   returns one such resource per type with the default values. Validation (400, Sonarr's shape):
   unique name (case-insensitive), known type, the type's own validation, `refreshInterval`.
-  `DELETE` → 400 while a mapping uses the source.
+  `DELETE` → 204, or 400 while a mapping uses the source.
 - `POST /source/test` takes a (possibly unsaved) source resource and returns
   `{ success, error?, events[], itemErrors[], responses[], meta, warnings[] }`; nothing is stored.
   A failed fetch is `200` with `success: false`.
