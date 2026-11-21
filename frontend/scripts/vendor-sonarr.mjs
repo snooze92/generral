@@ -45,6 +45,9 @@ const fileTransforms = [
   // Branding: teal accent (hue 182 ≈ #14b8a6) instead of Sonarr's blue (hue 215).
   ['Styles/Themes/themes.css', /(oklch\([^)]*?) 215\)/g, '$1 182)'],
   ['Styles/Themes/themes.css', /--sonarrBlue:/g, '--brandColor:'],
+  // Upstream relies on SignalR to refresh tags; fix the cache updates so they work without it.
+  ['Tags/useTags.ts', "setQueryData<Tag[]>(['tag']", "setQueryData<Tag[]>(['/tag']"],
+  ['Tags/useTags.ts', 'oldData.filter((tag) => tag.id === id)', 'oldData.filter((tag) => tag.id !== id)'],
 ];
 
 function sonarrFile(sonarrRoot, file) {
