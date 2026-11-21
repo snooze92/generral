@@ -53,6 +53,11 @@ Source, event and command resources (M1a):
   trigger }`. `POST /command` takes `{ name, ...body }` like Sonarr (e.g.
   `{ "name": "RefreshSources", "force": true }`); unknown names and invalid bodies → 400.
   `GET /command` lists the retained commands, newest first.
+- `tag`: `{ id, label }`, Sonarr's validation (required, `a-z`, `0-9`, `-`), stored lowercase and
+  unique regardless of case; `POST` with an existing label returns that tag. `GET /tag/detail`
+  (and `/tag/detail/{id}`) returns `{ id, label, sourceIds, seriesIds }`. Unlike Sonarr, `DELETE`
+  also works for a tag in use: it removes the id from every source and series in one transaction.
+  `source.tags` must reference existing tags (400 on `tags` otherwise).
 
 SignalR hub `/signalr/messages` broadcasts `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
 for `series`, `episode`, `episodefile`, `queue`, `command`, `health`, `source`, `event`,

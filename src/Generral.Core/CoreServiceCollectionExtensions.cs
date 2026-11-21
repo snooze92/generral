@@ -7,6 +7,7 @@ using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Http;
 using Generral.Core.Sources.Types;
+using Generral.Core.Tags;
 using Generral.Core.Templating;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +29,7 @@ public static class CoreServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<InitialUserService>();
         services.AddScoped<IUiSettingsService, UiSettingsService>();
+        services.AddScoped<TagService>();
 
         services.AddSourceTypes();
         services.AddSingleton<SourceRefreshService>();

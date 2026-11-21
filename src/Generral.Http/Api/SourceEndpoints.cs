@@ -7,6 +7,7 @@ using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Http;
 using Generral.Core.Sources.Types;
+using Generral.Core.Tags;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 
@@ -199,10 +200,10 @@ public static class SourceEndpoints
         return source is null ? Results.NotFound() : Results.Ok(await ToResourceAsync(db, source, types));
     }
 
-    private static async Task<IResult> Create(SourceResource resource, GenerralDbContext db, SourceTypeRegistry types)
+    private static async Task<IResult> Create(SourceResource resource, GenerralDbContext db, SourceTypeRegistry types, TagService tags)
     {
         var settings = Settings(resource, null);
-        var failures = await ValidateAsync(resource, settings, db, types, id: null);
+        var failures = await ValidateAsync(resource, settings, db, types, tags, id: null);
         if (failures.Count > 0)
         {
             return ValidationFailure.BadRequest([.. failures]);
@@ -216,7 +217,7 @@ public static class SourceEndpoints
         return Results.Created($"source/{source.Id}", ToResource(source, types.Find(source.Type), 0));
     }
 
-    private static async Task<IResult> Update(int id, SourceResource resource, GenerralDbContext db, SourceTypeRegistry types)
+    private static async Task<IResult> Update(int id, SourceResource resource, GenerralDbContext db, SourceTypeRegistry types, TagService tags)
     {
         var source = await db.Sources.SingleOrDefaultAsync(s => s.Id == id);
         if (source is null)
@@ -225,7 +226,7 @@ public static class SourceEndpoints
         }
 
         var settings = Settings(resource, source);
-        var failures = await ValidateAsync(resource, settings, db, types, id);
+        var failures = await ValidateAsync(resource, settings, db, types, tags, id);
         if (failures.Count > 0)
         {
             return ValidationFailure.BadRequest([.. failures]);
@@ -407,7 +408,7 @@ public static class SourceEndpoints
         return settings;
     }
 
-    private static async Task<List<ValidationFailure>> ValidateAsync(SourceResource resource, JsonObject settings, GenerralDbContext db, SourceTypeRegistry types, int? id)
+    private static async Task<List<ValidationFailure>> ValidateAsync(SourceResource resource, JsonObject settings, GenerralDbContext db, SourceTypeRegistry types, TagService tags, int? id)
     {
         var failures = new List<ValidationFailure>();
         var name = resource.Name?.Trim() ?? "";
@@ -436,6 +437,11 @@ public static class SourceEndpoints
             failures.AddRange(type.Validate(settings).Select(f => new ValidationFailure(f.PropertyName, f.ErrorMessage)));
         }
 
+        if (await TagEndpoints.ValidateTagIdsAsync(tags, resource.Tags) is { } tagFailure)
+        {
+            failures.Add(tagFailure);
+        }
+
         return failures;
     }
 
@@ -447,6 +453,6 @@ public static class SourceEndpoints
         source.Settings = settings;
         source.Enabled = resource.Enabled;
         source.RefreshInterval = TimeSpan.FromMinutes(resource.RefreshInterval);
-        source.Tags = resource.Tags ?? [];
+        source.Tags = (resource.Tags ?? []).Distinct().ToList();
     }
 }
