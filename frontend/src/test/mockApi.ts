@@ -63,17 +63,51 @@ const responses: Record<string, unknown> = {
   '/api/v1/settings/general': generalSettings,
 };
 
-/** Replaces global fetch with canned API responses; unknown paths return 404. */
-export function mockApi() {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-    const url = new URL(String(input), 'http://localhost');
-    const body = responses[url.pathname];
+export interface MockRequest {
+  method: string;
+  url: URL;
+  body: unknown;
+}
 
-    return new Response(body ? JSON.stringify(body) : '{}', {
-      status: body ? 200 : 404,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  });
+/** A canned response, or a handler returning the body or a Response. */
+export type MockRoute = unknown | ((request: MockRequest) => unknown);
+
+/**
+ * Replaces global fetch with canned API responses; unknown paths return 404. `routes` are keyed
+ * by path (any method) or by "METHOD path".
+ */
+export function mockApi(routes: Record<string, MockRoute> = {}) {
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://localhost');
+      const method = init?.method ?? 'GET';
+      const route =
+        routes[`${method} ${url.pathname}`] ??
+        routes[url.pathname] ??
+        (method === 'GET' ? responses[url.pathname] : undefined);
+
+      const result =
+        typeof route === 'function'
+          ? route({
+              method,
+              url,
+              body: init?.body ? JSON.parse(String(init.body)) : undefined,
+            })
+          : route;
+
+      if (result instanceof Response) {
+        return result;
+      }
+
+      return new Response(
+        result !== undefined ? JSON.stringify(result) : '{}',
+        {
+          status: result !== undefined ? 200 : 404,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+  );
 
   vi.stubGlobal('fetch', fetchMock);
 

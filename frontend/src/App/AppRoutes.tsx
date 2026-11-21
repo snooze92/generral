@@ -6,6 +6,7 @@ import PlaceholderPage, { Milestone } from 'Components/Page/PlaceholderPage';
 import GeneralSettings from 'Settings/General/GeneralSettings';
 import Settings from 'Settings/Settings';
 import UISettings from 'Settings/UI/UISettings';
+import Sources from 'Sources/Index/Sources';
 import Status from 'System/Status/Status';
 import translate from 'Utilities/String/translate';
 
@@ -20,7 +21,6 @@ interface PlaceholderRoute {
 const PLACEHOLDERS: PlaceholderRoute[] = [
   { path: '/series', title: () => translate('Series'), milestone: 'M1' },
   { path: '/add/new', scope: () => translate('Series'), title: () => translate('AddNew'), milestone: 'M1' },
-  { path: '/sources', title: () => translate('Sources'), milestone: 'M1' },
   { path: '/calendar', title: () => translate('Calendar'), milestone: 'M1' },
   {
     path: '/activity/queue',
@@ -135,6 +135,8 @@ export function appRouteElements() {
           }
         />
       ))}
+
+      <Route path="/sources" element={<Sources />} />
 
       <Route path="/settings" element={<Settings />} />
 

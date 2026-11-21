@@ -1,0 +1,6 @@
+/* Adapted from Sonarr (GPL-3.0-or-later): frontend/src/Settings/Indexers/Indexers/EditIndexerModalContent.module.css */
+.deleteButton {
+  composes: button from 'Components/Link/Button.module.css';
+
+  margin-right: auto;
+}

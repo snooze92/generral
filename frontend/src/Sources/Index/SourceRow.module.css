@@ -1,0 +1,16 @@
+.name {
+  color: var(--ink);
+  font-weight: 500;
+  text-align: left;
+}
+
+.never {
+  color: var(--inkMuted);
+}
+
+.actions {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 140px;
+  white-space: nowrap;
+}
