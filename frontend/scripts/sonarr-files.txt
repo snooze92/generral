@@ -191,6 +191,9 @@ Components/Scroller/Scroller.module.css
 Components/Scroller/Scroller.tsx
 Components/SectionHeading.module.css
 Components/SectionHeading.tsx
+Components/SettingsCard/AddCard.tsx
+Components/SettingsCard/SettingsCard.module.css
+Components/SettingsCard/SettingsCard.tsx
 Components/Sortable/SortableHandle.module.css
 Components/Sortable/SortableHandle.tsx
 Components/SpinnerIcon.tsx
@@ -294,6 +297,9 @@ Settings/AdvancedSettingsButton.tsx
 Settings/Settings.module.css
 Settings/SettingsPage.tsx
 Settings/SettingsSaveItems.tsx
+Settings/Tags/Details/TagDetailsModal.tsx
+Settings/Tags/Details/TagDetailsModalContent.module.css
+Settings/Tags/TagInUse.tsx
 Settings/UI/useUiSettings.ts
 Settings/advancedSettingsStore.ts
 Settings/useSettings.ts
@@ -312,6 +318,8 @@ Styles/scaffolding.css
 System/Status/About/About.module.css
 System/Status/About/StartTime.tsx
 System/Status/useSystemStatus.ts
+Tags/useTags.ts
+Utilities/Array/sortByProp.ts
 Utilities/Constants/keyCodes.ts
 Utilities/Date/dateFilterPredicate.ts
 Utilities/Date/formatDate.ts
@@ -355,6 +363,7 @@ Utilities/scrollLock.ts
 Utilities/selectSettings.ts
 typings/Field.ts
 typings/Helpers/ArrayElement.ts
+typings/Helpers/KeysMatching.ts
 typings/SystemStatus.ts
 typings/Table.ts
 typings/inputs.ts
