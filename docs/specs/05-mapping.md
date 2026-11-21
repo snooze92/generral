@@ -95,7 +95,7 @@ null), `date.add <duration>` (`-2h`, `3d`; null-safe), `date.year`, `date.tz(tz)
 |----------|----------------|-------|
 | `sequential` (default) | Position by `order` within the season, from 1 | Combined with [numbering stability](#numbering-stability). With parts, each part takes the next number in `parts` order. |
 | `field` | `episode.value` template (int) | e.g. official match number, round number. Mapping errors on collisions. |
-| `date` | No number; series becomes `seriesType: daily` | File named `Series - 2025-03-08 - Title`. Plex date-based TV. Good for "one event per day" content. |
+| `date` | No visible number; series becomes `seriesType: daily` | File named `Series - 2025-03-08 - Title`. Plex date-based TV. Good for "one event per day" content. Episodes still get an internal number, assigned like `sequential`, because `(season, episode)` is unique. |
 
 ### Parts
 
@@ -141,6 +141,8 @@ episode or loses watch state. Rules:
    policies.
 5. **Collisions.** If a `field`-strategy number collides with an existing different episode, that
    event is not applied. It shows up as a mapping error in the preview and as a health warning.
+   Likewise, an event whose templates fail (or render an invalid number/date) is not applied and its
+   existing episode is left as it was; other events are unaffected.
 6. **Multiple mappings → one series.** Allowed (e.g. a TheSportsDB mapping plus a `static` source
    that patches missing events). Slots are reserved per mapping in `priority` order. A `dedupe`
    template (e.g. `{{ event.start | date.to_string "%F" }}-{{ vars.number }}`) makes a
