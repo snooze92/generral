@@ -111,6 +111,25 @@ Mapping resources (M1b):
   the row errors as `key: message`. An invalid definition, series or source → 400. The rendered
   path column is not returned yet (naming is not implemented).
 
+Calendar (M1):
+
+- `GET /calendar?start=&end=&unmonitored=false&includeSeries=false&tags=` returns episode resources
+  with `airDateUtc` in `[start, end]` (default: server-local today 00:00 to +2 days, like Sonarr;
+  times without an offset are UTC), ordered by `airDateUtc`. Specials are included; orphaned
+  episodes without a file are not. `unmonitored=false` also drops episodes of unmonitored series.
+  `tags` is Sonarr's comma-separated list of tag ids or labels (a series matches any; unknown ones
+  match nothing). `includeSeries=true` adds `series` (the series resource) to each episode.
+- `GET /feed/v1/calendar/generral.ics?pastDays=7&futureDays=28&tags=&unmonitored=false&premieresOnly=false&asAllDay=false`
+  (`text/calendar`): same selection, from today − `pastDays` to today + `futureDays`. It accepts
+  `?apikey=` (calendar apps send no headers) or a UI session, and answers 401 rather than redirecting
+  to the login page. Events: `UID generral_episode_<id>` (stable), `SUMMARY` "Series - SxxEyy - Title"
+  (Sonarr uses `1x02`, but a year season reads better as `S2026E02`) or "Series - Title" for daily
+  series, `DESCRIPTION` = overview, `CATEGORIES` = network, `STATUS` confirmed with a file and
+  tentative otherwise. Times are UTC. `DTEND` = start + runtime or, without a runtime, the latest end
+  of the linked events. Without either there is no `DTEND`. `asAllDay` uses the episode's
+  series-local `airDate`. `premieresOnly` keeps episode 1 of non-special seasons. Titles and overviews
+  are already spoiler-free when rendered (spec 05 § Spoilers), so the feed adds no further rule.
+
 SignalR hub `/signalr/messages` broadcasts `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
 for `series`, `episode`, `episodefile`, `queue`, `command`, `health`, `source`, `event`,
 `mapping` (Sonarr's message format).

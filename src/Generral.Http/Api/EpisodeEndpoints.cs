@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Generral.Core.Datastore;
 using Generral.Core.Mappings;
 using Generral.Core.Tv;
@@ -52,6 +53,10 @@ public sealed record EpisodeResource
     public EpisodeStatus Status { get; init; }
 
     public List<EpisodeLinkResource> Links { get; init; } = [];
+
+    /// <summary>Only with <c>includeSeries=true</c> on the calendar.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SeriesResource? Series { get; init; }
 }
 
 /// <summary>The event (and part) an episode was produced from.</summary>
@@ -157,7 +162,7 @@ public static class EpisodeEndpoints
         return Results.Accepted($"episode/{id}", (await ToResourcesAsync(db, [episode]))[0]);
     }
 
-    private static async Task<List<EpisodeResource>> ToResourcesAsync(GenerralDbContext db, List<Episode> episodes)
+    internal static async Task<List<EpisodeResource>> ToResourcesAsync(GenerralDbContext db, List<Episode> episodes)
     {
         var ids = episodes.Select(e => e.Id).ToList();
         var links = (await db.EpisodeLinks.AsNoTracking().Where(l => ids.Contains(l.EpisodeId)).ToListAsync())
