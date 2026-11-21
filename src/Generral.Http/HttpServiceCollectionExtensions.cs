@@ -122,6 +122,8 @@ public static partial class HttpServiceCollectionExtensions
         api.MapSettingsEndpoints();
         api.MapSourceEndpoints();
         api.MapTagEndpoints();
+        api.MapSeriesEndpoints();
+        api.MapEpisodeEndpoints();
         api.MapCommandEndpoints();
         api.MapOpenApi("/openapi.json");
 
