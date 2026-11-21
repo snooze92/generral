@@ -120,6 +120,8 @@ public static partial class HttpServiceCollectionExtensions
         var api = app.MapGroup("/api/v1").RequireAuthorization(AuthSchemes.UiPolicy);
         api.MapSystemEndpoints();
         api.MapSettingsEndpoints();
+        api.MapSourceEndpoints();
+        api.MapCommandEndpoints();
         api.MapOpenApi("/openapi.json");
 
         app.MapFrontend();
