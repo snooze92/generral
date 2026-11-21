@@ -16,6 +16,12 @@ public sealed record ApplyMappingResult(int MappingId, string MappingName, int A
         : $"{MappingName}: {Error}";
 }
 
+/// <summary>An episode whose number a renumber changes.</summary>
+public sealed record RenumberMove(
+    int EpisodeId, int MappingId, string EventKey, string? PartKey, string Title, int SeasonNumber, int EpisodeNumber, int NewSeasonNumber, int NewEpisodeNumber);
+
+public sealed record RenumberResult(IReadOnlyList<RenumberMove> Moves, IReadOnlyList<ApplyMappingResult> Mappings);
+
 /// <summary>Evaluates mappings and persists the plan: seasons, episodes, links and orphan status (docs/specs/05-mapping.md).</summary>
 public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEngine engine, TimeProvider time, ILogger<ApplyMappingsService> logger)
 {
@@ -35,12 +41,72 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
                        ?? throw new KeyNotFoundException($"Mapping {mappingId} not found");
         }
 
+        return await WithSeriesLockAsync(seriesId, async () =>
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
+            var mapping = await db.Mappings.Include(m => m.Series).Include(m => m.Source).SingleOrDefaultAsync(m => m.Id == mappingId, cancellationToken)
+                          ?? throw new KeyNotFoundException($"Mapping {mappingId} not found");
+            return (await ApplyLockedAsync(db, mapping, false, cancellationToken)).Result;
+        });
+    }
+
+    /// <summary>
+    /// Series → Renumber (docs/specs/05-mapping.md § Renumber): applies every enabled mapping of the series, in priority order,
+    /// with unlocked episodes taking their ideal numbers. With <paramref name="dryRun"/> nothing is stored.
+    /// </summary>
+    /// <returns>The episodes whose number changes.</returns>
+    /// <exception cref="KeyNotFoundException">No such series.</exception>
+    public Task<RenumberResult> RenumberAsync(int seriesId, bool dryRun, CancellationToken cancellationToken = default) =>
+        WithSeriesLockAsync(seriesId, async () =>
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
+            if (!await db.Series.AnyAsync(s => s.Id == seriesId, cancellationToken))
+            {
+                throw new KeyNotFoundException($"Series {seriesId} not found");
+            }
+
+            var before = await db.Episodes.AsNoTracking().Where(e => e.SeriesId == seriesId)
+                .ToDictionaryAsync(e => e.Id, e => (e.SeasonNumber, e.EpisodeNumber), cancellationToken);
+            var mappings = await db.Mappings.Include(m => m.Series).Include(m => m.Source)
+                .Where(m => m.SeriesId == seriesId && m.Enabled)
+                .OrderBy(m => m.Priority).ThenBy(m => m.Id)
+                .ToListAsync(cancellationToken);
+
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            var results = new List<ApplyMappingResult>();
+            var moves = new List<RenumberMove>();
+            foreach (var mapping in mappings)
+            {
+                var (result, plan) = await ApplyLockedAsync(db, mapping, true, cancellationToken);
+                results.Add(result);
+                moves.AddRange((plan?.Rows ?? [])
+                    .Where(r => r.IsApplied && r.EpisodeId is { } id && before.TryGetValue(id, out var old) && old != (r.SeasonNumber!.Value, r.EpisodeNumber!.Value))
+                    .Select(r => new RenumberMove(r.EpisodeId!.Value, mapping.Id, r.Event.Key, r.PartKey, r.Title!,
+                        before[r.EpisodeId!.Value].SeasonNumber, before[r.EpisodeId!.Value].EpisodeNumber, r.SeasonNumber!.Value, r.EpisodeNumber!.Value)));
+            }
+
+            if (dryRun)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            else
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return new RenumberResult(moves.OrderBy(m => m.NewSeasonNumber).ThenBy(m => m.NewEpisodeNumber).ToList(), results);
+        });
+
+    private async Task<T> WithSeriesLockAsync<T>(int seriesId, Func<Task<T>> action)
+    {
         // Mappings of one series share its episode numbers.
         var seriesLock = _perSeries.GetOrAdd(seriesId, _ => new SemaphoreSlim(1));
-        await seriesLock.WaitAsync(cancellationToken);
+        await seriesLock.WaitAsync();
         try
         {
-            return await ApplyLockedAsync(mappingId, cancellationToken);
+            return await action();
         }
         finally
         {
@@ -48,31 +114,20 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
         }
     }
 
-    private async Task<ApplyMappingResult> ApplyLockedAsync(int mappingId, CancellationToken cancellationToken)
+    private async Task<(ApplyMappingResult Result, MappingPlan? Plan)> ApplyLockedAsync(GenerralDbContext db, Mapping mapping, bool renumber, CancellationToken cancellationToken)
     {
-        using var scope = scopes.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
-        var mapping = await db.Mappings.Include(m => m.Series).Include(m => m.Source).SingleOrDefaultAsync(m => m.Id == mappingId, cancellationToken)
-                      ?? throw new KeyNotFoundException($"Mapping {mappingId} not found");
         var series = mapping.Series!;
-
         await MappingHistory.RecordAsync(db, mapping, cancellationToken);
 
         MappingPlan plan;
         try
         {
+            var definition = MappingDefinitionParser.FromYaml(mapping.Definition);
+            var episodeList = await db.Episodes.Where(e => e.SeriesId == series.Id).ToListAsync(cancellationToken);
             plan = engine.Evaluate(
-                new MappingInput
+                await InputAsync(db, mapping, definition, episodeList, renumber, cancellationToken) with
                 {
-                    Definition = MappingDefinitionParser.FromYaml(mapping.Definition),
-                    Series = series,
-                    Source = mapping.Source!,
-                    SourceMeta = mapping.Source!.Meta,
-                    Events = await db.Events.AsNoTracking().Where(e => e.SourceId == mapping.SourceId).ToListAsync(cancellationToken),
-                    Episodes = await db.Episodes.Where(e => e.SeriesId == series.Id).ToListAsync(cancellationToken),
-                    Links = await db.EpisodeLinks.AsNoTracking().Where(l => l.MappingId == mapping.Id).ToListAsync(cancellationToken),
-                    Now = time.GetUtcNow().UtcDateTime,
-                    Timezone = Timezone,
+                    Claims = definition.Dedupe is null ? [] : await ClaimsAsync(db, mapping, episodeList, cancellationToken),
                 },
                 cancellationToken);
         }
@@ -80,7 +135,7 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
         {
             await db.SaveChangesAsync(cancellationToken);
             logger.LogWarning("Mapping {Name} is invalid: {Error}", mapping.Name, e.Message);
-            return new ApplyMappingResult(mapping.Id, mapping.Name, 0, 0, 0, 0, 0, e.Message);
+            return (new ApplyMappingResult(mapping.Id, mapping.Name, 0, 0, 0, 0, 0, e.Message), null);
         }
 
         // Episodes are tracked (loaded above); applying in two passes avoids transient unique-index clashes when numbers swap.
@@ -106,7 +161,7 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
             .ToList();
         if (moved.Count > 0)
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
             foreach (var episode in moved)
             {
                 episode.EpisodeNumber = -episode.Id;
@@ -114,7 +169,10 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
 
             await db.SaveChangesAsync(cancellationToken);
             await SaveAsync(db, plan, mapping, episodes, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
         }
         else
         {
@@ -132,7 +190,49 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
             counts.GetValueOrDefault(MappingChange.Error),
             null);
         logger.LogInformation("Applied mapping {Summary}", result.Summary);
-        return result;
+        return (result, plan);
+    }
+
+    private async Task<MappingInput> InputAsync(
+        GenerralDbContext db, Mapping mapping, MappingDefinition definition, List<Episode> episodes, bool renumber, CancellationToken cancellationToken) => new()
+        {
+            Definition = definition,
+            Series = mapping.Series!,
+            Source = mapping.Source!,
+            SourceMeta = mapping.Source!.Meta,
+            Events = await db.Events.AsNoTracking().Where(e => e.SourceId == mapping.SourceId).ToListAsync(cancellationToken),
+            Episodes = episodes,
+            Links = await db.EpisodeLinks.AsNoTracking().Where(l => l.MappingId == mapping.Id).ToListAsync(cancellationToken),
+            Renumber = renumber,
+            Now = time.GetUtcNow().UtcDateTime,
+            Timezone = Timezone,
+        };
+
+    /// <summary>The <c>dedupe</c> keys of the series' other enabled mappings (rule 6), each evaluated on its own.</summary>
+    public async Task<List<DedupeClaim>> ClaimsAsync(GenerralDbContext db, Mapping mapping, List<Episode> episodes, CancellationToken cancellationToken)
+    {
+        var claims = new List<DedupeClaim>();
+        var others = await db.Mappings.Include(m => m.Series).Include(m => m.Source)
+            .Where(m => m.SeriesId == mapping.SeriesId && m.Enabled && m.Id != mapping.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var other in others)
+        {
+            try
+            {
+                var definition = MappingDefinitionParser.FromYaml(other.Definition);
+                if (definition.Dedupe is not null)
+                {
+                    var plan = engine.Evaluate(await InputAsync(db, other, definition, episodes, false, cancellationToken), cancellationToken);
+                    claims.AddRange(MappingEngine.ClaimsOf(plan, other, mapping));
+                }
+            }
+            catch (MappingDefinitionException)
+            {
+                // Reported when that mapping is applied.
+            }
+        }
+
+        return claims;
     }
 
     private static async Task SaveAsync(GenerralDbContext db, MappingPlan plan, Mapping mapping, Dictionary<int, Episode> episodes, CancellationToken cancellationToken)
@@ -142,12 +242,19 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
             switch (row.Change)
             {
                 case MappingChange.New:
-                    var episode = new Episode { SeriesId = mapping.SeriesId, Title = "" };
+                    var episode = new Episode { SeriesId = mapping.SeriesId, Title = "", Monitored = row.Monitored ?? true };
                     row.ApplyTo(episode);
-                    db.EpisodeLinks.Add(new EpisodeLink { MappingId = mapping.Id, EventId = row.Event.Id, Episode = episode });
+                    db.EpisodeLinks.Add(new EpisodeLink { MappingId = mapping.Id, EventId = row.Event.Id, PartKey = row.LinkPartKey, Episode = episode });
                     break;
                 case MappingChange.Changed:
                     row.ApplyTo(episodes[row.EpisodeId!.Value]);
+                    if (!row.IsLinked)
+                    {
+                        // Taken over from a lower-priority mapping (dedupe).
+                        await db.EpisodeLinks.Where(l => l.EpisodeId == row.EpisodeId && l.PartKey == row.LinkPartKey).ExecuteDeleteAsync(cancellationToken);
+                        db.EpisodeLinks.Add(new EpisodeLink { MappingId = mapping.Id, EventId = row.Event.Id, PartKey = row.LinkPartKey, EpisodeId = row.EpisodeId!.Value });
+                    }
+
                     break;
                 case MappingChange.Orphaned:
                     episodes[row.EpisodeId!.Value].Status = EpisodeStatus.Orphaned;

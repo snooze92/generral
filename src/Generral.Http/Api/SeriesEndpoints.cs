@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Generral.Core.Datastore;
 using Generral.Core.Extensions;
+using Generral.Core.Mappings;
 using Generral.Core.Tags;
 using Generral.Core.Tv;
 using Microsoft.AspNetCore.Routing;
@@ -120,6 +121,12 @@ public sealed record SeriesStatisticsResource
     public decimal PercentOfEpisodes => EpisodeCount == 0 ? 0 : (decimal)EpisodeFileCount / EpisodeCount * 100;
 }
 
+public sealed record RenumberPreviewEpisodeResource(
+    int EpisodeId, int MappingId, string EventKey, string? PartKey, string Title, int SeasonNumber, int EpisodeNumber, int NewSeasonNumber, int NewEpisodeNumber);
+
+/// <param name="Errors">Mappings that could not be evaluated.</param>
+public sealed record RenumberPreviewResource(IReadOnlyList<RenumberPreviewEpisodeResource> Episodes, IReadOnlyList<string> Errors);
+
 public static partial class SeriesEndpoints
 {
     public static void MapSeriesEndpoints(this IEndpointRouteBuilder api)
@@ -131,6 +138,24 @@ public static partial class SeriesEndpoints
         series.MapPost("/", Create);
         series.MapPut("/{id:int}", Update);
         series.MapDelete("/{id:int}", Delete);
+        series.MapGet("/{id:int}/renumber-preview", RenumberPreview);
+    }
+
+    /// <summary>What <c>Renumber { seriesId }</c> would change (docs/specs/05-mapping.md § Renumber). Nothing is stored.</summary>
+    private static async Task<IResult> RenumberPreview(int id, ApplyMappingsService apply, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await apply.RenumberAsync(id, true, cancellationToken);
+            return Results.Ok(new RenumberPreviewResource(
+                result.Moves.Select(m => new RenumberPreviewEpisodeResource(
+                    m.EpisodeId, m.MappingId, m.EventKey, m.PartKey, m.Title, m.SeasonNumber, m.EpisodeNumber, m.NewSeasonNumber, m.NewEpisodeNumber)).ToList(),
+                result.Mappings.Where(m => !m.Success).Select(m => m.Summary).ToList()));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
     }
 
     private static async Task<List<SeriesResource>> GetAll(GenerralDbContext db, TimeProvider time) =>

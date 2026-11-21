@@ -112,6 +112,18 @@ Parts can also come from the data instead of a fixed list: `parts.from: '{{ even
 plus `parts.key`/`parts.title` templates per element. This is used for Sevens tournaments, where stages
 come from the source.
 
+Implementation notes (M1):
+
+- A part's properties other than `key`, `when`, `monitored`, `airDate`, `runtime` and `search` are
+  free and available as `part.*` (e.g. `title`, `airOffset`); `part.index` is added. Without a
+  top-level `title`, a mapping with parts defaults to `{{ event.title }} - {{ part.title }}`.
+- Part search rules (`search.parts.<key>`, then the part's own `search`) add to the event's `must`,
+  `mustNot` and `any`; part `queries` replace the event's. Unknown keys in `search.parts` are errors.
+- The preview has one row per event and part (`partKey`, `partTitle`, `monitored`); excluded parts
+  (`when` false) have no row unless they already have an episode (then it is orphaned). Episodes of
+  parts that are no longer produced are orphaned.
+- Not implemented yet: `parts.from`, `search.pack` (both rejected as "not supported yet").
+
 > Why parts are episodes rather than Plex "pt1/pt2" stacking: Plex treats split parts as *one
 > episode*. Prelims and main cards are released separately, sometimes in different qualities, and
 > often only one of them is wanted. They need their own monitored flags, searches and files, so they
@@ -147,11 +159,23 @@ episode or loses watch state. Rules:
    that patches missing events). Slots are reserved per mapping in `priority` order. A `dedupe`
    template (e.g. `{{ event.start | date.to_string "%F" }}-{{ vars.number }}`) makes a
    lower-priority mapping skip events already covered by a higher-priority one.
+   Implementation (M1): "higher priority" is the lower `priority` number, then the older mapping.
+   Keys are compared per part. Each apply evaluates the series' other enabled mappings that define
+   `dedupe` (without storing them) to know their keys: a kept event whose key a higher-priority
+   mapping also keeps is skipped (`change: duplicate`, `duplicateOf`, summary `duplicates`); its
+   existing episode is left alone. If a lower-priority mapping already has an episode for that key,
+   the higher-priority mapping takes it over (the link moves, the number is kept), so numbering is
+   stable when a primary source catches up with a patch source.
 
 ### Renumber
 
 The *Series → Renumber…* action computes the "ideal" numbering from the current mapping, shows a
 diff (old → new number, file renames), and applies it in one command.
+
+Implementation (M1): Renumber applies every enabled mapping of the series in priority order, as if
+`onInsert` were `renumber-unlocked`: unlocked episodes take their ideal number, locked ones (and
+`field`-strategy numbers) keep theirs. `GET /series/{id}/renumber-preview` runs the same thing in a
+rolled-back transaction. File renames are not part of it yet (no files exist in M1).
 
 ## Dates and timezones
 

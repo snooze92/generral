@@ -21,25 +21,117 @@ public sealed class MappingEngine(TemplateRenderer renderer)
     /// <exception cref="MappingDefinitionException">A template has syntax errors.</exception>
     public void Validate(MappingDefinition definition) => _ = new Templates(renderer, definition);
 
+    /// <summary>Lower <see cref="Mapping.Priority"/> wins, then the older mapping (id 0: not saved yet, so newest).</summary>
+    public static bool IsHigherPriority(Mapping mapping, Mapping other) =>
+        (mapping.Priority, Id(mapping)).CompareTo((other.Priority, Id(other))) < 0;
+
+    /// <summary>The <c>dedupe</c> keys a plan keeps, as claims against <paramref name="claimant"/>.</summary>
+    public static IEnumerable<DedupeClaim> ClaimsOf(MappingPlan plan, Mapping mapping, Mapping claimant) => plan.Rows
+        .Where(r => r.Kept && r.Errors.Count == 0 && r.DuplicateOf is null && r.DedupeKey is not null)
+        .Select(r => new DedupeClaim(r.DedupeKey!, r.LinkPartKey, mapping.Name, IsHigherPriority(mapping, claimant), r.IsLinked ? r.EpisodeId : null));
+
+    private static int Id(Mapping mapping) => mapping.Id == 0 ? int.MaxValue : mapping.Id;
+
     /// <exception cref="MappingDefinitionException">A template has syntax errors.</exception>
     public MappingPlan Evaluate(MappingInput input, CancellationToken cancellationToken = default)
     {
         var templates = new Templates(renderer, input.Definition);
         var episodes = input.Episodes.ToDictionary(e => e.Id);
         var linked = input.Links
-            .Where(l => l.PartKey == EpisodeLink.NoPart && episodes.ContainsKey(l.EpisodeId))
-            .ToDictionary(l => l.EventId, l => episodes[l.EpisodeId]);
+            .Where(l => episodes.ContainsKey(l.EpisodeId))
+            .ToDictionary(l => (l.EventId, l.PartKey), l => episodes[l.EpisodeId]);
+        var claims = input.Claims.ToLookup(c => (c.Key, c.PartKey));
         var sourceTimezone = new SourceSettings(input.Source.Settings).Timezone();
         var shared = MappingTemplateModel.Create(input.Series, input.Source, input.SourceMeta);
+        var parts = input.Definition.Parts;
 
         var rows = new List<RowState>();
         foreach (var ev in input.Events.OrderBy(e => e.Start ?? DateTime.MaxValue).ThenBy(e => e.Key, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var row = new RowState(new MappingPlanRow(ev, linked.GetValueOrDefault(ev.Id)), linked.GetValueOrDefault(ev.Id),
-                MappingTemplateModel.ForEvent(shared, ev, input.Source));
-            rows.Add(row);
-            Prepare(row, templates, input, sourceTimezone, cancellationToken);
+            var model = MappingTemplateModel.ForEvent(shared, ev, input.Source);
+            model["part"] = null;
+            var eventPlan = new MappingPlanRow(ev, null, null);
+            PrepareEvent(eventPlan, model, templates, cancellationToken);
+
+            var eventRows = new List<RowState>();
+            if (parts is null)
+            {
+                eventRows.Add(NewRow(ev, null, -1, model));
+            }
+            else
+            {
+                for (var i = 0; i < parts.Count; i++)
+                {
+                    var row = NewRow(ev, parts[i].Key, i, new Dictionary<string, object?>(model) { ["part"] = PartModel(parts[i], i) });
+                    if (row.Existing is not null || row.Plan.Kept || row.Plan.Errors.Count > 0)
+                    {
+                        eventRows.Add(row);
+                    }
+                }
+
+            }
+
+            // Links of parts the mapping no longer produces (part removed, or parts added/removed).
+            foreach (var link in input.Links.Where(l => l.EventId == ev.Id && linked.ContainsKey((l.EventId, l.PartKey))))
+            {
+                var partKey = link.PartKey == EpisodeLink.NoPart ? null : link.PartKey;
+                if (eventRows.All(r => r.Plan.PartKey != partKey))
+                {
+                    var stale = new RowState(new MappingPlanRow(ev, partKey, linked[(ev.Id, link.PartKey)]), linked[(ev.Id, link.PartKey)], model, -1);
+                    stale.Plan.RejectedBy = "part is no longer produced";
+                    eventRows.Add(stale);
+                }
+            }
+
+            if (eventRows.Count == 0)
+            {
+                if (eventPlan.Kept && eventPlan.Errors.Count == 0)
+                {
+                    eventPlan.Kept = false;
+                    eventPlan.RejectedBy = "no part is included";
+                }
+
+                eventRows.Add(new RowState(eventPlan, null, model, -1));
+            }
+
+            rows.AddRange(eventRows);
+
+            RowState NewRow(Event e, string? partKey, int index, Dictionary<string, object?> rowModel)
+            {
+                var existing = linked.GetValueOrDefault((e.Id, partKey ?? EpisodeLink.NoPart));
+                var plan = new MappingPlanRow(e, partKey, existing);
+                plan.CopyStateFrom(eventPlan);
+                plan.PartTitle = parts is null ? null : FieldValues.ToText(parts[index].Values["title"]);
+                var row = new RowState(plan, existing, rowModel, index);
+                if (plan.IsApplied && index >= 0 && templates.Parts[index].When is { } when
+                    && Try(plan, $"parts[{index}].when", () => IsTruthy(when.Evaluate(rowModel, cancellationToken)), out var included) && !included)
+                {
+                    plan.Kept = false;
+                    plan.RejectedBy = when.Text;
+                }
+
+                if (plan.IsApplied && plan.DedupeKey is { } key)
+                {
+                    var claim = claims[(key, plan.LinkPartKey)].OrderBy(c => !c.HigherPriority).FirstOrDefault();
+                    if (claim?.HigherPriority == true)
+                    {
+                        plan.DuplicateOf = claim.MappingName;
+                    }
+                    else if (existing is null && claim?.EpisodeId is { } adopted && episodes.TryGetValue(adopted, out var episode))
+                    {
+                        plan.EpisodeId = adopted;
+                        row.Existing = episode;
+                    }
+                }
+
+                if (plan.IsApplied)
+                {
+                    Prepare(row, templates, input, sourceTimezone, cancellationToken);
+                }
+
+                return row;
+            }
         }
 
         var numbering = rows.Where(r => r.Plan.IsApplied).ToList();
@@ -66,10 +158,17 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         return new MappingPlan(rows.Select(r => r.Plan).ToList(), seriesType, seasons);
     }
 
-    /// <summary>Filter, vars, air date, season inputs and order key: everything that does not depend on other events.</summary>
-    private static void Prepare(RowState row, Templates templates, MappingInput input, TimeZoneInfo sourceTimezone, CancellationToken cancellationToken)
+    /// <summary><c>part.*</c>: the part's properties as authored, plus <c>index</c>.</summary>
+    private static Dictionary<string, object?> PartModel(PartDefinition part, int index)
     {
-        var plan = row.Plan;
+        var model = part.Values.ToDictionary(p => p.Key, p => (object?)p.Value?.DeepClone());
+        model["index"] = index;
+        return model;
+    }
+
+    /// <summary>Filter, vars and dedupe key: shared by the parts of an event.</summary>
+    private static void PrepareEvent(MappingPlanRow plan, Dictionary<string, object?> model, Templates templates, CancellationToken cancellationToken)
+    {
         if (plan.Event.Status == EventStatus.Gone)
         {
             plan.RejectedBy = GoneReason;
@@ -78,7 +177,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
 
         foreach (var filter in templates.Filter)
         {
-            if (!Try(plan, "filter", () => IsTruthy(filter.Evaluate(row.Model, cancellationToken)), out var passed))
+            if (!Try(plan, "filter", () => IsTruthy(filter.Evaluate(model, cancellationToken)), out var passed))
             {
                 return;
             }
@@ -91,10 +190,10 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         }
 
         plan.Kept = true;
-        var vars = (Dictionary<string, object?>)row.Model["vars"]!;
+        var vars = (Dictionary<string, object?>)model["vars"]!;
         foreach (var (name, template) in templates.Vars)
         {
-            if (!Try(plan, $"vars.{name}", () => template.Evaluate(row.Model, cancellationToken), out var value))
+            if (!Try(plan, $"vars.{name}", () => template.Evaluate(model, cancellationToken), out var value))
             {
                 return;
             }
@@ -102,10 +201,26 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             vars[name] = value;
         }
 
-        if (Try(plan, "airDate", () => ToUtc(templates.AirDate.Evaluate(row.Model, cancellationToken), sourceTimezone), out var airDateUtc))
+        if (templates.Dedupe is not null && Try(plan, "dedupe", () => templates.Dedupe.Render(model, cancellationToken).Trim(), out var key))
+        {
+            plan.DedupeKey = key.Length > 0 ? key : null;
+        }
+    }
+
+    /// <summary>Air date, monitored, season inputs and order key: everything that does not depend on other events.</summary>
+    private static void Prepare(RowState row, Templates templates, MappingInput input, TimeZoneInfo sourceTimezone, CancellationToken cancellationToken)
+    {
+        var plan = row.Plan;
+        var part = row.PartIndex >= 0 ? templates.Parts[row.PartIndex] : null;
+        if (Try(plan, "airDate", () => ToUtc((part?.AirDate ?? templates.AirDate).Evaluate(row.Model, cancellationToken), sourceTimezone), out var airDateUtc))
         {
             plan.AirDateUtc = airDateUtc;
             plan.AirDate = airDateUtc is { } utc ? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(utc, input.Timezone)) : null;
+        }
+
+        if (part?.Monitored is { } monitored && Try(plan, $"parts[{row.PartIndex}].monitored", () => IsTruthy(monitored.Evaluate(row.Model, cancellationToken)), out var isMonitored))
+        {
+            plan.Monitored = isMonitored;
         }
 
         // File and grab locks are set elsewhere; the mapping locks numbers once the air date has passed.
@@ -191,7 +306,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
     private static void AssignEpisodes(List<RowState> rows, MappingInput input)
     {
         var episode = input.Definition.Episode;
-        var renumber = episode.OnInsert == InsertPolicy.RenumberUnlocked && episode.Strategy != EpisodeStrategy.Field;
+        var renumber = (episode.OnInsert == InsertPolicy.RenumberUnlocked || input.Renumber) && episode.Strategy != EpisodeStrategy.Field;
         var pool = new List<RowState>();
         foreach (var row in rows)
         {
@@ -289,7 +404,9 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             plan.AbsoluteEpisodeNumber = absolute;
         }
 
-        if (templates.Runtime is not null && Try(plan, "runtime", () => ToInt(templates.Runtime.Evaluate(row.Model, cancellationToken)), out var runtime))
+        var part = row.PartIndex >= 0 ? templates.Parts[row.PartIndex] : null;
+        if ((part?.Runtime ?? templates.Runtime) is { } runtimeTemplate
+            && Try(plan, "runtime", () => ToInt(runtimeTemplate.Evaluate(row.Model, cancellationToken)), out var runtime))
         {
             plan.Runtime = runtime;
         }
@@ -300,8 +417,12 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         }
 
         var terms = (JsonObject)definition.Search.Settings.DeepClone();
-        foreach (var (key, list) in templates.Search)
+        foreach (var (key, eventList) in templates.Search)
         {
+            var partLists = part?.Search.Where(p => p.Key == key).Select(p => p.Value).ToList() ?? [];
+            var list = key == "queries" && partLists.FirstOrDefault(l => l.Count > 0) is { } partQueries
+                ? partQueries
+                : eventList.Concat(key == "queries" ? [] : partLists.SelectMany(l => l)).ToList();
             if (list.Count == 0)
             {
                 continue;
@@ -326,6 +447,11 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             return MappingChange.Error;
         }
 
+        if (plan.DuplicateOf is not null)
+        {
+            return MappingChange.Duplicate;
+        }
+
         if (!plan.Kept)
         {
             return existing is null ? MappingChange.Filtered
@@ -336,6 +462,11 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         if (existing is null)
         {
             return MappingChange.New;
+        }
+
+        if (!plan.IsLinked)
+        {
+            return MappingChange.Changed;
         }
 
         var same = existing.Status == EpisodeStatus.Active
@@ -404,11 +535,14 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         _ => throw new FormatException($"'{value}' is not an ISO-8601 date"),
     };
 
-    private sealed class RowState(MappingPlanRow plan, Episode? existing, Dictionary<string, object?> model)
+    private sealed class RowState(MappingPlanRow plan, Episode? existing, Dictionary<string, object?> model, int partIndex)
     {
         public MappingPlanRow Plan { get; } = plan;
 
-        public Episode? Existing { get; } = existing;
+        public Episode? Existing { get; set; } = existing;
+
+        /// <summary>Index in <c>parts</c>, or -1.</summary>
+        public int PartIndex { get; } = partIndex;
 
         public Dictionary<string, object?> Model { get; } = model;
 
@@ -421,7 +555,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         public int? FieldNumber { get; set; }
     }
 
-    /// <summary>By <c>order</c> (numbers, dates or text; nulls last), then event start and key.</summary>
+    /// <summary>By <c>order</c> (numbers, dates or text; nulls last), then event start, key and part.</summary>
     private sealed class OrderComparer : IComparer<RowState>
     {
         public static readonly OrderComparer Instance = new();
@@ -434,7 +568,12 @@ public sealed class MappingEngine(TemplateRenderer renderer)
                 result = Nullable.Compare(x.Plan.Event.Start, y.Plan.Event.Start);
             }
 
-            return result != 0 ? result : string.CompareOrdinal(x.Plan.Event.Key, y.Plan.Event.Key);
+            if (result == 0)
+            {
+                result = string.CompareOrdinal(x.Plan.Event.Key, y.Plan.Event.Key);
+            }
+
+            return result != 0 ? result : x.PartIndex.CompareTo(y.PartIndex);
         }
 
         private static int CompareValues(object? x, object? y)
@@ -488,6 +627,24 @@ public sealed class MappingEngine(TemplateRenderer renderer)
 
             Filter = List(definition.Filter, "filter");
             Vars = definition.Vars.Select(v => KeyValuePair.Create(v.Key, Compile(v.Value, $"vars.{v.Key}"))).ToList();
+            Dedupe = Optional(definition.Dedupe, "dedupe");
+            Parts = (definition.Parts ?? []).Select((part, i) =>
+            {
+                var location = $"parts[{i}]";
+                List<KeyValuePair<string, List<CompiledTemplate>>> PartSearch(PartSearchDefinition? search, string searchLocation) => search is null ? [] :
+                [
+                    KeyValuePair.Create("queries", List(search.Queries, $"{searchLocation}.queries")),
+                    KeyValuePair.Create("must", List(search.Must, $"{searchLocation}.must")),
+                    KeyValuePair.Create("mustNot", List(search.MustNot, $"{searchLocation}.mustNot")),
+                    KeyValuePair.Create("any", List(search.Any, $"{searchLocation}.any")),
+                ];
+                return new PartTemplates(
+                    Optional(part.When, $"{location}.when"),
+                    Optional(part.Monitored, $"{location}.monitored"),
+                    Optional(part.AirDate, $"{location}.airDate"),
+                    Optional(part.Runtime, $"{location}.runtime"),
+                    [.. PartSearch(definition.Search.Parts.GetValueOrDefault(part.Key), $"search.parts.{part.Key}"), .. PartSearch(part.Search, $"{location}.search")]);
+            }).ToList();
             SeasonValue = definition.Season.Strategy == SeasonStrategy.Field ? Compile(definition.Season.Value!, "season.value") : null;
             SeasonGroup = Optional(definition.Season.Group, "season.group");
             SeasonTitle = Optional(definition.Season.Title, "season.title");
@@ -511,6 +668,10 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         public List<CompiledTemplate> Filter { get; }
 
         public List<KeyValuePair<string, CompiledTemplate>> Vars { get; }
+
+        public CompiledTemplate? Dedupe { get; }
+
+        public List<PartTemplates> Parts { get; }
 
         public CompiledTemplate? SeasonValue { get; }
 
@@ -536,4 +697,12 @@ public sealed class MappingEngine(TemplateRenderer renderer)
 
         public List<KeyValuePair<string, List<CompiledTemplate>>> Search { get; }
     }
+
+    /// <param name="Search">Part-level search lists (<c>search.parts.&lt;key&gt;</c>, then the part's own <c>search</c>).</param>
+    private sealed record PartTemplates(
+        CompiledTemplate? When,
+        CompiledTemplate? Monitored,
+        CompiledTemplate? AirDate,
+        CompiledTemplate? Runtime,
+        List<KeyValuePair<string, List<CompiledTemplate>>> Search);
 }

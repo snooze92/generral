@@ -43,6 +43,7 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<MappingEngine>();
         services.AddSingleton<ApplyMappingsService>();
         services.AddSingleton<ICommandHandler, ApplyMappingsHandler>();
+        services.AddSingleton<ICommandHandler, RenumberHandler>();
         services.AddHostedService<CommandWorker>();
         services.AddHostedService<ScheduledTaskService>();
 

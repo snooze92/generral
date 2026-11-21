@@ -52,6 +52,11 @@ public sealed record MappingPreviewRowResource
 {
     public required MappingPreviewEventResource Event { get; init; }
 
+    /// <summary>The part (one row per event and part), or null.</summary>
+    public string? PartKey { get; init; }
+
+    public string? PartTitle { get; init; }
+
     public bool Kept { get; init; }
 
     public string? RejectedBy { get; init; }
@@ -85,6 +90,12 @@ public sealed record MappingPreviewRowResource
 
     public bool NumberLocked { get; init; }
 
+    /// <summary>Monitored state of a new episode (the part's <c>monitored</c>), when set.</summary>
+    public bool? Monitored { get; init; }
+
+    /// <summary>The higher-priority mapping keeping the same event (<c>dedupe</c>).</summary>
+    public string? DuplicateOf { get; init; }
+
     /// <summary>The episode's season/episode number would change.</summary>
     public bool Renumbered { get; init; }
 
@@ -94,7 +105,7 @@ public sealed record MappingPreviewRowResource
 }
 
 /// <summary>The preview's summary bar (docs/specs/05-mapping.md § Preview &amp; dry-run).</summary>
-public sealed record MappingPreviewSummary(int Events, int Kept, int Episodes, int New, int Changed, int Unchanged, int Orphaned, int Filtered, int Errors, int Renumbered);
+public sealed record MappingPreviewSummary(int Events, int Kept, int Episodes, int New, int Changed, int Unchanged, int Orphaned, int Filtered, int Errors, int Renumbered, int Duplicates);
 
 public sealed record MappingPreviewSeasonResource(int SeasonNumber, string? Title);
 
@@ -252,6 +263,9 @@ public static class MappingEndpoints
             ? await db.EpisodeLinks.AsNoTracking().Where(l => l.MappingId == mapping.Id).ToListAsync(cancellationToken)
             : [];
         var episodes = series is null ? [] : await db.Episodes.AsNoTracking().Where(e => e.SeriesId == series.Id).ToListAsync(cancellationToken);
+        var claims = series is not null && definition!.Dedupe is not null
+            ? await apply.ClaimsAsync(db, mapping ?? new Mapping { Name = "", SeriesId = series.Id }, episodes, cancellationToken)
+            : [];
 
         var plan = engine.Evaluate(
             new MappingInput
@@ -263,6 +277,7 @@ public static class MappingEndpoints
                 Events = await db.Events.AsNoTracking().Where(e => e.SourceId == source.Id).ToListAsync(cancellationToken),
                 Episodes = episodes,
                 Links = links,
+                Claims = claims,
                 Now = time.GetUtcNow().UtcDateTime,
                 Timezone = apply.Timezone,
             },
@@ -281,19 +296,22 @@ public static class MappingEndpoints
             counts.GetValueOrDefault(MappingChange.Orphaned),
             counts.GetValueOrDefault(MappingChange.Filtered),
             counts.GetValueOrDefault(MappingChange.Error),
-            rows.Count(r => r.Renumbered));
+            rows.Count(r => r.Renumbered),
+            counts.GetValueOrDefault(MappingChange.Duplicate));
 
         return Results.Ok(new MappingPreviewResource(
             rows,
             summary,
             plan.SeriesType,
             plan.Seasons.OrderBy(s => s.Key).Select(s => new MappingPreviewSeasonResource(s.Key, s.Value)).ToList(),
-            rows.SelectMany(r => r.Errors.Select(e => $"{r.Event.Key}: {e}")).ToList()));
+            rows.SelectMany(r => r.Errors.Select(e => $"{r.Event.Key}{(r.PartKey is null ? "" : $"/{r.PartKey}")}: {e}")).ToList()));
     }
 
     private static MappingPreviewRowResource ToResource(MappingPlanRow row, Episode? existing) => new()
     {
         Event = new MappingPreviewEventResource(row.Event.Id, row.Event.Key, row.Event.Title, row.Event.Start, row.Event.Status),
+        PartKey = row.PartKey,
+        PartTitle = row.PartTitle,
         Kept = row.Kept,
         RejectedBy = row.RejectedBy,
         EpisodeId = row.EpisodeId,
@@ -310,6 +328,8 @@ public static class MappingEndpoints
         Thumb = row.Thumb,
         SearchTerms = row.SearchTerms,
         NumberLocked = row.NumberLocked,
+        Monitored = row.Monitored,
+        DuplicateOf = row.DuplicateOf,
         Renumbered = row.IsApplied && existing is not null && (existing.SeasonNumber != row.SeasonNumber || existing.EpisodeNumber != row.EpisodeNumber),
         Change = row.Change,
         Errors = row.Errors,
