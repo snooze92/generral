@@ -28,6 +28,11 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 
+// Modals, menus and tooltips render into #portal-root (index.html), looked up when they're imported.
+const portalRoot = document.createElement('div');
+portalRoot.id = 'portal-root';
+document.body.appendChild(portalRoot);
+
 setTranslations(translations);
 
 afterEach(() => {
