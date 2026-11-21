@@ -254,7 +254,7 @@ public static class SourceEndpoints
 
         db.Sources.Remove(source);
         await db.SaveChangesAsync();
-        return Results.Ok();
+        return Results.NoContent();
     }
 
     /// <summary>Fetches and extracts an unsaved definition. Nothing is stored; responses come from the cache when possible.</summary>
