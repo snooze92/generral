@@ -52,8 +52,8 @@ Generral is one process (an ASP.NET Core host) that serves both the API and the 
 | Module | Responsibility | Spec |
 |--------|---------------|------|
 | `Generral.Core.Sources` | Source type plugins, fetch scheduling, HTTP politeness (rate limit, caching, UA), raw → `Event` extraction. | [04](04-sources.md) |
-| `Generral.Core.Mapping` | Turning events into Series/Season/Episode; numbering stability; preview; presets import/export. | [05](05-mapping.md) |
-| `Generral.Core.Series` | Series, Season, Episode entities and services; monitoring; root folders. | [03](03-domain-model.md) |
+| `Generral.Core.Mappings` | Turning events into Series/Season/Episode; numbering stability; preview; presets import/export. | [05](05-mapping.md) |
+| `Generral.Core.Tv` | Series, Season, Episode entities and services; monitoring; root folders. (Not `Series`, which would clash with the entity name.) | [03](03-domain-model.md) |
 | `Generral.Core.Indexers` | Indexer definitions (Torznab, later Newznab), capabilities, RSS sync, search requests. | [06](06-indexers-and-search.md) |
 | `Generral.Core.DecisionEngine` | Release → episode matching, specifications (accept/reject with reasons), prioritisation. | [06](06-indexers-and-search.md) |
 | `Generral.Core.Qualities` / `Profiles` | Quality parser, definitions, profiles, release profiles, (later) custom formats. | [06](06-indexers-and-search.md) |
