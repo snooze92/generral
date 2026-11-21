@@ -49,6 +49,23 @@ const preview: MappingPreview = {
   errors: [],
 };
 
+const presets = [
+  {
+    id: 'ufc-numbered',
+    name: 'UFC – Numbered events',
+    description: 'Every numbered UFC event',
+    seriesTitle: 'UFC',
+    tags: ['sport'],
+    sourceType: 'thesportsdb',
+    requiredSecrets: [],
+    parameters: [
+      { name: 'tsdbKey', label: 'TheSportsDB API key', default: '123', secret: true },
+      { name: 'seasons', label: 'Seasons', default: 'current', secret: false },
+    ],
+    shipped: true,
+  },
+];
+
 const created = {
   id: 7,
   title: 'Cup',
@@ -74,6 +91,7 @@ function renderWizard(routes: Record<string, MockRoute> = {}) {
     'GET /api/v1/series': [],
     'GET /api/v1/tag': [{ id: 1, label: 'football' }],
     'POST /api/v1/mapping/preview': preview,
+    'GET /api/v1/preset': presets,
     ...routes,
   });
 
@@ -106,7 +124,13 @@ function requests(fetchMock: ReturnType<typeof mockApi>, method: string, path: s
     .map(([, init]) => (init?.body ? JSON.parse(String(init.body)) : undefined));
 }
 
+async function startFromScratch() {
+  fireEvent.click(await screen.findByRole('option', { name: /From scratch/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+}
+
 async function goToMapping() {
+  await startFromScratch();
   fireEvent.click(await screen.findByRole('option', { name: /Cup/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Next' }));
   fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
@@ -120,6 +144,7 @@ describe('Add series', () => {
 
   it('links to the sources page when there is no source', async () => {
     renderWizard({ 'GET /api/v1/source': [] });
+    await startFromScratch();
 
     expect(await screen.findByText(/Add a source first/)).toBeTruthy();
     expect(
@@ -228,5 +253,35 @@ describe('Add series', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Cup' }));
     expect(await screen.findByText('Series page cup')).toBeTruthy();
     expect(requests(fetchMock, 'POST', '/api/v1/series')).toHaveLength(2);
+  });
+
+  it('instantiates a preset with its parameters, then opens the series', async () => {
+    const fetchMock = renderWizard({
+      'POST /api/v1/preset/ufc-numbered/instantiate': { ...created, title: 'UFC', titleSlug: 'ufc' },
+    });
+
+    fireEvent.click(await screen.findByRole('option', { name: /UFC – Numbered events/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(screen.getByDisplayValue('UFC').getAttribute('name')).toBe('title');
+    fireEvent.change(screen.getByPlaceholderText('/tv'), {
+      target: { name: 'rootFolderPath', value: '/sport' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('123'), {
+      target: { name: 'tsdbKey', value: 'premium' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add UFC' }));
+
+    expect(await screen.findByText('Series page ufc')).toBeTruthy();
+    expect(requests(fetchMock, 'POST', '/api/v1/preset/ufc-numbered/instantiate')[0]).toEqual({
+      title: 'UFC',
+      rootFolderPath: '/sport',
+      monitored: true,
+      monitorNewItems: 'all',
+      seasonFolder: true,
+      tags: [],
+      parameters: {},
+      secrets: { tsdbKey: 'premium' },
+    });
   });
 });

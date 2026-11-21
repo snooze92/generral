@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Generral.Http;
 
@@ -28,7 +29,7 @@ public static partial class HttpServiceCollectionExtensions
             .SetApplicationName("Generral")
             .PersistKeysToFileSystem(new DirectoryInfo(folders.DataProtectionFolder));
 
-        services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<LoginThrottle>();
         services.AddSingleton<IRestartService, RestartService>();
 
@@ -125,6 +126,7 @@ public static partial class HttpServiceCollectionExtensions
         api.MapSeriesEndpoints();
         api.MapEpisodeEndpoints();
         api.MapMappingEndpoints();
+        api.MapPresetEndpoints();
         api.MapCalendarEndpoints();
         api.MapCommandEndpoints();
         api.MapOpenApi("/openapi.json");

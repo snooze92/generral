@@ -113,6 +113,27 @@ Mapping resources (M1b):
   With `parts`, there is one row per event and part, with `partKey`, `partTitle` and `monitored`;
   `duplicateOf` names the higher-priority mapping for `change: duplicate` rows (summary
   `duplicates`).
+
+Preset resources (M1):
+
+- `GET /preset`: shipped then imported presets, `[{ id, name, description, seriesTitle, tags,
+  sourceType (first source), sourceTypes[], requiredSecrets[] (secrets without a default),
+  parameters[{ name, label, default, secret }], shipped }]`. A file that doesn't parse is skipped
+  (logged).
+- `POST /preset/import`: the YAML document as the body, or JSON `{ url }` / `{ yaml }`. URLs are
+  fetched with the source HTTP client (SSRF guard). The document is fully validated (placeholders
+  filled with defaults) and stored as `<config>/presets/<id>.yaml`, replacing an imported preset
+  with the same id; a shipped preset's id → 400. Returns the preset (201).
+- `POST /preset/{id}/instantiate { title?, rootFolderPath | path, monitored?, monitorNewItems?,
+  seasonFolder?, tags[], parameters{}, secrets{} }`: fills the placeholders (empty values → the
+  defaults; a missing required one → 400), validates the sources (as `source.settings.<field>`),
+  mappings and series (as on `POST /series`), then in one transaction reuses an existing source of
+  the same type with identical settings or creates one (name suffixed ` (2)` when taken), creates
+  the series and the mappings, and queues `RefreshSource` for each source (which applies the
+  mappings). Returns the series (201).
+- `POST /series/{id}/export`: the series, its mappings (priority order) and their sources as a
+  preset (`application/yaml`, id = the title slug). Password settings and header values become
+  `{{ secret.NAME }}` placeholders, declared as secret parameters without a default.
 - `GET /series/{id}/renumber-preview` → `{ episodes[{ episodeId, mappingId, eventKey, partKey,
   title, seasonNumber, episodeNumber, newSeasonNumber, newEpisodeNumber }], errors[] }` (404 for an
   unknown series); nothing is stored. Command `Renumber { seriesId }` applies it (see

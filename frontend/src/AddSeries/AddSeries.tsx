@@ -18,27 +18,36 @@ import translate from 'Utilities/String/translate';
 import defaultDefinition from './defaultDefinition';
 import MappingStep from './MappingStep';
 import OptionsStep from './OptionsStep';
+import PresetStep from './PresetStep';
 import SourceStep from './SourceStep';
+import StartStep from './StartStep';
 import useAddSeries, { NewSeries } from './useAddSeries';
+import { useInstantiatePreset, usePresets } from './usePresets';
 import styles from './AddSeries.module.css';
 
-const STEPS = ['source', 'mapping', 'options'] as const;
+const SCRATCH_STEPS = ['start', 'source', 'mapping', 'options'] as const;
+const PRESET_STEPS = ['start', 'options'] as const;
 
-type Step = (typeof STEPS)[number];
+type Step = (typeof SCRATCH_STEPS)[number];
 
 const stepLabels: Record<Step, () => string> = {
+  start: () => translate('Start'),
   source: () => translate('Source'),
   mapping: () => translate('Mapping'),
   options: () => translate('Options'),
 };
 
-/** The from-scratch Add Series wizard (docs/specs/10-ui.md § Add series). */
+/** The Add Series wizard, from a preset or from scratch (docs/specs/10-ui.md § Add series). */
 function AddSeries() {
   const navigate = useNavigate();
   const { data: sources } = useSources();
   const { data: allSeries } = useSeries();
 
-  const [step, setStep] = useState<Step>('source');
+  const { data: presets } = usePresets();
+  const [step, setStep] = useState<Step>('start');
+  const [presetId, setPresetId] = useState<string>();
+  const [scratch, setScratch] = useState(false);
+  const [presetValues, setPresetValues] = useState<Record<string, string>>({});
   const [sourceId, setSourceId] = useState<number>();
   const [definition, setDefinition] = useState(defaultDefinition);
   const [seriesType, setSeriesType] = useState<MappingPreview['seriesType']>();
@@ -54,8 +63,40 @@ function AddSeries() {
   });
 
   const { addSeries, isAdding, addError, reset } = useAddSeries();
+  const { instantiate, isInstantiating, instantiateError, reset: resetInstantiate } =
+    useInstantiatePreset();
   const source = sources.find((s) => s.id === sourceId);
+  const preset = scratch ? undefined : presets.find((p) => p.id === presetId);
+  const STEPS: readonly Step[] = preset ? PRESET_STEPS : SCRATCH_STEPS;
   const stepIndex = STEPS.indexOf(step);
+
+  const handlePresetSelect = useCallback(
+    (id: string) => {
+      setPresetId(id);
+      setScratch(false);
+      setPresetValues({});
+      setSeries((current) => ({
+        ...current,
+        title: titleEdited
+          ? current.title
+          : (presets.find((p) => p.id === id)?.seriesTitle ?? ''),
+        rootFolderPath:
+          current.rootFolderPath || (allSeries[0]?.rootFolderPath ?? ''),
+      }));
+    },
+    [presets, allSeries, titleEdited]
+  );
+
+  const handleScratchSelect = useCallback(() => {
+    setScratch(true);
+    setPresetId(undefined);
+  }, []);
+
+  const handlePresetValueChange = useCallback(
+    ({ name, value }: InputChanged<string>) =>
+      setPresetValues((current) => ({ ...current, [name]: value })),
+    []
+  );
 
   const handleSourceSelect = useCallback(
     (id: number) => {
@@ -88,6 +129,37 @@ function AddSeries() {
   }, []);
 
   const handleAddPress = useCallback(() => {
+    if (preset) {
+      const secrets = new Set(
+        preset.parameters.filter((p) => p.secret).map((p) => p.name)
+      );
+      const pick = (secret: boolean) =>
+        Object.fromEntries(
+          Object.entries(presetValues).filter(
+            ([name, value]) => value.trim() && secrets.has(name) === secret
+          )
+        );
+
+      resetInstantiate();
+      instantiate(
+        {
+          id: preset.id,
+          request: {
+            title: series.title,
+            rootFolderPath: series.rootFolderPath,
+            monitored: series.monitored,
+            monitorNewItems: series.monitorNewItems,
+            seasonFolder: series.seasonFolder,
+            tags: series.tags,
+            parameters: pick(false),
+            secrets: pick(true),
+          },
+        },
+        { onSuccess: (added) => navigate(`/series/${added.titleSlug}`) }
+      );
+      return;
+    }
+
     if (!source) {
       return;
     }
@@ -101,6 +173,10 @@ function AddSeries() {
       { onSuccess: (added) => navigate(`/series/${added.titleSlug}`) }
     );
   }, [
+    preset,
+    presetValues,
+    instantiate,
+    resetInstantiate,
     source,
     series,
     seriesType,
@@ -110,8 +186,12 @@ function AddSeries() {
     navigate,
   ]);
 
-  const seriesFailures =
-    addError?.step === 'series'
+  const presetFailures = instantiateError
+    ? getValidationFailures(instantiateError).errors
+    : [];
+  const seriesFailures = preset
+    ? presetFailures
+    : addError?.step === 'series'
       ? getValidationFailures(addError.error).errors
       : [];
   const mappingFailures =
@@ -120,7 +200,13 @@ function AddSeries() {
       : [];
 
   const canContinue =
-    step === 'source' ? !!source : step === 'mapping' ? !!definition.trim() : true;
+    step === 'start'
+      ? !!preset || scratch
+      : step === 'source'
+        ? !!source
+        : step === 'mapping'
+          ? !!definition.trim()
+          : true;
 
   return (
     <PageContent title={translate('AddNewSeries')}>
@@ -146,6 +232,15 @@ function AddSeries() {
             </li>
           ))}
         </ol>
+
+        {step === 'start' ? (
+          <StartStep
+            presetId={presetId}
+            scratch={scratch}
+            onPresetSelect={handlePresetSelect}
+            onScratchSelect={handleScratchSelect}
+          />
+        ) : null}
 
         {step === 'source' ? (
           <SourceStep sourceId={sourceId} onSourceSelect={handleSourceSelect} />
@@ -180,8 +275,17 @@ function AddSeries() {
               </Alert>
             ) : null}
 
-            {addError?.step === 'series' && !seriesFailures.length ? (
+            {(preset ? !!instantiateError : addError?.step === 'series') &&
+            !seriesFailures.length ? (
               <Alert kind={kinds.DANGER}>{translate('AddSeriesFailed')}</Alert>
+            ) : null}
+
+            {preset ? (
+              <PresetStep
+                preset={preset}
+                values={presetValues}
+                onChange={handlePresetValueChange}
+              />
             ) : null}
 
             <OptionsStep
@@ -196,7 +300,7 @@ function AddSeries() {
         <div className={styles.buttons}>
           {stepIndex > 0 ? (
             <Button
-              isDisabled={isAdding}
+              isDisabled={isAdding || isInstantiating}
               onPress={() => setStep(STEPS[stepIndex - 1])}
             >
               {translate('Back')}
@@ -206,8 +310,12 @@ function AddSeries() {
           {step === 'options' ? (
             <SpinnerButton
               kind={kinds.PRIMARY}
-              isSpinning={isAdding}
-              isDisabled={!series.title.trim() || !series.rootFolderPath.trim()}
+              isSpinning={isAdding || isInstantiating}
+              isDisabled={
+                !series.title.trim() ||
+                !series.rootFolderPath.trim() ||
+                !!preset?.requiredSecrets.some((s) => !presetValues[s]?.trim())
+              }
               onPress={handleAddPress}
             >
               {translate('AddSeriesWithTitle', { title: series.title })}

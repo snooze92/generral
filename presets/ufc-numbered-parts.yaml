@@ -1,0 +1,70 @@
+# Preset: UFC numbered events (UC2), each event as three card parts.
+# Result in Plex:  UFC/Season 2027/UFC - S2027E04 - UFC 330 - Main Card [WEBDL-1080p].mkv
+schema: generral/preset@1
+id: ufc-numbered-parts
+name: UFC – Numbered events (with card parts)
+description: >
+  Every numbered UFC event (UFC 330, 331, …) in a year-based season, from TheSportsDB. Each event
+  becomes three episodes (Early Prelims, Prelims, Main Card); only Main Card is monitored. The free
+  API key returns at most 15 events per season, which misses some numbered events: use a premium key.
+requires: { generral: ">=0.1" }
+tags: [sport, mma, ufc]
+
+parameters:
+  - { name: tsdbKey, label: TheSportsDB API key, default: "123", secret: true }
+  - { name: seasons, label: "Seasons (current, 2026 or 2025..current)", default: current }
+
+source:
+  name: TheSportsDB – UFC
+  type: thesportsdb
+  settings:
+    apiKey: "{{ secret.tsdbKey }}"
+    leagueId: "4443"
+    seasons: "{{ seasons }}"
+    includePast: true
+    includeFuture: true
+  refreshInterval: 12h
+
+series:
+  title: UFC
+  overview: Numbered UFC pay-per-view events.
+  network: UFC
+  genres: [Sport, MMA]
+  seasonFolder: true
+
+mapping:
+  name: UFC numbered events (parts)
+  filter:
+    - '{{ event.title | regex.match "^UFC \\d+\\b" }}'
+    - '{{ event.status != "cancelled" }}'
+  vars:
+    number:   '{{ (event.title | regex.match "^UFC (\\d+)")[1] | string.to_int }}'
+    headline: '{{ event.title | regex.replace "^UFC \\d+:?\\s*" "" }}'
+  parts:
+    - { key: early-prelims, title: Early Prelims, monitored: false, airOffset: -3h, runtime: 90 }
+    - { key: prelims,       title: Prelims,       monitored: false, airOffset: -2h, runtime: 120 }
+    - { key: main-card,     title: Main Card,     monitored: true,                  runtime: 180 }
+  season:  { strategy: year }
+  episode: { strategy: sequential, order: '{{ event.start }}', onInsert: renumber-unlocked }
+  absolute: '{{ vars.number }}'
+  title:    'UFC {{ vars.number }}{{ if vars.headline != "" }}: {{ vars.headline }}{{ end }} - {{ part.title }}'
+  overview: '{{ [event.fields.strVenue, event.fields.strCity, event.fields.strCountry] | array.compact | array.join ", " }}'
+  airDate:  '{{ event.start | date.add part.airOffset }}'
+  runtime:  '{{ part.runtime }}'
+  images:
+    thumb: '{{ event.images.thumb ?? event.images.poster }}'
+  search:
+    categories: [5000, 5060]
+    queries:
+      - 'UFC {{ vars.number }}'
+      - 'UFC{{ vars.number }}'
+    must:
+      - '\bUFC[ ._-]?{{ vars.number }}\b'
+    mustNot:
+      - '\bfight[ ._-]?night\b'
+      - '\b(countdown|embedded|weigh[ ._-]?ins?|press[ ._-]?conference)\b'
+    dateWindow: { before: 6h, after: 90d }
+    parts:
+      early-prelims: { must: ['\bearly[ ._-]?prelims?\b'] }
+      prelims:       { must: ['\bprelims?\b'], mustNot: ['\bearly[ ._-]?prelims?\b'] }
+      main-card:     { mustNot: ['\bprelims?\b'] }

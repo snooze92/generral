@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
 using YamlDotNet.RepresentationModel;
 
 namespace Generral.Core.Extensions;
@@ -74,6 +76,62 @@ public static class YamlJson
             default:
                 throw new FormatException($"Unsupported YAML node at line {node.Start.Line}");
         }
+    }
+
+    /// <summary>Writes JSON nodes as block YAML that <see cref="Parse"/> reads back to the same nodes.</summary>
+    public static string ToYaml(JsonNode? node)
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+        var emitter = new Emitter(writer);
+        emitter.Emit(new StreamStart());
+        emitter.Emit(new DocumentStart());
+        Emit(emitter, node);
+        emitter.Emit(new DocumentEnd(isImplicit: true));
+        emitter.Emit(new StreamEnd());
+        return writer.ToString();
+    }
+
+    private static void Emit(IEmitter emitter, JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                emitter.Emit(new MappingStart(AnchorName.Empty, TagName.Empty, true, obj.Count == 0 ? MappingStyle.Flow : MappingStyle.Block));
+                foreach (var (key, value) in obj)
+                {
+                    EmitString(emitter, key);
+                    Emit(emitter, value);
+                }
+
+                emitter.Emit(new MappingEnd());
+                break;
+            case JsonArray array:
+                emitter.Emit(new SequenceStart(AnchorName.Empty, TagName.Empty, true, array.Count == 0 ? SequenceStyle.Flow : SequenceStyle.Block));
+                foreach (var item in array)
+                {
+                    Emit(emitter, item);
+                }
+
+                emitter.Emit(new SequenceEnd());
+                break;
+            case JsonValue value when value.GetValueKind() == JsonValueKind.String:
+                EmitString(emitter, value.GetValue<string>());
+                break;
+            case JsonValue value:
+                emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, value.ToJsonString(), ScalarStyle.Plain, true, false));
+                break;
+            default:
+                emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, "null", ScalarStyle.Plain, true, false));
+                break;
+        }
+    }
+
+    /// <summary>Quoted when a plain scalar would read back as something else (number, boolean, null).</summary>
+    private static void EmitString(IEmitter emitter, string value)
+    {
+        var plain = ConvertScalar(new YamlScalarNode(value) { Style = ScalarStyle.Plain });
+        var style = plain is JsonValue v && v.GetValueKind() == JsonValueKind.String ? ScalarStyle.Any : ScalarStyle.DoubleQuoted;
+        emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, value, style, true, true));
     }
 
     private static JsonNode? ConvertScalar(YamlScalarNode scalar)

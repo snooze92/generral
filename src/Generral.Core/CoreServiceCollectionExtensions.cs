@@ -4,6 +4,7 @@ using Generral.Core.Datastore;
 using Generral.Core.Lifecycle;
 using Generral.Core.Mappings;
 using Generral.Core.Messaging;
+using Generral.Core.Presets;
 using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Http;
@@ -33,6 +34,7 @@ public static class CoreServiceCollectionExtensions
         services.AddScoped<IUiSettingsService, UiSettingsService>();
         services.AddScoped<TagService>();
         services.AddScoped<CalendarService>();
+        services.AddSingleton<PresetStore>();
 
         services.AddSourceTypes();
         services.AddSingleton<SourceRefreshService>();
