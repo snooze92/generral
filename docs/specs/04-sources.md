@@ -25,7 +25,7 @@ All types share common settings:
 
 | Setting | Default | Notes |
 |---------|---------|-------|
-| `refreshInterval` | `12h` | Minimum `15m`. |
+| `refreshInterval` | `12h` | Minimum `15m`. In the API, a number of minutes (default `720`). |
 | `requestDelay` | type default (`thesportsdb`: 2 s, others 1 s) | Between HTTP requests within one fetch. |
 | `headers` | `{}` | Extra headers (e.g. auth). Values may reference secrets: `{{ secret.MY_TOKEN }}`. |
 | `cookies` | none | Optional raw cookie string. |
@@ -202,6 +202,22 @@ implemented yet. The API key is part of the URL path and is redacted from logs.
   256 entries; bypassable per fetch, e.g. for scheduled refreshes. Conditional GET is not
   implemented yet.)*
 - **Concurrency:** one fetch per source at a time; global max 4 concurrent source fetches.
+
+Implementation notes (M1a):
+
+- The hash is a SHA-256 of everything but the key (title, start, end, timezone, status, fields
+  including `_raw`, images). A `gone` event that is returned again gets its status back and a
+  revision. Revisions older than 30 days are deleted at the end of each successful refresh of the
+  source.
+- `missedRefreshes` counts consecutive successful refreshes without the event; an item that failed
+  extraction but still has a `key` counts as returned. Failures (fetch errors, invalid settings,
+  zero-item guard) leave events untouched and set `lastRefresh` and `lastError` (secrets removed
+  with the log cleansing rules), not `lastSuccess`. The zero-item guard compares with the events
+  returned by the previous successful refresh (`missedRefreshes = 0`).
+- Scheduled refreshes bypass the raw-response cache; `POST /source/test` uses it.
+- A source is due when it is enabled and `lastRefresh + refreshInterval` has passed (never
+  refreshed = due at once). `RefreshSources` refreshes the due sources, or all enabled ones with
+  `force: true`; `RefreshSource` refreshes one, due or not.
 
 ## Source editor UI
 
