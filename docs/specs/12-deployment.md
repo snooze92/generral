@@ -49,6 +49,7 @@ the UI.
 | `GENERRAL__DB__TYPE` / `__CONNECTIONSTRING` | `database.*` | `sqlite` / `/config/generral.db` |
 | `GENERRAL__ALLOWSCRIPTSOURCES` | `allowScriptSources` | `false` |
 | `GENERRAL__INSTANCENAME` | `instanceName` | `Generral` |
+| `GENERRAL__PRESETSDIR` | – | `<app>/presets` (shipped presets, read-only) |
 | `GENERRAL__CONFIGDIR` | n/a | `/config` in Docker, `~/.config/Generral` otherwise |
 | `GENERRAL__UIDIR` | n/a | `<app>/UI` (the built SPA; for development, point it at `frontend/dist`) |
 | `GENERRAL__AUTH__USERNAME` / `__PASSWORD` | n/a (first start only) | `generral` / random, printed once to the log |

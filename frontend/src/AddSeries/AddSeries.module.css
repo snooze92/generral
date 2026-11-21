@@ -108,3 +108,11 @@
   gap: 10px;
   margin-top: 24px;
 }
+
+.presetDescription {
+  display: block;
+  margin-top: 4px;
+  color: var(--inkMuted);
+  font-weight: normal;
+  font-size: 12px;
+}

@@ -83,6 +83,7 @@ public sealed partial class PresetDocument
 
         Name = RequiredString(root, "name");
         Description = OptionalString(root["description"], "description")?.Trim();
+        SeriesTitle = root["series"] is JsonObject series ? OptionalString(series["title"], "series.title")?.Trim() : null;
         Tags = root["tags"] is JsonArray tags ? tags.Select(t => OptionalString(t, "tags")).OfType<string>().ToList() : [];
         Parameters = ParseParameters(root);
         var sources = SourceNodes(root);
@@ -94,6 +95,9 @@ public sealed partial class PresetDocument
     public string Name { get; }
 
     public string? Description { get; }
+
+    /// <summary>The default series title, possibly with placeholders.</summary>
+    public string? SeriesTitle { get; }
 
     /// <summary>Gallery labels (e.g. <c>sport</c>), not series tags.</summary>
     public IReadOnlyList<string> Tags { get; }

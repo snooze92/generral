@@ -227,6 +227,38 @@ mode, quality profile name, tags), and `mapping`. Presets:
 
 The *Add Series* flow (see [10](10-ui.md#add-series)) starts with *From preset* or *From scratch*.
 
+Format (M1):
+
+```yaml
+schema: generral/preset@1          # required
+id: ufc-numbered                   # a-z, 0-9, '-'; the file name of shipped presets
+name: UFC – Numbered events
+description: …
+requires: { generral: ">=0.1" }    # informational, not checked yet
+tags: [sport, mma]                 # gallery labels, not series tags
+parameters:                        # prompted on instantiate
+  - { name: tsdbKey, label: TheSportsDB API key, default: "123", secret: true }
+  - { name: seasons, label: Seasons, default: current }
+source: { name, type, settings, refreshInterval: 12h }   # or sources: [ … ]
+series: { title, overview, network, genres, year, seriesType, seasonFolder, monitored, monitorNewItems, searchSettings }
+mapping: { name, priority, source, …definition }          # or mappings: [ … ]
+```
+
+- `{{ NAME }}` and `{{ secret.NAME }}` (exactly that, nothing else in the braces) are replaced as
+  text in every string before the preset is read; every other template is left to the source and
+  mapping. An undeclared `{{ secret.NAME }}` is a required secret. Parameter names can't shadow
+  template globals (`event`, `vars`, `series`, `date`, …).
+- With several sources, a mapping names its `source` (default: the first); `priority` defaults to
+  the list index. The rest of a mapping is the stored mapping definition.
+- `series` keys are those of the series resource; quality profile, images and `monitor` modes wait
+  for M2 (unknown keys are errors, so the spec examples' `images`/`monitor`/`qualityProfile` are
+  not in the shipped presets yet).
+- Shipped presets live in `presets/` (copied to `<app>/presets`, `GENERRAL__PRESETSDIR` overrides),
+  imported ones in `<config>/presets/`. Shipped M1 presets: `ufc-numbered`, `ufc-numbered-parts`
+  (TheSportsDB, free key `123` by default) and `rugby-world-cup` (fixturedownload.com JSON feed,
+  no key: the spec example's Wikipedia `http-html` source type doesn't exist yet). Their live
+  checks (`presets.yml`) are not set up yet; `PresetApiTests` runs them against synthetic responses.
+
 ## Import/export
 
 Every Source, Series and Mapping has *Export YAML* / *Import YAML* actions. The YAML form is the
