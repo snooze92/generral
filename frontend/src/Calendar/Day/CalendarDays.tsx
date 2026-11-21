@@ -34,7 +34,7 @@ function CalendarDays() {
     clearTimeout(updateTimeout.current);
 
     const todaysDate = moment().startOf('day');
-    const diff = moment().diff(todaysDate.clone().add(1, 'day'));
+    const diff = todaysDate.clone().add(1, 'day').diff(moment());
 
     setTodaysDate(todaysDate.toISOString());
 
@@ -96,6 +96,8 @@ function CalendarDays() {
     if (view === calendarViews.MONTH) {
       scheduleUpdate();
     }
+
+    return () => clearTimeout(updateTimeout.current);
   }, [view, scheduleUpdate]);
 
   useEffect(() => {
