@@ -43,11 +43,17 @@ are versioned so that the UI can show what changed.
 | `start` | datetime (UTC) | Optional but needed for date-based features. |
 | `end` | datetime (UTC) | Optional. |
 | `timezone` | IANA tz | Original timezone if known. |
-| `status` | enum | `scheduled`, `postponed`, `cancelled`, `completed`, `unknown`. |
+| `status` | enum | `scheduled`, `postponed`, `cancelled`, `completed`, `unknown`, `gone` (set by refresh, see [04](04-sources.md#fetch-semantics)). |
 | `fields` | JSON object | **All extracted fields**, plus raw source payload under `_raw` (truncated to a size cap). This is what mapping templates read. |
 | `images` | `{poster?, fanart?, thumb?, banner?, logo?}` URLs | Optional. |
 | `firstSeen`, `lastSeen`, `lastChanged` | timestamps | An event missing from refreshes for N consecutive runs is marked `gone` (never auto-deleted while it is linked to a file). |
+| `missedRefreshes` | int | Consecutive successful refreshes that did not return the event (drives `gone`). |
 | `hash` | string | Content hash, used to detect changes. |
+
+### EventRevision
+
+Snapshot of an event *before* a change (`title`, `start`, `end`, `status`, `fields`, `images`, `hash`,
+`created`), one row per detected change, kept for 30 days. Used for the "what changed" view.
 
 ## Series
 
@@ -116,7 +122,8 @@ numbering stable across refreshes.
 | `episodeId` | int | |
 | `createdAt` | datetime | |
 
-Unique on `(mappingId, eventId, partKey)`.
+Unique on `(mappingId, eventId, partKey)`. Storage: "no part" is stored as `""` rather than NULL
+(SQLite treats NULLs as distinct in unique indexes), exposed as `EpisodeLink.NoPart`.
 
 ## Mapping
 
@@ -131,7 +138,17 @@ See [05 – Mapping](05-mapping.md) for full semantics.
 | `priority` | int | When two mappings want the same slot (season+episode), the lower number wins and the loser gets a health warning. |
 | `definition` | YAML/JSON | `filter`, `parts`, `season`, `episode`, `title`, …, `search`. |
 | `enabled` | bool | |
-| `version` | int | Incremented on change. Every version is kept for diff/rollback. |
+| `version` | int | Incremented on change. Every version is kept for diff/rollback in **MappingVersion** (`mappingId`, `version`, `definition`, `created`; unique on `(mappingId, version)`). |
+
+Deleting a Source referenced by a Mapping is refused (FK `Restrict`); deleting a Series cascades to
+its seasons, episodes, mappings and links. Events cascade from their Source.
+
+### Storage notes
+
+JSON-shaped values (`settings`, `fields`, `images`, `definition`, `tags`, `genres`, `searchSettings`,
+`searchTerms`) are TEXT columns holding camelCase JSON. Enums are stored as their names. All
+timestamps are UTC. `Series.titleSlug` and `Series.guid` are unique; `Source.name` and `Tag.label`
+are unique case-insensitively.
 
 ## EpisodeFile
 

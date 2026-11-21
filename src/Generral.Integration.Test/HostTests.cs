@@ -60,7 +60,7 @@ public class HostTests
             Assert.That(status.GetProperty("appName").GetString(), Is.EqualTo("Generral"));
             Assert.That(status.GetProperty("authentication").GetString(), Is.EqualTo("forms"));
             Assert.That(status.GetProperty("databaseType").GetString(), Is.EqualTo("sqlite"));
-            Assert.That(status.GetProperty("migrationVersion").GetString(), Does.EndWith("InitialCreate"));
+            Assert.That(status.GetProperty("migrationVersion").GetString(), Does.Match(@"^\d{14}_\w+$"));
         });
     }
 
