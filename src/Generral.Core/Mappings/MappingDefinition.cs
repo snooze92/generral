@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: The Generral contributors
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 using System.Text.Json.Nodes;
 
 namespace Generral.Core.Mappings;
@@ -8,6 +5,7 @@ namespace Generral.Core.Mappings;
 /// <summary>The parsed <see cref="Mapping.Definition"/> (docs/specs/05-mapping.md § Shape). Every string is a Scriban template.</summary>
 public sealed record MappingDefinition
 {
+    public const string DefaultTitle = "{{ event.title }}";
     public const string DefaultAirDate = "{{ event.start }}";
 
     /// <summary>All must be truthy for an event to be kept.</summary>
@@ -22,7 +20,7 @@ public sealed record MappingDefinition
 
     public string? Absolute { get; init; }
 
-    public required string Title { get; init; }
+    public string Title { get; init; } = DefaultTitle;
 
     public string? Overview { get; init; }
 
@@ -30,8 +28,8 @@ public sealed record MappingDefinition
 
     public string? Runtime { get; init; }
 
-    /// <summary>Image kind (<c>thumb</c>, <c>poster</c>, …) → URL template.</summary>
-    public IReadOnlyList<KeyValuePair<string, string>> Images { get; init; } = [];
+    /// <summary>Episode thumbnail URL template.</summary>
+    public string? Thumb { get; init; }
 
     public SearchDefinition Search { get; init; } = new();
 }
@@ -48,7 +46,7 @@ public sealed record SeasonDefinition
 {
     public SeasonStrategy Strategy { get; init; } = SeasonStrategy.Year;
 
-    /// <summary>Season number template for <see cref="SeasonStrategy.Field"/> and <see cref="SeasonStrategy.Fixed"/>.</summary>
+    /// <summary>Season number template for <see cref="SeasonStrategy.Field"/>; an integer for <see cref="SeasonStrategy.Fixed"/>.</summary>
     public string? Value { get; init; }
 
     /// <summary>Grouping key template for <see cref="SeasonStrategy.Sequential"/>.</summary>
@@ -62,6 +60,8 @@ public enum EpisodeStrategy
 {
     Sequential,
     Field,
+
+    /// <summary>No episode number (stored as 0); the series becomes daily and episodes are identified by air date.</summary>
     Date,
 }
 
