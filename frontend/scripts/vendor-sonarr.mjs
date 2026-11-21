@@ -48,6 +48,18 @@ const fileTransforms = [
   // Upstream relies on SignalR to refresh tags; fix the cache updates so they work without it.
   ['Tags/useTags.ts', "setQueryData<Tag[]>(['tag']", "setQueryData<Tag[]>(['/tag']"],
   ['Tags/useTags.ts', 'oldData.filter((tag) => tag.id === id)', 'oldData.filter((tag) => tag.id !== id)'],
+  // Upstream's midnight timer has a negative delay (it reschedules itself immediately, forever) and
+  // is never cleared on unmount, which breaks test teardown.
+  [
+    'Calendar/Day/CalendarDays.tsx',
+    "moment().diff(todaysDate.clone().add(1, 'day'))",
+    "todaysDate.clone().add(1, 'day').diff(moment())",
+  ],
+  [
+    'Calendar/Day/CalendarDays.tsx',
+    '      scheduleUpdate();\n    }\n  }, [view, scheduleUpdate]);',
+    '      scheduleUpdate();\n    }\n\n    return () => clearTimeout(updateTimeout.current);\n  }, [view, scheduleUpdate]);',
+  ],
 ];
 
 function sonarrFile(sonarrRoot, file) {
