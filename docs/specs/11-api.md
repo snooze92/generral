@@ -33,6 +33,27 @@ Resource shapes reuse Sonarr's where the concept is the same, so that vendored U
 | `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `RenameFiles`, `RenameSeries`, `Renumber`, `DownloadedEpisodesScan`, `Backup`, `CheckHealth`, `Housekeeping` |
 | `system` | `/system/status`, `/system/task`, `/system/backup`, `/health`, `/log`, `/log/file` |
 
+Source, event and command resources (M1a):
+
+- `source`: `{ id, name, type, typeName, enabled, refreshInterval (minutes, ≥ 15), tags, fields[],
+  lastRefresh, lastSuccess, lastError, nextRefresh, eventCount (not gone) }`. `fields[]` is Sonarr's
+  provider field list (`order`, `name`, `label`, `value`, `type`, `helpText`, `unit`, `placeholder`,
+  `advanced`, `privacy`, `selectOptions`); only `name`/`value` are read back. Password fields are
+  returned as `********`, and sending that value back keeps the stored one. `GET /source/schema`
+  returns one such resource per type with the default values. Validation (400, Sonarr's shape):
+  unique name (case-insensitive), known type, the type's own validation, `refreshInterval`.
+  `DELETE` → 400 while a mapping uses the source.
+- `POST /source/test` takes a (possibly unsaved) source resource and returns
+  `{ success, error?, events[], itemErrors[], responses[], meta, warnings[] }`; nothing is stored.
+  A failed fetch is `200` with `success: false`.
+- `POST /source/{id}/refresh` enqueues `RefreshSource { sourceId }` and returns the command (201).
+  `GET /source/{id}/events?includeGone=false` lists events by start; `GET /event/{id}` adds
+  `revisions[]` (newest first). `GET /source/{id}/raw` is not implemented yet.
+- `command`: `{ id, name, commandName, body, status, message, queued, started, ended, duration,
+  trigger }`. `POST /command` takes `{ name, ...body }` like Sonarr (e.g.
+  `{ "name": "RefreshSources", "force": true }`); unknown names and invalid bodies → 400.
+  `GET /command` lists the retained commands, newest first.
+
 SignalR hub `/signalr/messages` broadcasts `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
 for `series`, `episode`, `episodefile`, `queue`, `command`, `health`, `source`, `event`,
 `mapping` (Sonarr's message format).

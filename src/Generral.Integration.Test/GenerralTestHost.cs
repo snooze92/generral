@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Generral.Core.Configuration;
+using Generral.Core.Messaging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -49,6 +50,7 @@ public sealed partial class GenerralTestHost : IAsyncDisposable
             [AppFolders.UiDirKey] = uiFolder,
             ["GENERRAL:AUTH:USERNAME"] = Username,
             ["GENERRAL:AUTH:PASSWORD"] = Password,
+            [ScheduledTaskService.EnabledKey] = "false",
         };
 
         foreach (var (key, value) in settings ?? [])
