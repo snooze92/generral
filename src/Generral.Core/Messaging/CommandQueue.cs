@@ -77,7 +77,7 @@ public sealed class CommandQueue(IEnumerable<ICommandHandler> handlers, TimeProv
         command.Start(time.GetUtcNow().UtcDateTime);
         try
         {
-            var message = await Handler(command.Name).ExecuteAsync(command.Body, new CommandContext(command), cancellationToken);
+            var message = await Handler(command.Name).ExecuteAsync(command.Body, new CommandContext(command, this), cancellationToken);
             command.Finish(CommandStatus.Completed, message ?? "Completed", time.GetUtcNow().UtcDateTime);
         }
         catch (CommandFailedException e)

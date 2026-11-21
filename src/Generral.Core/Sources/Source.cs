@@ -25,5 +25,8 @@ public class Source
 
     public string? LastError { get; set; }
 
+    /// <summary>Source-level data from the last successful fetch, exposed to mappings as <c>source.meta</c>.</summary>
+    public JsonObject Meta { get; set; } = [];
+
     public List<int> Tags { get; set; } = [];
 }
