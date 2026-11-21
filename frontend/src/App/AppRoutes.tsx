@@ -1,6 +1,7 @@
 // Adapted from Sonarr (GPL-3.0-or-later): frontend/src/App/AppRoutes.tsx
 import React from 'react';
 import { Navigate, Route } from 'react-router-dom';
+import AddSeries from 'AddSeries/AddSeries';
 import NotFound from 'Components/NotFound';
 import PlaceholderPage, { Milestone } from 'Components/Page/PlaceholderPage';
 import SeriesDetailsPage from 'Series/Details/SeriesDetailsPage';
@@ -22,7 +23,6 @@ interface PlaceholderRoute {
 
 // Pages that later milestones will build (docs/specs/13-roadmap.md).
 const PLACEHOLDERS: PlaceholderRoute[] = [
-  { path: '/add/new', scope: () => translate('Series'), title: () => translate('AddNew'), milestone: 'M1' },
   { path: '/calendar', title: () => translate('Calendar'), milestone: 'M1' },
   {
     path: '/activity/queue',
@@ -136,6 +136,8 @@ export function appRouteElements() {
           }
         />
       ))}
+
+      <Route path="/add/new" element={<AddSeries />} />
 
       <Route path="/series" element={<SeriesIndex />} />
 

@@ -62,6 +62,7 @@ Components/Form/Select/UMaskInput.module.css
 Components/Form/Select/UMaskInput.tsx
 Components/Form/SelectInput.module.css
 Components/Form/SelectInput.tsx
+Components/Form/Tag/SeriesTagInput.tsx
 Components/Form/Tag/TagInput.module.css
 Components/Form/Tag/TagInput.tsx
 Components/Form/Tag/TagInputInput.module.css

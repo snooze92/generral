@@ -15,9 +15,23 @@ const isFinished = (command: Command) =>
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Polls `GET /command/{id}` until the command has finished (no SignalR yet). */
+export const waitForCommand = async (command: Command) => {
+  let current = command;
+
+  while (!isFinished(current)) {
+    await delay(POLL_INTERVAL);
+    current = await fetchJson<Command, void>({
+      path: getQueryPath(`/command/${current.id}`),
+      headers,
+    });
+  }
+
+  return current;
+};
+
 /**
- * POSTs to an endpoint that enqueues a command, then polls `GET /command/{id}` until the command
- * has finished (there is no SignalR to push command updates yet).
+ * POSTs to an endpoint that enqueues a command, then waits until the command has finished.
  */
 export const useTrackedCommand = (
   path: string,
@@ -25,22 +39,14 @@ export const useTrackedCommand = (
 ) => {
   const { mutate, isPending } = useMutation<Command, ApiError, object | void>({
     mutationFn: async (body) => {
-      let command = await fetchJson<Command, object>({
+      const command = await fetchJson<Command, object>({
         path: getQueryPath(path),
         method: 'POST',
         headers,
         body: body ?? undefined,
       });
 
-      while (!isFinished(command)) {
-        await delay(POLL_INTERVAL);
-        command = await fetchJson<Command, void>({
-          path: getQueryPath(`/command/${command.id}`),
-          headers,
-        });
-      }
-
-      return command;
+      return waitForCommand(command);
     },
     onSuccess: onFinished,
   });

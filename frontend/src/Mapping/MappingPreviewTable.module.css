@@ -1,0 +1,41 @@
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--inkSoft);
+  font-weight: 500;
+}
+
+.summaryErrors {
+  color: var(--dangerColor);
+}
+
+.rejected {
+  composes: row from 'Components/Table/TableRow.module.css';
+
+  color: var(--inkFaint);
+}
+
+.eventTitle {
+  font-weight: 500;
+}
+
+.eventKey,
+.rejectedBy {
+  color: var(--inkMuted);
+  font-size: 12px;
+  font-family: var(--monoSpaceFontFamily);
+}
+
+.number {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  white-space: nowrap;
+  font-family: var(--monoSpaceFontFamily);
+}
+
+.error {
+  color: var(--dangerColor);
+  font-size: 12px;
+}

@@ -19,6 +19,7 @@ import EnhancedSelectInput, {
   EnhancedSelectInputProps,
 } from './Select/EnhancedSelectInput';
 import UMaskInput, { UMaskInputProps } from './Select/UMaskInput';
+import SeriesTagInput, { SeriesTagInputProps } from './Tag/SeriesTagInput';
 import TagSelectInput, { TagSelectInputProps } from './Tag/TagSelectInput';
 import TextTagInput, { TextTagInputProps } from './Tag/TextTagInput';
 import TextArea, { TextAreaProps } from './TextArea';
@@ -34,6 +35,7 @@ const componentMap: Partial<Record<InputType, ElementType>> = {
   number: NumberInput,
   password: PasswordInput,
   select: EnhancedSelectInput,
+  tag: SeriesTagInput,
   tagSelect: TagSelectInput,
   text: TextInput,
   textArea: TextArea,
@@ -55,6 +57,8 @@ type PickProps<V, C extends InputType> = C extends 'autoComplete'
   : C extends 'select'
   ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EnhancedSelectInputProps<any, V>
+  : C extends 'tag'
+  ? SeriesTagInputProps<V>
   : C extends 'tagSelect'
   ? TagSelectInputProps
   : C extends 'textArea'
