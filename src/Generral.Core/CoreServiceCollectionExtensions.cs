@@ -77,6 +77,8 @@ public static class CoreServiceCollectionExtensions
             .ConfigurePrimaryHttpMessageHandler(QBittorrentClient.CreateHandler);
         services.AddSingleton<IDownloadClient, QBittorrentClient>();
         services.AddSingleton<DownloadClientProvider>();
+        services.AddHttpClient(TorrentReleaseFetcher.ClientName, TorznabClient.ConfigureClient)
+            .ConfigurePrimaryHttpMessageHandler(TorrentReleaseFetcher.CreateHandler);
         services.AddSingleton<TorrentReleaseFetcher>();
         services.AddScoped<DownloadClientConfigService>();
         services.AddScoped<HistoryService>();

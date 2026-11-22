@@ -21,7 +21,17 @@ public sealed record TorrentPayload(string Hash, string? MagnetUrl, byte[]? File
 /// </summary>
 public sealed partial class TorrentReleaseFetcher(IHttpClientFactory clients, ILogger<TorrentReleaseFetcher> logger)
 {
+    public const string ClientName = "IndexerDownload";
+
     private const int MaxRedirects = 5;
+
+    /// <summary>Redirects are followed by hand: the handler would throw on a <c>magnet:</c> location.</summary>
+    public static SocketsHttpHandler CreateHandler()
+    {
+        var handler = SourceFetcherFactory.CreateHandler();
+        handler.AllowAutoRedirect = false;
+        return handler;
+    }
 
     /// <exception cref="ReleaseDownloadException">Neither the torrent file nor the magnet link is usable.</exception>
     public async Task<TorrentPayload> ResolveAsync(ReleaseInfo release, CancellationToken cancellationToken = default)
@@ -64,7 +74,7 @@ public sealed partial class TorrentReleaseFetcher(IHttpClientFactory clients, IL
             SsrfGuard.EnsureAllowed(url);
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Accept.ParseAdd("application/x-bittorrent");
-            using var response = await clients.CreateClient(TorznabClient.ClientName).SendAsync(request, cancellationToken);
+            using var response = await clients.CreateClient(ClientName).SendAsync(request, cancellationToken);
             if ((int)response.StatusCode is >= 300 and < 400)
             {
                 var location = response.Headers.Location ?? throw new ReleaseDownloadException("Remote website tried to redirect without providing a location.");
