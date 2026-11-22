@@ -197,7 +197,9 @@ seeders before size.
   day 9. A slot missed by more than 1 day (downtime) is skipped; offsets beyond 60 d are ignored.
   Per series/mapping: `searchSchedule: [1h, 6h, 2d]` in the search settings (`[]` disables).
   It is an automatic search (monitored only, grabs the best accepted release).
-- `CutoffUnmetEpisodeSearch` exists but searches nothing until episode files exist (M3).
+- `CutoffUnmetEpisodeSearch` searches monitored, aired episodes of monitored series whose file is below the cutoff.
+  Upgrades (§ Specifications) follow Sonarr's `UpgradableSpecification` without custom formats: propers/repacks are always
+  preferred.
 
 ## Languages
 

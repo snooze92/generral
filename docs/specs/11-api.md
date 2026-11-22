@@ -116,7 +116,20 @@ Quality resources (M2b), Sonarr v3-shaped:
   returns Sonarr's `PagingResource<EpisodeResource>` of aired active episodes without a file;
   `monitored=true` (default) = episode and series monitored, `false` = either unmonitored. Sort keys
   `episodes.airDateUtc` (default, ascending), `episodes.lastSearchTime`, `series.sortTitle`.
-  `GET /wanted/cutoff` (same parameters) is always empty until episode files exist (M3).
+  `GET /wanted/cutoff` (same parameters) lists active episodes whose file is below the profile cutoff.
+- Import & media management (M3a), Sonarr-shaped: `rootfolder` (`GET`, `GET/{id}`, `POST { path }` (must
+  exist), `DELETE/{id}`; `{ id, path, accessible, freeSpace, totalSpace, unmappedFolders[] }`),
+  `remotepathmapping` CRUD (`{ id, host, remotePath, localPath }`, paths stored with a trailing slash,
+  local path must exist), `GET/PUT /config/naming` (Sonarr's `NamingConfigResource` without anime; enums
+  as numbers) and `GET /config/naming/examples` (query overrides the stored formats, sports samples),
+  `GET/PUT /config/mediamanagement` (`copyUsingHardlinks`, `recycleBin`, `recycleBinCleanupDays`,
+  `skipFreeSpaceCheckWhenImporting`, `minimumFreeSpaceWhenImporting`, `importExtraFiles`,
+  `extraFileExtensions`, `deleteEmptyFolders`, `setPermissionsLinux`, `chmodFolder`, `chownGroup`),
+  `episodefile` (`GET ?seriesId=|episodeFileIds=`, `GET/{id}`, `DELETE/{id}` → recycle bin),
+  `GET /manualimport?folder=|downloadId=&seriesId=` (files with suggested episodes and rejections). The
+  import itself is the `ManualImport { files: [{ path, seriesId, episodeIds, quality?, releaseGroup?,
+  downloadId? }], importMode: auto|move|copy }` command, as in Sonarr; `POST /manualimport`
+  (reprocess) is not implemented. `chownGroup` is stored but not applied yet.
 - `releaseprofile`: `{ id, name, enabled, required[], ignored[], indexerId, tags[], excludedTags[] }`
   (`required`/`ignored` also accept a comma-separated string). At least one term is required; the
   indexer and tags must exist; a tag can't be both included and excluded. Sonarr's air-date and
