@@ -92,6 +92,9 @@ function renderWizard(routes: Record<string, MockRoute> = {}) {
     'GET /api/v1/tag': [{ id: 1, label: 'football' }],
     'POST /api/v1/mapping/preview': preview,
     'GET /api/v1/preset': presets,
+    'GET /api/v1/rootfolder': [
+      { id: 1, path: '/sport', accessible: true, freeSpace: 1e12, unmappedFolders: [] },
+    ],
     'GET /api/v1/qualityprofile': [
       { id: 1, name: 'Any', upgradeAllowed: false, cutoff: 1 },
       { id: 4, name: 'HD-1080p', upgradeAllowed: false, cutoff: 9 },
@@ -202,9 +205,6 @@ describe('Add series', () => {
 
     const title = screen.getByDisplayValue('Cup');
     expect(title.getAttribute('name')).toBe('title');
-    fireEvent.change(screen.getByPlaceholderText('/tv'), {
-      target: { name: 'rootFolderPath', value: '/sport' },
-    });
     expect(await screen.findByText('Any')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add Cup' }));
 
@@ -245,9 +245,6 @@ describe('Add series', () => {
 
     await goToMapping();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.change(screen.getByPlaceholderText('/tv'), {
-      target: { name: 'rootFolderPath', value: '/sport' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Add Cup' }));
 
     expect(await screen.findByText('title: invalid template')).toBeTruthy();
@@ -290,9 +287,6 @@ describe('Add series', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(screen.getByDisplayValue('EFL').getAttribute('name')).toBe('title');
-    fireEvent.change(screen.getByPlaceholderText('/tv'), {
-      target: { name: 'rootFolderPath', value: '/sport' },
-    });
     fireEvent.change(screen.getByPlaceholderText('123'), {
       target: { name: 'tsdbKey', value: 'premium' },
     });

@@ -13,6 +13,9 @@ import SeriesIndex from 'Series/Index/SeriesIndex';
 import DownloadClientSettings from 'Settings/DownloadClients/DownloadClientSettings';
 import GeneralSettings from 'Settings/General/GeneralSettings';
 import IndexerSettings from 'Settings/Indexers/IndexerSettings';
+import MediaManagementSettings from 'Settings/MediaManagement/MediaManagementSettings';
+import MetadataSettings from 'Settings/Metadata/MetadataSettings';
+import NotificationSettings from 'Settings/Notifications/NotificationSettings';
 import Profiles from 'Settings/Profiles/Profiles';
 import QualitySettings from 'Settings/Quality/QualitySettings';
 import Settings from 'Settings/Settings';
@@ -32,24 +35,6 @@ interface PlaceholderRoute {
 
 // Pages that later milestones will build (docs/specs/13-roadmap.md).
 const PLACEHOLDERS: PlaceholderRoute[] = [
-  {
-    path: '/settings/mediamanagement',
-    scope: () => translate('Settings'),
-    title: () => translate('MediaManagement'),
-    milestone: 'M3',
-  },
-  {
-    path: '/settings/connect',
-    scope: () => translate('Settings'),
-    title: () => translate('Connect'),
-    milestone: 'M3',
-  },
-  {
-    path: '/settings/metadata',
-    scope: () => translate('Settings'),
-    title: () => translate('Metadata'),
-    milestone: 'M3',
-  },
   { path: '/system/tasks', scope: () => translate('System'), title: () => translate('Tasks'), milestone: 'M3' },
   {
     path: '/system/backups',
@@ -132,6 +117,15 @@ export function appRouteElements() {
         path="/settings/downloadclients"
         element={<DownloadClientSettings />}
       />
+
+      <Route
+        path="/settings/mediamanagement"
+        element={<MediaManagementSettings />}
+      />
+
+      <Route path="/settings/connect" element={<NotificationSettings />} />
+
+      <Route path="/settings/metadata" element={<MetadataSettings />} />
 
       <Route path="/system/status" element={<Status />} />
 

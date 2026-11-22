@@ -1,5 +1,5 @@
 import classNames from 'classnames';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from 'Components/Alert';
 import Button from 'Components/Link/Button';
@@ -12,6 +12,7 @@ import { getValidationFailures } from 'Helpers/Hooks/useApiMutation';
 import { kinds } from 'Helpers/Props';
 import { MappingPreview } from 'Mapping/Mapping';
 import useSeries from 'Series/useSeries';
+import { useRootFolders } from 'Settings/MediaManagement/MediaManagement';
 import { useSources } from 'Sources/useSources';
 import { InputChanged } from 'typings/inputs';
 import translate from 'Utilities/String/translate';
@@ -42,6 +43,12 @@ function AddSeries() {
   const navigate = useNavigate();
   const { data: sources } = useSources();
   const { data: allSeries } = useSeries();
+  const { data: rootFolders } = useRootFolders();
+  // An existing series' root folder if it is still configured, else the first one.
+  const defaultRootFolder =
+    rootFolders.find((f) => f.path === allSeries[0]?.rootFolderPath)?.path ??
+    rootFolders[0]?.path ??
+    '';
 
   const { data: presets } = usePresets();
   const [step, setStep] = useState<Step>('start');
@@ -52,7 +59,7 @@ function AddSeries() {
   const [definition, setDefinition] = useState(defaultDefinition);
   const [seriesType, setSeriesType] = useState<MappingPreview['seriesType']>();
   const [titleEdited, setTitleEdited] = useState(false);
-  const [series, setSeries] = useState<NewSeries>({
+  const [options, setSeries] = useState<NewSeries>({
     title: '',
     rootFolderPath: '',
     monitored: true,
@@ -62,6 +69,13 @@ function AddSeries() {
     qualityProfileId: 0,
     tags: [],
   });
+  const series = useMemo(
+    () => ({
+      ...options,
+      rootFolderPath: options.rootFolderPath || defaultRootFolder,
+    }),
+    [options, defaultRootFolder]
+  );
 
   const { addSeries, isAdding, addError, reset } = useAddSeries();
   const { instantiate, isInstantiating, instantiateError, reset: resetInstantiate } =
@@ -81,11 +95,9 @@ function AddSeries() {
         title: titleEdited
           ? current.title
           : (presets.find((p) => p.id === id)?.seriesTitle ?? ''),
-        rootFolderPath:
-          current.rootFolderPath || (allSeries[0]?.rootFolderPath ?? ''),
       }));
     },
-    [presets, allSeries, titleEdited]
+    [presets, titleEdited]
   );
 
   const handleScratchSelect = useCallback(() => {
@@ -103,17 +115,15 @@ function AddSeries() {
     (id: number) => {
       setSourceId(id);
 
-      // Defaults: the source's name, and the root folder of an existing series.
+      // Defaults to the source's name.
       setSeries((current) => ({
         ...current,
         title: titleEdited
           ? current.title
           : (sources.find((s) => s.id === id)?.name ?? ''),
-        rootFolderPath:
-          current.rootFolderPath || (allSeries[0]?.rootFolderPath ?? ''),
       }));
     },
-    [sources, allSeries, titleEdited]
+    [sources, titleEdited]
   );
 
   const handlePreview = useCallback(
