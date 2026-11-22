@@ -12,6 +12,7 @@ const profile: QualityProfile = {
   name: 'HD',
   upgradeAllowed: true,
   cutoff: 3,
+  language: { id: 1, name: 'English' },
   items: [
     { quality: { id: 1, name: 'SDTV' }, items: [], allowed: false },
     { quality: { id: 4, name: 'HDTV-720p' }, items: [], allowed: true },
@@ -54,6 +55,12 @@ function renderProfiles() {
       return releaseProfiles[1];
     },
     'GET /api/v1/indexer': [],
+    'GET /api/v1/language': [
+      { id: -1, name: 'Any' },
+      { id: -2, name: 'Original' },
+      { id: 1, name: 'English' },
+      { id: 2, name: 'French' },
+    ],
   });
 }
 
@@ -83,6 +90,23 @@ describe('Profiles', () => {
       { quality: { id: 1, name: 'SDTV' }, items: [], allowed: true },
       { quality: { id: 3, name: 'WEBDL-1080p' }, items: [], allowed: true },
     ]);
+  });
+
+  it('picks the language of a quality profile', async () => {
+    const fetchMock = renderProfiles();
+
+    fireEvent.click(await screen.findByLabelText('Edit Quality Profile'));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(await within(dialog).findByText('English'));
+    expect(await screen.findByText('Original')).toBeTruthy();
+    expect(screen.getByText('French')).toBeTruthy();
+    fireEvent.click(screen.getByText('Any'));
+
+    fireEvent.click(within(dialog).getByText('Save'));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const [saved] = requests(fetchMock, 'PUT', '/api/v1/qualityprofile/1');
+    expect(saved.language).toEqual({ id: -1, name: 'Any' });
   });
 
   it('shows why a quality profile cannot be deleted', async () => {

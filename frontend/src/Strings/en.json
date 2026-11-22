@@ -619,5 +619,21 @@
   "UnableToImportAutomatically": "Unable to Import Automatically",
   "UnknownEventTooltip": "Unknown event",
   "WaitingToImport": "Waiting to Import",
-  "WaitingToProcess": "Waiting to Process"
+  "WaitingToProcess": "Waiting to Process",
+  "CutoffUnmetLoadError": "Error loading cutoff unmet items",
+  "CutoffUnmetNoItems": "No cutoff unmet items",
+  "Language": "Language",
+  "Languages": "Languages",
+  "MassSearchCancelWarning": "This cannot be cancelled once started without restarting {appName} or disabling all of your indexers.",
+  "MissingLoadError": "Error loading missing items",
+  "MissingNoItems": "No missing items",
+  "MultiLanguages": "Multi-Languages",
+  "Search": "Search",
+  "SearchAll": "Search All",
+  "SearchForAllMissingEpisodes": "Search for all missing episodes",
+  "SearchForAllMissingEpisodesConfirmationCount": "Are you sure you want to search for all {totalRecords} missing episodes?",
+  "SearchForCutoffUnmetEpisodes": "Search for all Cutoff Unmet episodes",
+  "SearchForCutoffUnmetEpisodesConfirmationCount": "Are you sure you want to search for all {totalRecords} Cutoff Unmet episodes?",
+  "SearchSelected": "Search Selected",
+  "QualityProfileLanguageHelpText": "Releases in other languages are rejected. Any accepts every language; Original counts as English."
 }

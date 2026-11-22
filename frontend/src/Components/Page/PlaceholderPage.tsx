@@ -6,7 +6,7 @@ import PageHeading from 'Components/Page/PageHeading';
 import { kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 
-export type Milestone = 'M1' | 'M2' | 'M3';
+export type Milestone = 'M3';
 
 interface PlaceholderPageProps {
   scope?: string;

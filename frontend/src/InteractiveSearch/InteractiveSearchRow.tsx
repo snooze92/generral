@@ -7,6 +7,7 @@ import SpinnerIconButton from 'Components/Link/SpinnerIconButton';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRow from 'Components/Table/TableRow';
 import Popover from 'Components/Tooltip/Popover';
+import EpisodeLanguages from 'Episode/EpisodeLanguages';
 import EpisodeQuality from 'Episode/EpisodeQuality';
 import { icons, kinds, tooltipPositions } from 'Helpers/Props';
 import formatAge from 'Utilities/Number/formatAge';
@@ -46,6 +47,7 @@ function InteractiveSearchRow({ release }: { release: Release }) {
     size,
     seeders,
     leechers,
+    languages,
     quality,
     rejections,
     downloadAllowed,
@@ -80,6 +82,10 @@ function InteractiveSearchRow({ release }: { release: Release }) {
         {protocol === 'torrent' ? (
           <Peers seeders={seeders} leechers={leechers} />
         ) : null}
+      </TableRowCell>
+
+      <TableRowCell className={styles.languages}>
+        <EpisodeLanguages languages={languages} />
       </TableRowCell>
 
       <TableRowCell className={styles.quality}>
