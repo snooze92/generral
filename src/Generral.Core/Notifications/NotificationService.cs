@@ -45,6 +45,22 @@ public sealed class NotificationService(
         }
     }
 
+    /// <summary>Health issues go to every connection with the trigger, whatever its tags; warnings only with <c>includeHealthWarnings</c>.</summary>
+    public async Task NotifyHealthAsync(HealthCheck.HealthCheck check, bool restored, CancellationToken cancellationToken = default)
+    {
+        var trigger = restored ? NotificationTrigger.HealthRestored : NotificationTrigger.HealthIssue;
+        foreach (var definition in await db.Notifications.AsNoTracking().ToListAsync(cancellationToken))
+        {
+            if (provider.Find(definition.Implementation) is not { } notification || !definition.Has(trigger) || !notification.SupportedTriggers.Contains(trigger) ||
+                !restored && check.Type != HealthCheck.HealthCheckResult.Error && !(check.Type == HealthCheck.HealthCheckResult.Warning && definition.IncludeHealthWarnings))
+            {
+                continue;
+            }
+
+            await RunAsync(definition, () => notification.SendHealthAsync(definition, check, restored, cancellationToken), cancellationToken);
+        }
+    }
+
     /// <summary>Refreshes media servers after only metadata files changed (e.g. a title update).</summary>
     public async Task UpdateMediaServersAsync(Series series, CancellationToken cancellationToken = default)
     {

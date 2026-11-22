@@ -91,6 +91,16 @@ public sealed class DiscordNotification(IHttpClientFactory clients, IHostConfigP
     public Task SendAsync(NotificationDefinition definition, NotificationMessage message, CancellationToken cancellationToken = default) =>
         PostAsync(definition, Build(definition, message), cancellationToken);
 
+    public Task SendHealthAsync(NotificationDefinition definition, HealthCheck.HealthCheck check, bool restored, CancellationToken cancellationToken = default) =>
+        PostAsync(definition, Payload(definition, new DiscordEmbed
+        {
+            Author = Author(definition),
+            Title = restored ? "Health Issue Resolved: " + check.Source : check.Source,
+            Description = restored ? $"The following issue is now resolved: {check.Message}" : check.Message,
+            Timestamp = time.GetUtcNow().UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
+            Color = (int)(restored ? DiscordColors.Success : check.Type == HealthCheck.HealthCheckResult.Warning ? DiscordColors.Warning : DiscordColors.Danger),
+        }), cancellationToken);
+
     public async Task<IReadOnlyList<IndexerValidationFailure>> TestAsync(NotificationDefinition definition, CancellationToken cancellationToken = default)
     {
         try

@@ -3,6 +3,7 @@ using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Extensions;
 using Generral.Core.Extras.Metadata;
+using Generral.Core.HealthCheck;
 using Generral.Core.Mappings;
 using Generral.Core.Messaging;
 using Generral.Core.Notifications;
@@ -46,6 +47,7 @@ public class ApplyMappingsServiceTests
         services.AddDbContext<GenerralDbContext>(o => o.UseSqlite(_connection));
         services.AddSingleton<TimeProvider>(_time);
         services.AddSourceTypes();
+        services.AddSingleton<ProviderStatusTracker>();
         services.AddSingleton<SourceRefreshService>();
         services.AddSingleton<CommandQueue>();
         services.AddSingleton<ICommandHandler, RefreshSourceHandler>();
@@ -56,7 +58,7 @@ public class ApplyMappingsServiceTests
         services.AddSingleton<NotificationProvider>();
         services.AddScoped<NotificationService>();
         services.AddSingleton(sp => new ApplyMappingsService(
-            sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<MappingEngine>(), _time, NullLogger<ApplyMappingsService>.Instance)
+            sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<MappingEngine>(), new ProviderStatusTracker(_time), _time, NullLogger<ApplyMappingsService>.Instance)
         {
             Timezone = TimeZoneInfo.Utc,
         });

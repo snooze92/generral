@@ -213,6 +213,9 @@ public static class NotificationEndpoints
         definition.OnSeriesDelete = On(resource.OnSeriesDelete, NotificationTrigger.SeriesDelete);
         definition.OnEpisodeFileDelete = On(resource.OnEpisodeFileDelete, NotificationTrigger.EpisodeFileDelete);
         definition.OnEpisodeFileDeleteForUpgrade = On(resource.OnEpisodeFileDeleteForUpgrade, NotificationTrigger.EpisodeFileDeleteForUpgrade);
+        definition.OnHealthIssue = On(resource.OnHealthIssue, NotificationTrigger.HealthIssue);
+        definition.IncludeHealthWarnings = definition.OnHealthIssue && resource.IncludeHealthWarnings;
+        definition.OnHealthRestored = On(resource.OnHealthRestored, NotificationTrigger.HealthRestored);
         return null;
     }
 
@@ -241,6 +244,9 @@ public static class NotificationEndpoints
             OnSeriesDelete = definition.OnSeriesDelete,
             OnEpisodeFileDelete = definition.OnEpisodeFileDelete,
             OnEpisodeFileDeleteForUpgrade = definition.OnEpisodeFileDeleteForUpgrade,
+            OnHealthIssue = definition.OnHealthIssue,
+            IncludeHealthWarnings = definition.IncludeHealthWarnings,
+            OnHealthRestored = definition.OnHealthRestored,
         };
         return notification is null ? resource : WithSupports(notification, resource);
     }
@@ -262,6 +268,8 @@ public static class NotificationEndpoints
             SupportsOnSeriesDelete = supported.Contains(NotificationTrigger.SeriesDelete),
             SupportsOnEpisodeFileDelete = supported.Contains(NotificationTrigger.EpisodeFileDelete),
             SupportsOnEpisodeFileDeleteForUpgrade = supported.Contains(NotificationTrigger.EpisodeFileDeleteForUpgrade),
+            SupportsOnHealthIssue = supported.Contains(NotificationTrigger.HealthIssue),
+            SupportsOnHealthRestored = supported.Contains(NotificationTrigger.HealthRestored),
         };
     }
 

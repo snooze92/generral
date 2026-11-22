@@ -40,6 +40,13 @@ public class NotificationDefinition
 
     public bool OnEpisodeFileDeleteForUpgrade { get; set; }
 
+    public bool OnHealthIssue { get; set; }
+
+    /// <summary>With <see cref="OnHealthIssue"/>: warnings too, not only errors.</summary>
+    public bool IncludeHealthWarnings { get; set; }
+
+    public bool OnHealthRestored { get; set; }
+
     public bool Has(NotificationTrigger trigger) => trigger switch
     {
         NotificationTrigger.Grab => OnGrab,
@@ -49,11 +56,13 @@ public class NotificationDefinition
         NotificationTrigger.SeriesDelete => OnSeriesDelete,
         NotificationTrigger.EpisodeFileDelete => OnEpisodeFileDelete,
         NotificationTrigger.EpisodeFileDeleteForUpgrade => OnEpisodeFileDeleteForUpgrade,
+        NotificationTrigger.HealthIssue => OnHealthIssue,
+        NotificationTrigger.HealthRestored => OnHealthRestored,
         _ => false,
     };
 }
 
-/// <summary>Sonarr's triggers that Generral raises; rename and health triggers come with those features.</summary>
+/// <summary>Sonarr's triggers that Generral raises; rename comes with that feature.</summary>
 public enum NotificationTrigger
 {
     Grab,
@@ -63,6 +72,8 @@ public enum NotificationTrigger
     SeriesDelete,
     EpisodeFileDelete,
     EpisodeFileDeleteForUpgrade,
+    HealthIssue,
+    HealthRestored,
 }
 
 /// <summary>An event to notify; episodes are already spoiler-filtered.</summary>
@@ -140,6 +151,11 @@ public interface INotification
     Task<IReadOnlyList<IndexerValidationFailure>> TestAsync(NotificationDefinition definition, CancellationToken cancellationToken = default);
 
     IReadOnlyList<IndexerValidationFailure> Validate(JsonObject settings);
+
+    /// <summary>A health issue appeared or, with <paramref name="restored"/>, was resolved.</summary>
+    /// <exception cref="NotificationException">Sending failed.</exception>
+    Task SendHealthAsync(NotificationDefinition definition, HealthCheck.HealthCheck check, bool restored, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }
 
 /// <summary>A connection that refreshes a media server library; also told when only metadata files changed.</summary>

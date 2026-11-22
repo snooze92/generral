@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Generral.Core.Datastore;
 using Generral.Core.Extras.Metadata;
+using Generral.Core.HealthCheck;
 using Generral.Core.Notifications;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
@@ -25,7 +26,8 @@ public sealed record RenumberMove(
 public sealed record RenumberResult(IReadOnlyList<RenumberMove> Moves, IReadOnlyList<ApplyMappingResult> Mappings);
 
 /// <summary>Evaluates mappings and persists the plan: seasons, episodes, links and orphan status (docs/specs/05-mapping.md).</summary>
-public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEngine engine, TimeProvider time, ILogger<ApplyMappingsService> logger)
+public sealed class ApplyMappingsService(
+    IServiceScopeFactory scopes, MappingEngine engine, ProviderStatusTracker status, TimeProvider time, ILogger<ApplyMappingsService> logger)
 {
     private readonly ConcurrentDictionary<int, SemaphoreSlim> _perSeries = new();
 
@@ -149,6 +151,7 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
         catch (MappingDefinitionException e)
         {
             await db.SaveChangesAsync(cancellationToken);
+            status.RecordFailure(ProviderKind.Mapping, mapping.Id, mapping.Name, e.Message);
             logger.LogWarning("Mapping {Name} is invalid: {Error}", mapping.Name, e.Message);
             return (new ApplyMappingResult(mapping.Id, mapping.Name, 0, 0, 0, 0, 0, e.Message), null);
         }
@@ -204,6 +207,15 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
             counts.GetValueOrDefault(MappingChange.Orphaned),
             counts.GetValueOrDefault(MappingChange.Error),
             null);
+        if (result.Errors > 0)
+        {
+            status.RecordFailure(ProviderKind.Mapping, mapping.Id, mapping.Name, $"{result.Errors} event(s) could not be mapped");
+        }
+        else
+        {
+            status.RecordSuccess(ProviderKind.Mapping, mapping.Id);
+        }
+
         logger.LogInformation("Applied mapping {Summary}", result.Summary);
         return (result, plan);
     }

@@ -1,4 +1,5 @@
 using Generral.Core.Authentication;
+using Generral.Core.Backup;
 using Generral.Core.Blocklisting;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
@@ -8,6 +9,7 @@ using Generral.Core.Download.Clients.QBittorrent;
 using Generral.Core.Download.TrackedDownloads;
 using Generral.Core.Extras.Metadata;
 using Generral.Core.Extras.Metadata.Consumers.PlexNfo;
+using Generral.Core.HealthCheck;
 using Generral.Core.History;
 using Generral.Core.Indexers.Torznab;
 using Generral.Core.IndexerSearch;
@@ -98,6 +100,20 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<NotificationProvider>();
         services.AddScoped<NotificationService>();
 
+        services.AddSingleton<ProviderStatusTracker>();
+        services.AddSingleton<HealthCheckService>();
+        services.AddScoped<IProvideHealthCheck, IndexerRssCheck>();
+        services.AddScoped<IProvideHealthCheck, IndexerSearchCheck>();
+        services.AddScoped<IProvideHealthCheck, IndexerStatusCheck>();
+        services.AddScoped<IProvideHealthCheck, DownloadClientCheck>();
+        services.AddScoped<IProvideHealthCheck, DownloadClientStatusCheck>();
+        services.AddScoped<IProvideHealthCheck, RootFolderCheck>();
+        services.AddScoped<IProvideHealthCheck, RemotePathMappingCheck>();
+        services.AddScoped<IProvideHealthCheck, SourceRefreshCheck>();
+        services.AddScoped<IProvideHealthCheck, MappingCheck>();
+        services.AddSingleton<ICommandHandler, CheckHealthHandler>();
+        services.AddSingleton<BackupService>();
+        services.AddSingleton<ICommandHandler, BackupHandler>();
         services.AddSingleton<CommandQueue>();
         services.AddSingleton<ICommandHandler, RefreshSourcesHandler>();
         services.AddSingleton<ICommandHandler, RefreshSourceHandler>();
@@ -114,7 +130,8 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<ICommandHandler, CutoffUnmetEpisodeSearchHandler>();
         services.AddSingleton<ICommandHandler, RefreshMonitoredDownloadsHandler>();
         services.AddHostedService<CommandWorker>();
-        services.AddHostedService<ScheduledTaskService>();
+        services.AddSingleton<ScheduledTaskService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScheduledTaskService>());
 
         return services;
     }

@@ -4,7 +4,7 @@
 //
 // Ported from Sonarr@51a2412af235 src/NzbDrone.Core/Notifications/Webhook/WebhookBase.cs, WebhookPayload.cs, WebhookEventType.cs,
 // WebhookSeries.cs, WebhookEpisode.cs, WebhookEpisodeFile.cs, WebhookRelease.cs, WebhookGrabbedRelease.cs, WebhookImage.cs,
-// WebhookGrabPayload.cs, WebhookImportPayload.cs, WebhookEpisodeDeletePayload.cs, WebhookSeriesAddPayload.cs and WebhookSeriesDeletePayload.cs
+// WebhookGrabPayload.cs, WebhookImportPayload.cs, WebhookEpisodeDeletePayload.cs, WebhookSeriesAddPayload.cs, WebhookSeriesDeletePayload.cs and WebhookHealthPayload.cs
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Generral.Core.Datastore;
@@ -48,6 +48,18 @@ public record WebhookPayload
     public WebhookSeries? Series { get; init; }
 
     public List<WebhookEpisode>? Episodes { get; init; }
+}
+
+public sealed record WebhookHealthPayload : WebhookPayload
+{
+    [JsonConverter(typeof(JsonStringEnumConverter<HealthCheck.HealthCheckResult>))]
+    public HealthCheck.HealthCheckResult Level { get; init; }
+
+    public required string Message { get; init; }
+
+    public required string Type { get; init; }
+
+    public string? WikiUrl { get; init; }
 }
 
 public sealed record WebhookGrabPayload : WebhookPayload

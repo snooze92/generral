@@ -9,8 +9,10 @@ using Generral.Core.Datastore;
 using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
 using Generral.Core.Download.TrackedDownloads;
+using Generral.Core.HealthCheck;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
+using Generral.Core.Instrumentation;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +32,7 @@ public sealed class ReleaseSearchService(
     DownloadDecisionMaker decisionMaker,
     IDownloadService downloads,
     TrackedDownloadService trackedDownloads,
+    ProviderStatusTracker status,
     TimeProvider time,
     ILogger<ReleaseSearchService> logger)
 {
@@ -233,10 +236,13 @@ public sealed class ReleaseSearchService(
     {
         try
         {
-            return await torznab.SearchAsync(indexer, search, cancellationToken);
+            var releases = await torznab.SearchAsync(indexer, search, cancellationToken);
+            status.RecordSuccess(ProviderKind.Indexer, indexer.Id);
+            return releases;
         }
         catch (Exception e) when (e is TorznabException or HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
+            status.RecordFailure(ProviderKind.Indexer, indexer.Id, indexer.Name, CleanseLogMessage.Cleanse(e.Message));
             logger.LogWarning("Indexer {Indexer} failed: {Message}", indexer.Name, e.Message);
             return [];
         }

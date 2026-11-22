@@ -10,8 +10,10 @@ using Generral.Core.Blocklisting;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.DecisionEngine;
+using Generral.Core.HealthCheck;
 using Generral.Core.History;
 using Generral.Core.IndexerSearch;
+using Generral.Core.Instrumentation;
 using Generral.Core.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,7 +27,8 @@ public sealed record RefreshResult(int Tracked, int Failed, int Imported, IReadO
 /// The downloads of every enabled client (in memory, rebuilt from the clients and the grab history), their state, and failed
 /// download handling: failed or stalled grabs are recorded in history, blocklisted and searched again.
 /// </summary>
-public sealed class TrackedDownloadService(IServiceScopeFactory scopes, DownloadClientProvider provider, TimeProvider time, ILogger<TrackedDownloadService> logger)
+public sealed class TrackedDownloadService(
+    IServiceScopeFactory scopes, DownloadClientProvider provider, ProviderStatusTracker status, TimeProvider time, ILogger<TrackedDownloadService> logger)
 {
     public const string FailedDownloadHandling = "Generral Failed Download Handling";
 
@@ -113,9 +116,11 @@ public sealed class TrackedDownloadService(IServiceScopeFactory scopes, Download
                 try
                 {
                     items = await implementation.GetItemsAsync(client, cancellationToken);
+                    status.RecordSuccess(ProviderKind.DownloadClient, client.Id);
                 }
                 catch (DownloadClientException e)
                 {
+                    status.RecordFailure(ProviderKind.DownloadClient, client.Id, client.Name, CleanseLogMessage.Cleanse(e.Message));
                     logger.LogWarning("Unable to retrieve the queue of {Client}: {Message}", client.Name, e.Message);
                     continue;
                 }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using Generral.Core.Datastore;
+using Generral.Core.HealthCheck;
 using Generral.Core.Instrumentation;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Types;
@@ -18,7 +19,8 @@ public sealed record SourceRefreshResult(int SourceId, string SourceName, bool S
 }
 
 /// <summary>Runs a source's type and upserts its events (docs/specs/04-sources.md § Fetch semantics).</summary>
-public sealed class SourceRefreshService(IServiceScopeFactory scopes, SourceTypeRegistry types, TimeProvider time, ILogger<SourceRefreshService> logger)
+public sealed class SourceRefreshService(
+    IServiceScopeFactory scopes, SourceTypeRegistry types, ProviderStatusTracker status, TimeProvider time, ILogger<SourceRefreshService> logger)
 {
     public const int MissedRefreshesUntilGone = 3;
     public const int MaxConcurrentRefreshes = 4;
@@ -140,6 +142,7 @@ public sealed class SourceRefreshService(IServiceScopeFactory scopes, SourceType
             .Where(r => r.Created < cutoff && db.Events.Any(e => e.Id == r.EventId && e.SourceId == sourceId))
             .ExecuteDeleteAsync(cancellationToken);
 
+        status.RecordSuccess(ProviderKind.Source, source.Id);
         var result = new SourceRefreshResult(source.Id, source.Name, true, added, changed, unchanged, gone, null);
         logger.LogInformation("Refreshed source {Summary}", result.Summary);
         return result;
@@ -153,6 +156,7 @@ public sealed class SourceRefreshService(IServiceScopeFactory scopes, SourceType
         source.LastError = error;
         await db.SaveChangesAsync(cancellationToken);
 
+        status.RecordFailure(ProviderKind.Source, source.Id, source.Name, error);
         logger.LogWarning("Refreshing source {Name} failed: {Error}", source.Name, error);
         return new SourceRefreshResult(source.Id, source.Name, false, 0, 0, 0, 0, error);
     }

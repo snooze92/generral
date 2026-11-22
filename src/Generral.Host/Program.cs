@@ -1,5 +1,6 @@
 using Generral.Core;
 using Generral.Core.Authentication;
+using Generral.Core.Backup;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Instrumentation;
@@ -85,6 +86,7 @@ public static class Program
             app.Logger.LogInformation("Generated a new API key in {ConfigFile}", folders.ConfigFile);
         }
 
+        BackupService.ApplyPendingRestore(folders, settings, app.Logger);
         DatabaseInitializer.Migrate(app.Services);
 
         using (var scope = app.Services.CreateScope())

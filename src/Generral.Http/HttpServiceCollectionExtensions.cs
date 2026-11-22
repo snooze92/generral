@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Generral.Core.Authentication;
 using Generral.Core.Configuration;
+using Generral.Core.HealthCheck;
 using Generral.Core.Lifecycle;
 using Generral.Http.Api;
 using Generral.Http.Authentication;
@@ -123,7 +124,9 @@ public static partial class HttpServiceCollectionExtensions
 
         // UI requests authenticate with either the API key (initialize.json hands it to the SPA) or the UI method.
         var api = app.MapGroup("/api/v1").RequireAuthorization(AuthSchemes.UiPolicy);
+        api.AddEndpointFilter(MarkHealthDirtyAsync);
         api.MapSystemEndpoints();
+        api.MapSystemHealthEndpoints();
         api.MapSettingsEndpoints();
         api.MapSourceEndpoints();
         api.MapTagEndpoints();
@@ -155,6 +158,21 @@ public static partial class HttpServiceCollectionExtensions
         app.MapFrontend();
 
         return app;
+    }
+
+    private static readonly string[] HealthRelevant = ["/api/v1/indexer", "/api/v1/downloadclient", "/api/v1/rootfolder", "/api/v1/remotepathmapping", "/api/v1/source", "/api/v1/mapping", "/api/v1/series"];
+
+    /// <summary>Sonarr's CheckOn(ProviderUpdated/Deleted…): a successful change to a health-relevant resource re-runs the checks soon.</summary>
+    private static async ValueTask<object?> MarkHealthDirtyAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    {
+        var result = await next(context);
+        var http = context.HttpContext;
+        if (!HttpMethods.IsGet(http.Request.Method) && HealthRelevant.Any(p => http.Request.Path.StartsWithSegments(p)))
+        {
+            http.RequestServices.GetRequiredService<HealthCheckService>().MarkDirty();
+        }
+
+        return result;
     }
 
     private static Task RedirectToLogin(RedirectContext<CookieAuthenticationOptions> context)

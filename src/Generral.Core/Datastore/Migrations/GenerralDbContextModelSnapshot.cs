@@ -502,6 +502,9 @@ namespace Generral.Core.Datastore.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IncludeHealthWarnings")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT")
@@ -517,6 +520,12 @@ namespace Generral.Core.Datastore.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("OnGrab")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnHealthIssue")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnHealthRestored")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("OnSeriesAdd")
