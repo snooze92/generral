@@ -57,7 +57,11 @@ Implementation notes (M2a):
   http(s), `apiPath` a path, `additionalParameters` like `&a=b`, seed criteria > 0, known tags, and,
   for enabled indexers, the `t=caps` test (must support `q` in `search` or `tv-search`).
 - Requests use the `Indexer` HTTP client: same SSRF guard as sources (only link-local blocked, so
-  a LAN Prowlarr works), 100 s timeout, and at most one request per 2 s per indexer host.
+  a LAN Prowlarr works), 100 s timeout, and at most one request per 2 s per indexer (keyed by URL
+  path, not host: all Prowlarr proxies share one host).
+- Searches and RSS syncs query up to 8 indexers in parallel; each indexer gets 30 s for all its
+  queries of that search. A failing or timed-out indexer is logged and only loses its own results,
+  so an interactive search takes about as long as the slowest indexer (capped at 30 s).
 
 A **native Prowlarr app type** (like the one Sportarr has open as Prowlarr PR #2758) is a `Later`
 upstream contribution. The Sonarr shim stays.
@@ -78,6 +82,7 @@ search:
   mustNot:  [ 'fight[ ._-]?night' ]                  # none may match
   any:      []                                        # at least one must match (if non-empty)
   dateWindow: { before: 2d, after: 60d }  # release publishDate relative to airDateUtc
+  searchSchedule: [1h, 3h, 6h, 12h, 24h, 48h, 3d, 4d, 5d, 6d, 7d, 8d, 9d]  # on-air searches (default); [] = off
   parts: { <partKey>: { must: [...], mustNot: [...] } }   # merged with event-level rules
   pack:                                    # optional: releases covering several episodes
     must: [ '\bUFC[ ._-]?{{ vars.number }}\b' ]
@@ -135,6 +140,7 @@ rejection carries a human-readable reason shown in interactive search and logs.
 | Upgrade allowed / cutoff not met / is an upgrade | Against existing file. |
 | Size within quality definition limits | Uses the episode `runtime` (from mapping; default 120 min for sport events) × MB/min limits. |
 | Minimum seeders | Indexer field. |
+| Language | Profile `language` (see § Languages). |
 | Release profiles | *Must contain* / *Must not contain* / (Sonarr v3-style) *Preferred words* with scores, scoped by tags. Useful for broadcaster or commentary-language preferences (`Sky Sports`, `ESPN`, `French`, `English`). |
 | Custom formats | `Later`. Port Sonarr v4 custom formats (also covers e.g. `50fps` and broadcaster preferences). |
 | Blocklisted | By title+indexer or by infohash. |
@@ -183,6 +189,27 @@ seeders before size.
 - Grabs go through `IDownloadService`, which sends them to a download client (spec 07 § Implementation notes (M2d)).
   A failed grab is logged and the next best release for the same episodes is tried.
 - Interactive results are ordered accepted → rejected matches → unmatched, each best first.
+  Any matched release can be grabbed (`POST /release`), rejected ones included (date window, quality…);
+  unmatched ones need `episodeIds`.
+- On-air search: the scheduler (every minute) queues `OnAirSearch` when a monitored episode of a
+  monitored series, without a file or queued download, has a passed slot it wasn't searched since
+  (`lastSearchTime` < slot). Slots: `airDateUtc` + 1h, 3h, 6h, 12h, 24h, 48h, then daily from day 3 to
+  day 9. A slot missed by more than 1 day (downtime) is skipped; offsets beyond 60 d are ignored.
+  Per series/mapping: `searchSchedule: [1h, 6h, 2d]` in the search settings (`[]` disables).
+  It is an automatic search (monitored only, grabs the best accepted release).
+- `CutoffUnmetEpisodeSearch` exists but searches nothing until episode files exist (M3).
+
+## Languages
+
+Sonarr's `LanguageParser` and language list (ids unchanged) are ported. Release languages are
+parsed from the title, ignoring the text matched by the episode's `must`/`any` rules (so `FRA` in
+`NZL v FRA` isn't French). Like Sonarr, an untagged title is `Unknown` and a `MULTi` title adds
+`Original`. Series have no original language: **Unknown and Original count as English**.
+
+The quality profile has one wanted `language` (Radarr-style; default English, seeded English for
+existing profiles), or the special values `Any` (-1, no check) and `Original` (-2, = English). The
+language specification rejects releases whose languages don't include it: "Language French is not
+wanted (profile: English)". The indexer `multiLanguages` setting is accepted but not used yet.
 
 ## Quality
 

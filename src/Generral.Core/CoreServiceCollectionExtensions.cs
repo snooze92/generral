@@ -81,6 +81,8 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<ICommandHandler, SeriesSearchHandler>();
         services.AddSingleton<ICommandHandler, MissingEpisodeSearchHandler>();
         services.AddSingleton<ICommandHandler, RssSyncHandler>();
+        services.AddSingleton<ICommandHandler, OnAirSearchHandler>();
+        services.AddSingleton<ICommandHandler, CutoffUnmetEpisodeSearchHandler>();
         services.AddSingleton<ICommandHandler, RefreshMonitoredDownloadsHandler>();
         services.AddHostedService<CommandWorker>();
         services.AddHostedService<ScheduledTaskService>();

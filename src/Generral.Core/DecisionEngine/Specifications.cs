@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Ported from Sonarr@51a2412af235 src/NzbDrone.Core/DecisionEngine/Specifications/ (ProtocolSpecification.cs,
-// QualityAllowedByProfileSpecification.cs, UpgradeDiskSpecification.cs, AcceptableSizeSpecification.cs, TorrentSeedingSpecification.cs,
+// QualityAllowedByProfileSpecification.cs, Radarr's LanguageSpecification.cs, UpgradeDiskSpecification.cs, AcceptableSizeSpecification.cs, TorrentSeedingSpecification.cs,
 // ReleaseRestrictionsSpecification.cs, RssSync/MonitoredEpisodeSpecification.cs, BlocklistSpecification.cs, QueueSpecification.cs) and src/NzbDrone.Core/Profiles/Releases/TermMatcherService.cs
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
+using Generral.Core.Languages;
 
 namespace Generral.Core.DecisionEngine;
 
@@ -36,6 +37,29 @@ public sealed class QualityAllowedByProfileSpecification : IDecisionSpecificatio
 
         var (index, _) = profile.GetIndex(subject.Quality.Quality.Id);
         return index >= 0 && profile.Items[index].Allowed ? null : $"{subject.Quality.Quality.Name} is not wanted in profile";
+    }
+}
+
+/// <summary>
+/// Radarr-style: the profile's language must be among the release's. Series have no original language, so it is English:
+/// untagged (Unknown) and original-language releases are English.
+/// </summary>
+public sealed class LanguageSpecification : IDecisionSpecification
+{
+    public static readonly Language OriginalLanguage = Language.English;
+
+    public string? Check(RemoteEpisode subject, DecisionContext context)
+    {
+        if (subject.QualityProfile is not { } profile || profile.Language == Language.Any)
+        {
+            return null;
+        }
+
+        var wanted = profile.Language == Language.Original ? OriginalLanguage : profile.Language;
+        var languages = subject.Languages.Select(l => l == Language.Unknown || l == Language.Original ? OriginalLanguage : l).ToList();
+        return languages.Contains(wanted)
+            ? null
+            : $"Language {string.Join(", ", subject.Languages)} is not wanted (profile: {profile.Language.Name})";
     }
 }
 

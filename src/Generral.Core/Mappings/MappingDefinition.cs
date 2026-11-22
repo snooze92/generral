@@ -118,7 +118,7 @@ public sealed record SearchDefinition
     /// <summary>Rules added for one part (by key), merged with the event-level ones.</summary>
     public IReadOnlyDictionary<string, PartSearchDefinition> Parts { get; init; } = new Dictionary<string, PartSearchDefinition>();
 
-    /// <summary>Non-template settings (<c>categories</c>, <c>queryMode</c>, <c>dateWindow</c>), copied as-is.</summary>
+    /// <summary>Non-template settings (<c>categories</c>, <c>queryMode</c>, <c>dateWindow</c>, <c>searchSchedule</c>), copied as-is.</summary>
     public JsonObject Settings { get; init; } = [];
 }
 

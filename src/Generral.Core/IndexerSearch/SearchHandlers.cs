@@ -101,6 +101,17 @@ public sealed class MissingEpisodeSearchHandler(ReleaseSearchService search, Tim
     }
 }
 
+/// <summary><c>CutoffUnmetEpisodeSearch</c>: Wanted → Cutoff Unmet. Nothing is upgradable until episode files exist (M3).</summary>
+public sealed class CutoffUnmetEpisodeSearchHandler : ICommandHandler
+{
+    public const string CommandName = "CutoffUnmetEpisodeSearch";
+
+    public string Name => CommandName;
+
+    public Task<string?> ExecuteAsync(JsonObject body, CommandContext context, CancellationToken cancellationToken) =>
+        Task.FromResult<string?>("0 episode(s) searched: no episode has a file below its cutoff");
+}
+
 public sealed class RssSyncHandler(ReleaseSearchService search) : ICommandHandler
 {
     public const string CommandName = "RssSync";

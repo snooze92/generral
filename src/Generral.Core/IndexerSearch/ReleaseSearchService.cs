@@ -33,6 +33,11 @@ public sealed class ReleaseSearchService(
     TimeProvider time,
     ILogger<ReleaseSearchService> logger)
 {
+    public const int MaxParallelIndexers = 8;
+
+    /// <summary>Budget of one indexer within one search or RSS sync (all its queries).</summary>
+    public TimeSpan IndexerTimeout { get; internal set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>In memory: after a restart RSS sync runs at the first scheduler check.</summary>
     public DateTime? LastRssSync { get; private set; }
 
@@ -64,11 +69,7 @@ public sealed class ReleaseSearchService(
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
         var indexers = await SearchableIndexersAsync(db, i => i.EnableRss, cancellationToken);
-        var releases = new List<ReleaseInfo>();
-        foreach (var indexer in indexers)
-        {
-            releases.AddRange(await FetchAsync(indexer, new TorznabSearch(), cancellationToken));
-        }
+        var releases = await QueryIndexersAsync(indexers, async (indexer, found, token) => found.AddRange(await FetchAsync(indexer, new TorznabSearch(), token)), cancellationToken);
 
         var now = time.GetUtcNow().UtcDateTime;
         var candidates = (await LoadCandidatesAsync(db, db.Episodes.Where(e => e.Status == EpisodeStatus.Active && e.EpisodeFileId == null && e.AirDateUtc != null), cancellationToken))
@@ -99,35 +100,34 @@ public sealed class ReleaseSearchService(
         var scopeCandidates = await LoadCandidatesAsync(db, db.Episodes.Where(e => seriesIds.Contains(e.SeriesId) && e.Status == EpisodeStatus.Active), cancellationToken);
         var indexers = await SearchableIndexersAsync(db, interactive ? i => i.EnableInteractiveSearch : i => i.EnableAutomaticSearch, cancellationToken);
 
-        var releases = new List<ReleaseInfo>();
-        var done = new HashSet<(int, string, string)>();
-        foreach (var candidate in scopeCandidates.Where(c => requested.Contains(c.Episode.Id)))
+        var searched = scopeCandidates.Where(c => requested.Contains(c.Episode.Id)).ToList();
+        foreach (var candidate in searched.Where(c => c.Terms.Queries.Count == 0))
         {
-            if (candidate.Terms.Queries.Count == 0)
-            {
-                logger.LogInformation("{Series} {Episode} has no search queries", candidate.Episode.Series?.Title, candidate.Label);
-                continue;
-            }
+            logger.LogInformation("{Series} {Episode} has no search queries", candidate.Episode.Series?.Title, candidate.Label);
+        }
 
-            foreach (var indexer in indexers)
+        var releases = await QueryIndexersAsync(indexers, async (indexer, found, token) =>
+        {
+            var done = new HashSet<(string, string)>();
+            foreach (var candidate in searched)
             {
                 foreach (var query in candidate.Terms.Queries)
                 {
                     var categories = candidate.Terms.Categories;
-                    if (!done.Add((indexer.Id, query, string.Join(',', categories ?? []))))
+                    if (!done.Add((query, string.Join(',', categories ?? []))))
                     {
                         continue;
                     }
 
-                    var found = await FetchAsync(indexer, new TorznabSearch { Query = query, Categories = categories?.Count > 0 ? categories : null }, cancellationToken);
-                    releases.AddRange(found);
-                    if (found.Count > 0 && candidate.Terms.QueryMode == QueryMode.FirstWithResults)
+                    var results = await FetchAsync(indexer, new TorznabSearch { Query = query, Categories = categories?.Count > 0 ? categories : null }, token);
+                    found.AddRange(results);
+                    if (results.Count > 0 && candidate.Terms.QueryMode == QueryMode.FirstWithResults)
                     {
                         break;
                     }
                 }
             }
-        }
+        }, cancellationToken);
 
         await db.Episodes.Where(e => requested.Contains(e.Id))
             .ExecuteUpdateAsync(e => e.SetProperty(x => x.LastSearchTime, time.GetUtcNow().UtcDateTime), cancellationToken);
@@ -196,6 +196,35 @@ public sealed class ReleaseSearchService(
         (await db.Indexers.AsNoTracking().OrderBy(i => i.Priority).ThenBy(i => i.Id).ToListAsync(cancellationToken))
         .Where(i => enabled(i) && i.Implementation == IndexerImplementations.Torznab)
         .ToList();
+
+    /// <summary>
+    /// Runs <paramref name="query"/> for up to <see cref="MaxParallelIndexers"/> indexers at once, each within <see cref="IndexerTimeout"/>:
+    /// a slow or failing indexer only loses its own (remaining) results.
+    /// </summary>
+    private async Task<List<ReleaseInfo>> QueryIndexersAsync(
+        IReadOnlyList<Indexer> indexers,
+        Func<Indexer, List<ReleaseInfo>, CancellationToken, Task> query,
+        CancellationToken cancellationToken)
+    {
+        var perIndexer = new List<ReleaseInfo>[indexers.Count];
+        var options = new ParallelOptions { MaxDegreeOfParallelism = MaxParallelIndexers, CancellationToken = cancellationToken };
+        await Parallel.ForEachAsync(Enumerable.Range(0, indexers.Count), options, async (i, token) =>
+        {
+            var found = perIndexer[i] = [];
+            using var timeout = new CancellationTokenSource(IndexerTimeout, time);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, timeout.Token);
+            try
+            {
+                await query(indexers[i], found, linked.Token);
+            }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested && !token.IsCancellationRequested)
+            {
+                logger.LogWarning("Indexer {Indexer} timed out after {Seconds}s, {Count} release(s) kept", indexers[i].Name, IndexerTimeout.TotalSeconds, found.Count);
+            }
+        });
+
+        return perIndexer.SelectMany(r => r).ToList();
+    }
 
     private async Task<IReadOnlyList<ReleaseInfo>> FetchAsync(Indexer indexer, TorznabSearch search, CancellationToken cancellationToken)
     {

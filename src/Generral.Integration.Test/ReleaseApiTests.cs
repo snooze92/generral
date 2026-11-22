@@ -7,6 +7,7 @@ using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
+using Generral.Core.IndexerSearch;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -93,6 +94,8 @@ public class ReleaseApiTests
         var unknown = await _client.PostAsJsonAsync("/api/v1/release", new JsonObject { ["guid"] = "nope", ["indexerId"] = 1 });
         var invalid = await _client.PostAsJsonAsync("/api/v1/release", new JsonObject());
         var missing = await _client.GetAsync("/api/v1/release");
+        var languages = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/language"))!;
+        var profile = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/qualityprofile"))![0]!;
         var grabs = _grabs.Grabs;
 
         Assert.Multiple(() =>
@@ -106,6 +109,10 @@ public class ReleaseApiTests
             Assert.That((string)best["indexer"]!, Is.EqualTo("Tracker"));
             Assert.That((string)best["protocol"]!, Is.EqualTo("torrent"));
             Assert.That((int)best["mappedEpisodeInfo"]![0]!["id"]!, Is.EqualTo(mainCardId));
+            Assert.That((string)best["languages"]![0]!["name"]!, Is.EqualTo("Unknown"));
+            Assert.That(languages.Take(2).Select(l => (string)l!["name"]!), Is.EqualTo(new[] { "Any", "Original" }));
+            Assert.That(languages.Select(l => (int)l!["id"]!), Does.Contain(1).And.Contain(11));
+            Assert.That((string)profile["language"]!["name"]!, Is.EqualTo("English"));
             Assert.That(prelims["rejections"]!.AsArray().Select(r => (string)r!), Is.EqualTo(new[] { "Matches S2026E02, which wasn't requested" }));
             Assert.That((string)sd["rejections"]![0]!, Is.EqualTo("SDTV is not wanted in profile"));
             Assert.That(releases.Single(r => ((string)r["title"]!).Contains("Fight Night"))["rejections"]![0]!.GetValue<string>(), Does.StartWith("Does not match S2026E03: Does not match required rule"));
@@ -115,6 +122,58 @@ public class ReleaseApiTests
             Assert.That(unknown.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
             Assert.That(invalid.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
             Assert.That(missing.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        });
+    }
+
+    [Test]
+    public async Task Indexers_are_searched_in_parallel_and_a_slow_one_times_out()
+    {
+        var (_, mainCardId) = await SeedAsync();
+        using (var scope = _host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
+            foreach (var name in new[] { "fast", "slow", "stuck" })
+            {
+                db.Indexers.Add(new Indexer
+                {
+                    Name = name,
+                    Implementation = IndexerImplementations.Torznab,
+                    Settings = new JsonObject { ["baseUrl"] = $"https://{name}.example", ["apiKey"] = "secret" },
+                });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        _handler.Delays["tracker.example"] = TimeSpan.FromSeconds(1);
+        _handler.Delays["slow.example"] = TimeSpan.FromSeconds(1);
+        _handler.Delays["stuck.example"] = TimeSpan.FromMinutes(5);
+        _host.Services.GetRequiredService<ReleaseSearchService>().IndexerTimeout = TimeSpan.FromSeconds(2);
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var releases = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/release?episodeId={mainCardId}"))!;
+        watch.Stop();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(watch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(3.5)), "1 s + 1 s + 2 s timeout in sequence would take 4 s or more");
+            Assert.That(releases.Select(r => (string)r!["indexer"]!).Distinct(), Is.EquivalentTo(new[] { "Tracker", "fast", "slow" }));
+        });
+    }
+
+    [Test]
+    public async Task On_air_search_grabs_due_monitored_episodes_once_per_slot()
+    {
+        var (_, mainCardId) = await SeedAsync();
+
+        var first = await RunAsync("OnAirSearch");
+        var second = await RunAsync("OnAirSearch");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That((string)first["message"]!, Is.EqualTo("1 episode(s) searched, 5 release(s) found, 1 grabbed"));
+            Assert.That(_grabs.Grabs.Single().EpisodeIds, Is.EqualTo(new[] { mainCardId }));
+            Assert.That((string)second["message"]!, Is.EqualTo("No episode due"));
         });
     }
 
@@ -178,6 +237,12 @@ public class ReleaseApiTests
         return (prelims.Id, mainCard.Id);
     }
 
+    private async Task<JsonObject> RunAsync(string name)
+    {
+        var command = await _client.PostAsJsonAsync("/api/v1/command", new JsonObject { ["name"] = name });
+        return await WaitAsync((int)(await command.Content.ReadFromJsonAsync<JsonObject>())!["id"]!);
+    }
+
     private async Task<JsonObject> WaitAsync(int id)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
@@ -201,8 +266,16 @@ public class ReleaseApiTests
 
         public List<string> Categories { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        /// <summary>Response delay by host.</summary>
+        public Dictionary<string, TimeSpan> Delays { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (Delays.TryGetValue(request.RequestUri!.Host, out var delay))
+            {
+                await Task.Delay(delay, cancellationToken);
+            }
+
             var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri!.Query);
             lock (Queries)
             {
@@ -222,7 +295,7 @@ public class ReleaseApiTests
                 <?xml version="1.0" encoding="UTF-8"?>
                 <rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>{items}</channel></rss>
                 """;
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(xml, Encoding.UTF8, "application/xml") });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(xml, Encoding.UTF8, "application/xml") };
         }
 
         private string Item(string title, int gigabytes, int seeders) => $"""

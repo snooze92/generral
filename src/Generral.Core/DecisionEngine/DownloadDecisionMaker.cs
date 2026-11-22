@@ -4,6 +4,7 @@
 //
 // Ported from Sonarr@51a2412af235 src/NzbDrone.Core/DecisionEngine/DownloadDecisionMaker.cs
 using Generral.Core.Indexers;
+using Generral.Core.Languages;
 using Generral.Core.Qualities;
 
 namespace Generral.Core.DecisionEngine;
@@ -18,6 +19,7 @@ public sealed class DownloadDecisionMaker(TimeProvider time)
     [
         new ProtocolSpecification(),
         new QualityAllowedByProfileSpecification(),
+        new LanguageSpecification(),
         new UpgradeDiskSpecification(),
         new AcceptableSizeSpecification(),
         new TorrentSeedingSpecification(),
@@ -32,7 +34,7 @@ public sealed class DownloadDecisionMaker(TimeProvider time)
 
     public DownloadDecision GetDecision(ReleaseInfo release, DecisionContext context)
     {
-        var remote = new RemoteEpisode { Release = release, Quality = QualityParser.ParseQuality(release.Title) };
+        var remote = new RemoteEpisode { Release = release, Quality = QualityParser.ParseQuality(release.Title), Languages = ParseLanguages(release.Title) };
         var rejections = Match(remote, context);
         return Evaluate(remote, context, rejections);
     }
@@ -52,6 +54,22 @@ public sealed class DownloadDecisionMaker(TimeProvider time)
         }
 
         return new DownloadDecision(remote, rejections);
+    }
+
+    /// <summary>Like Sonarr's aggregation, a <c>MULTi</c> release also carries the original language.</summary>
+    public static List<Language> ParseLanguages(string title)
+    {
+        var languages = LanguageParser.ParseLanguages(title);
+        if (LanguageParser.HasMultipleLanguages(title))
+        {
+            languages.Remove(Language.Unknown);
+            if (!languages.Contains(Language.Original))
+            {
+                languages.Add(Language.Original);
+            }
+        }
+
+        return languages;
     }
 
     private List<string> Match(RemoteEpisode remote, DecisionContext context)
@@ -75,6 +93,11 @@ public sealed class DownloadDecisionMaker(TimeProvider time)
         var inWindow = titleMatches.Where(c => DateWindowRejection(c, release) is null).ToList();
         var matches = inWindow.Count > 0 ? inWindow : titleMatches;
         remote.Episodes = matches.Select(c => c.Episode).ToList();
+        if (matches.Count == 1 && ReleaseTitleMatcher.RemoveMatches(matches[0].Terms, release.Title) is { } rest)
+        {
+            remote.Languages = ParseLanguages(rest);
+        }
+
         remote.Series = matches.FirstOrDefault()?.Episode.Series
             ?? context.Scope.FirstOrDefault(c => context.Requested?.Contains(c.Episode.Id) == true)?.Episode.Series;
         remote.EpisodeRequested = context.Requested is null || remote.Episodes.Any(e => context.Requested.Contains(e.Id));

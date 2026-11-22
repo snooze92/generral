@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Generral.Core.DecisionEngine;
 using Generral.Core.Indexers;
+using Generral.Core.Languages;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
 using Generral.Core.Test.Sources;
@@ -90,6 +91,24 @@ public class DownloadDecisionMakerTests
         var decision = _maker.GetDecision(Release(title), Context(UfcEpisodes(), userInvoked: true));
 
         Assert.That(decision.Rejections, Does.Contain(reason));
+    }
+
+    [TestCase("UFC 314 1080p WEB h264", 1, null)]
+    [TestCase("UFC 314 MULTi 1080p WEB h264", 1, null)]
+    [TestCase("UFC 314 TRUEFRENCH 1080p WEB h264", 1, "Language French is not wanted (profile: English)")]
+    [TestCase("UFC 314 RUS 1080p WEB h264", -2, "Language Russian is not wanted (profile: Original)")]
+    [TestCase("UFC 314 RUS 1080p WEB h264", -1, null)]
+    [TestCase("UFC 314 TRUEFRENCH 1080p WEB h264", 2, null)]
+    [TestCase("UFC 314 1080p WEB h264", 2, "Language Unknown is not wanted (profile: French)")]
+    public void Language_must_be_the_profile_one(string title, int language, string? reason)
+    {
+        var profile = QualityProfileService.GetDefaultProfile("HD", Quality.DefaultQualityDefinitions, Quality.WEBDL1080p, Quality.WEBDL1080p);
+        profile.Language = Language.Find(language)!;
+        var context = Context(UfcEpisodes(), userInvoked: true) with { QualityProfiles = new Dictionary<int, QualityProfile> { [1] = profile } };
+
+        var decision = _maker.GetDecision(Release(title), context);
+
+        Assert.That(decision.Rejections.Where(r => r.StartsWith("Language", StringComparison.Ordinal)), reason is null ? Is.Empty : Is.EqualTo(new[] { reason }));
     }
 
     [Test]

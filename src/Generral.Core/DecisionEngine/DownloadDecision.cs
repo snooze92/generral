@@ -5,6 +5,7 @@
 // Ported from Sonarr@51a2412af235 src/NzbDrone.Core/DecisionEngine/DownloadDecision.cs and src/NzbDrone.Core/Parser/Model/RemoteEpisode.cs
 using Generral.Core.Blocklisting;
 using Generral.Core.Indexers;
+using Generral.Core.Languages;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
 using Generral.Core.Tv;
@@ -17,6 +18,9 @@ public sealed class RemoteEpisode
     public required ReleaseInfo Release { get; init; }
 
     public required QualityModel Quality { get; init; }
+
+    /// <summary>Parsed from the title (without the text matched by the episode's rules); <see cref="Language.Unknown"/> when untagged, <see cref="Language.Original"/> for MULTi releases.</summary>
+    public IReadOnlyList<Language> Languages { get; set; } = [Language.Unknown];
 
     /// <summary>The matched series, or the searched one when nothing matched; null for unmatched RSS releases.</summary>
     public Series? Series { get; set; }

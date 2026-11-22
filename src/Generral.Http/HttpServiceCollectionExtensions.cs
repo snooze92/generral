@@ -130,6 +130,7 @@ public static partial class HttpServiceCollectionExtensions
         api.MapIndexerEndpoints();
         api.MapDownloadClientEndpoints();
         api.MapActivityEndpoints();
+        api.MapLanguageEndpoints();
         api.MapQualityProfileEndpoints();
         api.MapQualityDefinitionEndpoints();
         api.MapReleaseProfileEndpoints();
@@ -139,6 +140,7 @@ public static partial class HttpServiceCollectionExtensions
         api.MapMappingEndpoints();
         api.MapPresetEndpoints();
         api.MapCalendarEndpoints();
+        api.MapWantedEndpoints();
         api.MapCommandEndpoints();
         api.MapOpenApi("/openapi.json");
 

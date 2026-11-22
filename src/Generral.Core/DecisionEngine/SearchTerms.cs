@@ -40,6 +40,9 @@ public sealed record SearchTerms
 
     public TimeSpan After { get; init; } = DefaultAfter;
 
+    /// <summary>On-air search offsets from <c>airDateUtc</c> (<c>searchSchedule</c>; <c>[]</c> disables), ascending.</summary>
+    public IReadOnlyList<TimeSpan> Schedule { get; init; } = IndexerSearch.OnAirSchedule.Default;
+
     /// <summary>Episode keys win over the series defaults, key by key.</summary>
     public static SearchTerms From(JsonObject episodeTerms, JsonObject? seriesDefaults = null)
     {
@@ -58,6 +61,9 @@ public sealed record SearchTerms
             QueryMode = Get("queryMode") is JsonValue mode && mode.TryGetValue<string>(out var text) && text == "all" ? QueryMode.All : QueryMode.FirstWithResults,
             Before = Duration(window?["before"]) ?? DefaultBefore,
             After = Duration(window?["after"]) ?? DefaultAfter,
+            Schedule = Get("searchSchedule") is JsonArray schedule
+                ? schedule.Select(Duration).OfType<TimeSpan>().Order().ToList()
+                : IndexerSearch.OnAirSchedule.Default,
         };
     }
 
@@ -118,11 +124,27 @@ public static partial class ReleaseTitleMatcher
         return null;
     }
 
-    private static (bool Ok, string? Error) Match(string rule, string raw, string normalized)
+    /// <summary>The normalised title without the parts matched by <c>must</c>/<c>any</c> rules (e.g. the team code <c>FRA</c>), or null when none matched.</summary>
+    public static string? RemoveMatches(SearchTerms terms, string title)
     {
-        var isRaw = rule.StartsWith(RawPrefix, StringComparison.Ordinal);
-        var pattern = isRaw ? rule[RawPrefix.Length..] : rule;
-        var regex = Cache.GetOrAdd(pattern, static p =>
+        var normalized = Normalize(title);
+        var removed = normalized;
+        foreach (var rule in terms.Must.Concat(terms.Any).Where(r => !r.StartsWith(RawPrefix, StringComparison.Ordinal)))
+        {
+            try
+            {
+                removed = Regex(rule)?.Replace(removed, " ") ?? removed;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+            }
+        }
+
+        return removed == normalized ? null : removed;
+    }
+
+    private static Regex? Regex(string pattern) =>
+        Cache.GetOrAdd(pattern, static p =>
         {
             try
             {
@@ -133,6 +155,12 @@ public static partial class ReleaseTitleMatcher
                 return null;
             }
         });
+
+    private static (bool Ok, string? Error) Match(string rule, string raw, string normalized)
+    {
+        var isRaw = rule.StartsWith(RawPrefix, StringComparison.Ordinal);
+        var pattern = isRaw ? rule[RawPrefix.Length..] : rule;
+        var regex = Regex(pattern);
 
         if (regex is null)
         {

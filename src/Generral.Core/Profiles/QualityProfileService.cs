@@ -42,6 +42,7 @@ public sealed class QualityProfileService(GenerralDbContext db)
         stored.UpgradeAllowed = profile.UpgradeAllowed;
         stored.Cutoff = profile.Cutoff;
         stored.Items = profile.Items;
+        stored.Language = profile.Language;
         await db.SaveChangesAsync();
         return stored;
     }
