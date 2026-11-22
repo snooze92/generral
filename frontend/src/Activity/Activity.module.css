@@ -1,0 +1,70 @@
+.series {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  min-width: 160px;
+}
+
+.episode {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 100px;
+  white-space: nowrap;
+}
+
+.episodeTitle {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+}
+
+.sourceTitle {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  overflow-wrap: anywhere;
+}
+
+.quality {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 150px;
+}
+
+.protocol {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 90px;
+}
+
+.narrow {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 35px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.progress {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 150px;
+}
+
+.size {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 90px;
+  white-space: nowrap;
+}
+
+.actions {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 50px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 8px;
+}

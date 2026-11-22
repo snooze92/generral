@@ -25,7 +25,7 @@ describe('App', () => {
   });
 
   it('renders the shell with the sidebar and header', async () => {
-    renderApp('/activity/queue');
+    renderApp('/wanted/missing');
 
     expect(await screen.findByText('Generral')).toBeTruthy();
     expect(

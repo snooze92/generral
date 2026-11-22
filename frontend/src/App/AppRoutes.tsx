@@ -1,6 +1,9 @@
 // Adapted from Sonarr (GPL-3.0-or-later): frontend/src/App/AppRoutes.tsx
 import React from 'react';
 import { Navigate, Route } from 'react-router-dom';
+import Blocklist from 'Activity/Blocklist/Blocklist';
+import History from 'Activity/History/History';
+import Queue from 'Activity/Queue/Queue';
 import AddSeries from 'AddSeries/AddSeries';
 import CalendarPage from 'Calendar/CalendarPage';
 import NotFound from 'Components/NotFound';
@@ -28,24 +31,6 @@ interface PlaceholderRoute {
 
 // Pages that later milestones will build (docs/specs/13-roadmap.md).
 const PLACEHOLDERS: PlaceholderRoute[] = [
-  {
-    path: '/activity/queue',
-    scope: () => translate('Activity'),
-    title: () => translate('Queue'),
-    milestone: 'M2',
-  },
-  {
-    path: '/activity/history',
-    scope: () => translate('Activity'),
-    title: () => translate('History'),
-    milestone: 'M2',
-  },
-  {
-    path: '/activity/blocklist',
-    scope: () => translate('Activity'),
-    title: () => translate('Blocklist'),
-    milestone: 'M2',
-  },
   {
     path: '/wanted/missing',
     scope: () => translate('Wanted'),
@@ -126,6 +111,12 @@ export function appRouteElements() {
       <Route path="/sources" element={<Sources />} />
 
       <Route path="/calendar" element={<CalendarPage />} />
+
+      <Route path="/activity/queue" element={<Queue />} />
+
+      <Route path="/activity/history" element={<History />} />
+
+      <Route path="/activity/blocklist" element={<Blocklist />} />
 
       <Route path="/settings" element={<Settings />} />
 

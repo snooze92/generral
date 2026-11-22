@@ -1,21 +1,28 @@
 import classNames from 'classnames';
 import { Lock, LockOpen } from 'lucide-react';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
+import { getQueueStatus } from 'Activity/Queue/QueueStatus';
+import { Queue } from 'Activity/Queue/useQueue';
+import useSearchCommand from 'Commands/useSearchCommand';
+import Icon from 'Components/Icon';
 import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
+import SpinnerIconButton from 'Components/Link/SpinnerIconButton';
 import MonitorToggleButton from 'Components/MonitorToggleButton';
 import RelativeDateCell from 'Components/Table/Cells/RelativeDateCell';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRow from 'Components/Table/TableRow';
 import Episode from 'Episode/Episode';
 import { useToggleEpisodeLocked } from 'Episode/useEpisodes';
-import { kinds } from 'Helpers/Props';
+import { icons, kinds } from 'Helpers/Props';
+import InteractiveSearchModal from 'InteractiveSearch/InteractiveSearchModal';
 import isBefore from 'Utilities/Date/isBefore';
 import translate from 'Utilities/String/translate';
 import styles from './EpisodeRow.module.css';
 
 interface EpisodeRowProps {
   episode: Episode;
+  queueItem?: Queue;
   seriesMonitored: boolean;
   isSaving: boolean;
   onMonitorEpisodePress: (
@@ -25,7 +32,25 @@ interface EpisodeRowProps {
   ) => void;
 }
 
-function EpisodeStatus({ episode }: { episode: Episode }) {
+interface EpisodeStatusProps {
+  episode: Episode;
+  queueItem?: Queue;
+}
+
+function EpisodeStatus({ episode, queueItem }: EpisodeStatusProps) {
+  if (queueItem) {
+    const { iconName, iconKind, title } = getQueueStatus(queueItem);
+    const progress = queueItem.size
+      ? 100 - (queueItem.sizeleft / queueItem.size) * 100
+      : 0;
+
+    return (
+      <span title={`${title} (${progress.toFixed(1)}%)`}>
+        <Icon name={iconName} kind={iconKind} title={title} />
+      </span>
+    );
+  }
+
   if (episode.status === 'orphaned') {
     return (
       <Label kind={kinds.DEFAULT} title={translate('OrphanedEpisodeHelpText')}>
@@ -51,6 +76,7 @@ function EpisodeStatus({ episode }: { episode: Episode }) {
 
 function EpisodeRow({
   episode,
+  queueItem,
   seriesMonitored,
   isSaving,
   onMonitorEpisodePress,
@@ -58,6 +84,8 @@ function EpisodeRow({
   const { id, episodeNumber, title, monitored, numberLocked, status } =
     episode;
   const { toggleEpisodeLocked, isTogglingLocked } = useToggleEpisodeLocked(id);
+  const { search, isSearching } = useSearchCommand();
+  const [isInteractiveSearchOpen, setIsInteractiveSearchOpen] = useState(false);
 
   const handleMonitorPress = useCallback(
     (value: boolean, options: { shiftKey: boolean }) =>
@@ -112,7 +140,31 @@ function EpisodeRow({
       />
 
       <TableRowCell className={styles.status}>
-        <EpisodeStatus episode={episode} />
+        <EpisodeStatus episode={episode} queueItem={queueItem} />
+      </TableRowCell>
+
+      <TableRowCell className={styles.actions}>
+        <SpinnerIconButton
+          name={icons.SEARCH}
+          title={translate('AutomaticSearch')}
+          aria-label={translate('AutomaticSearch')}
+          isSpinning={isSearching}
+          onPress={() => search({ name: 'EpisodeSearch', episodeIds: [id] })}
+        />
+
+        <IconButton
+          name={icons.INTERACTIVE}
+          title={translate('InteractiveSearch')}
+          aria-label={translate('InteractiveSearch')}
+          onPress={() => setIsInteractiveSearchOpen(true)}
+        />
+
+        <InteractiveSearchModal
+          isOpen={isInteractiveSearchOpen}
+          episodeId={id}
+          title={`${episode.seasonNumber}x${episodeNumber} - ${title ?? ''}`}
+          onModalClose={() => setIsInteractiveSearchOpen(false)}
+        />
       </TableRowCell>
     </TableRow>
   );

@@ -1,5 +1,6 @@
 // Adapted from Sonarr (GPL-3.0-or-later): frontend/src/Series/Details/SeriesDetails.tsx
 import React, { useCallback, useMemo, useState } from 'react';
+import useSearchCommand from 'Commands/useSearchCommand';
 import Alert from 'Components/Alert';
 import Label from 'Components/Label';
 import Link from 'Components/Link/Link';
@@ -44,6 +45,7 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
   const { toggleSeriesMonitored, isTogglingSeriesMonitored } =
     useToggleSeriesMonitored(id);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const { search, isSearching } = useSearchCommand();
 
   // The latest season starts expanded, like Sonarr.
   const sortedSeasons = useMemo(
@@ -82,6 +84,17 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
   return (
     <PageContent title={title}>
       <PageToolbar>
+        <ToolbarItem
+          id="search-monitored"
+          priority={1}
+          groupId="left"
+          label={translate('SearchMonitored')}
+          iconName={icons.SEARCH}
+          isSpinning={isSearching}
+          isDisabled={!monitored}
+          onPress={() => search({ name: 'SeriesSearch', seriesId: id })}
+        />
+
         <ToolbarItem
           id="delete"
           priority={1}
