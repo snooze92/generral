@@ -9,6 +9,7 @@ import TableRow from 'Components/Table/TableRow';
 import Episode from 'Episode/Episode';
 import EpisodeQuality from 'Episode/EpisodeQuality';
 import { icons } from 'Helpers/Props';
+import ManualImportModal from 'ManualImport/ManualImportModal';
 import Series from 'Series/Series';
 import { useUiSettingsValues } from 'Settings/UI/useUiSettings';
 import formatBytes from 'Utilities/Number/formatBytes';
@@ -40,6 +41,7 @@ function QueueRow({ item, series, episodes }: QueueRowProps) {
   const { showRelativeDates, shortDateFormat, timeFormat } =
     useUiSettingsValues();
   const [isRemoveOpen, setIsRemoveOpen] = useState(false);
+  const [isManualImportOpen, setIsManualImportOpen] = useState(false);
   const progress = size ? 100 - (sizeleft / size) * 100 : 0;
   const removeLabel = translate('RemoveFromQueue');
 
@@ -87,6 +89,15 @@ function QueueRow({ item, series, episodes }: QueueRowProps) {
       <TableRowCell className={styles.size}>{formatBytes(size)}</TableRowCell>
 
       <TableRowCell className={styles.actions}>
+        {item.trackedDownloadState === 'importBlocked' ? (
+          <IconButton
+            name={icons.INTERACTIVE_IMPORT}
+            title={translate('ManualImport')}
+            aria-label={translate('ManualImport')}
+            onPress={() => setIsManualImportOpen(true)}
+          />
+        ) : null}
+
         <IconButton
           name={icons.REMOVE}
           title={removeLabel}
@@ -94,6 +105,13 @@ function QueueRow({ item, series, episodes }: QueueRowProps) {
           onPress={() => setIsRemoveOpen(true)}
         />
       </TableRowCell>
+
+      <ManualImportModal
+        isOpen={isManualImportOpen}
+        downloadId={item.downloadId}
+        title={title}
+        onModalClose={() => setIsManualImportOpen(false)}
+      />
 
       <RemoveQueueItemModal
         isOpen={isRemoveOpen}

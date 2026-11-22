@@ -423,6 +423,7 @@ path = [
   "frontend/src/InteractiveSearch/useReleases.ts",
   "frontend/src/Language/Language.ts",
   "frontend/src/Language/useLanguages.ts",
+  "frontend/src/ManualImport/ManualImportModal.tsx",
   "frontend/src/Quality/Quality.ts",
   "frontend/src/Series/Delete/DeleteSeriesModal.tsx",
   "frontend/src/Series/Details/SeasonInfo.module.css",

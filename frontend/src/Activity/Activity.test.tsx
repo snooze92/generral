@@ -86,6 +86,65 @@ describe('Activity', () => {
     expect(String(call?.[0])).toContain('removeFromClient=true&blocklist=true');
   });
 
+  it('manually imports the files of an import-blocked download', async () => {
+    const fetchMock = renderSettingsPage(<Queue />, {
+      ...commonRoutes,
+      'GET /api/v1/queue': paged([
+        { ...queueItem, trackedDownloadState: 'importBlocked', status: 'completed' },
+      ]),
+      'GET /api/v1/manualimport': [
+        {
+          id: 1,
+          path: '/downloads/abc/f1.mkv',
+          relativePath: 'f1.mkv',
+          size: 1000,
+          series: series[0],
+          episodes,
+          quality,
+          downloadId: 'abc',
+          rejections: [],
+        },
+        {
+          id: 2,
+          path: '/downloads/abc/sample.mkv',
+          relativePath: 'sample.mkv',
+          size: 10,
+          episodes: [],
+          quality,
+          rejections: [{ reason: 'Sample' }],
+        },
+      ],
+      'POST /api/v1/command': { id: 2, name: 'ManualImport', status: 'completed' },
+    });
+
+    const title = await screen.findByText(queueItem.title);
+    fireEvent.click(
+      within(title.closest('tr') as HTMLElement).getByLabelText('Manual Import')
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(await dialog.findByText('sample.mkv')).toBeTruthy();
+    expect(dialog.getByText('Sample')).toBeTruthy();
+    fireEvent.click(dialog.getByRole('button', { name: 'Import' }));
+
+    await waitFor(() =>
+      expect(requests(fetchMock, 'POST', '/api/v1/command')).toEqual([
+        {
+          name: 'ManualImport',
+          importMode: 'auto',
+          files: [
+            {
+              path: '/downloads/abc/f1.mkv',
+              seriesId: 1,
+              episodeIds: [11],
+              quality,
+              downloadId: 'abc',
+            },
+          ],
+        },
+      ])
+    );
+  });
+
   it('refreshes the queue with RefreshMonitoredDownloads', async () => {
     const fetchMock = renderSettingsPage(<Queue />, {
       ...commonRoutes,

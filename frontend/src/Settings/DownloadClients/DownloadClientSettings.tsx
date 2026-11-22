@@ -1,5 +1,5 @@
 // Adapted from Sonarr (GPL-3.0-or-later): frontend/src/Settings/DownloadClients/DownloadClientSettings.tsx
-// Without Test All / Manage Clients and Remote Path Mappings (Later). Completed download handling
+// Without Test All / Manage Clients (Later); remote path mappings are on Media Management. Completed download handling
 // is always on (M3 imports), so the options are the failed download handling ones.
 import React, { useCallback, useState } from 'react';
 import FieldSet from 'Components/FieldSet';

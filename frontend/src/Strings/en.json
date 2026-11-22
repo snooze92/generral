@@ -753,5 +753,9 @@
   "ConnectSettings": "Connect Settings",
   "Connections": "Connections",
   "PlexTokenHelpText": "Plex Media Server needs your X-Plex-Token: in Plex Web, open any item → ⋯ → Get Info → View XML, and copy the X-Plex-Token value from the address bar.",
-  "NotificationsLoadError": "Unable to load connections"
+  "NotificationsLoadError": "Unable to load connections",
+  "ManualImport": "Manual Import",
+  "RelativePath": "Relative Path",
+  "NoVideoFilesFoundSelectedFolder": "No video files were found in this download",
+  "ManualImportLoadError": "Unable to load the files of this download"
 }

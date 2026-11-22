@@ -57,7 +57,8 @@
 .actions {
   composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
 
-  width: 50px;
+  width: 80px;
+  white-space: nowrap;
   text-align: right;
   white-space: nowrap;
 }
