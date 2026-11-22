@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Ported from Sonarr@51a2412af235 src/NzbDrone.Core/DecisionEngine/DownloadDecision.cs and src/NzbDrone.Core/Parser/Model/RemoteEpisode.cs
+using Generral.Core.Blocklisting;
 using Generral.Core.Indexers;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
@@ -27,7 +28,19 @@ public sealed class RemoteEpisode
     /// <summary>The matched episodes are among those searched for.</summary>
     public bool EpisodeRequested { get; set; }
 
+    public ReleaseSourceType ReleaseSource { get; set; }
+
     public override string ToString() => Release.Title;
+}
+
+public enum ReleaseSourceType
+{
+    Unknown,
+    Rss,
+    Search,
+    UserInvokedSearch,
+    InteractiveSearch,
+    ReleasePush,
 }
 
 public sealed record DownloadDecision(RemoteEpisode RemoteEpisode, IReadOnlyList<string> Rejections)
@@ -63,4 +76,10 @@ public sealed record DecisionContext
 
     /// <summary>A user search: unmonitored episodes may be grabbed.</summary>
     public bool UserInvoked { get; init; }
+
+    /// <summary>Blocklist entries of the series in scope, by series id.</summary>
+    public ILookup<int, Blocklist> Blocklist { get; init; } = Array.Empty<Blocklist>().ToLookup(b => b.SeriesId);
+
+    /// <summary>Episodes with a download in the queue, and its title.</summary>
+    public IReadOnlyDictionary<int, string> QueuedEpisodes { get; init; } = new Dictionary<int, string>();
 }

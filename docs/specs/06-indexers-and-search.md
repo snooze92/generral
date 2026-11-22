@@ -168,7 +168,9 @@ seeders before size.
   profile, existing file (no upgrades until episode files exist), size (MB/min × runtime, default
   120 min), minimum seeders (indexer setting), release profile required/ignored terms (Sonarr
   term matcher: `/regex/i` or substring; tags and indexer scope), monitored (automatic/RSS only).
-  Not yet: blocklist, queue/already imported, retention, packs, release-profile scores.
+  M2d added blocklisted (Sonarr's comparer: infohash, else title + indexer, per series) and already in queue
+  (any tracked, non-failed download for one of the episodes rejects: "Release in queue already: …").
+  Not yet: already imported, retention, packs, release-profile scores.
 - Commands: `EpisodeSearch { episodeIds }` (any state), `SeasonSearch { seriesId, seasonNumber }`,
   `SeriesSearch { seriesId }` and `MissingEpisodeSearch` (monitored, aired, no file; Missing also
   needs a monitored series). Each grabs the best accepted release per episode set and never two
@@ -178,8 +180,8 @@ seeders before size.
   window contains now. Interval: `PUT /settings/indexer { rssSyncInterval }` (minutes, 0 off, else
   10–120, default 15); the last run is kept in memory, so it runs at the first scheduler check after
   a start.
-- Grabs go through `IDownloadService`; until download clients exist it keeps the last 100 grabs in
-  memory and logs "No download client".
+- Grabs go through `IDownloadService`, which sends them to a download client (spec 07 § Implementation notes (M2d)).
+  A failed grab is logged and the next best release for the same episodes is tried.
 - Interactive results are ordered accepted → rejected matches → unmatched, each best first.
 
 ## Quality

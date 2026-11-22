@@ -220,7 +220,20 @@ public static class ReleaseEndpoints
             return Results.NotFound(new { message = "Unable to find matching series and episodes, will need to be manually provided" });
         }
 
-        await downloads.GrabAsync(remote, cancellationToken);
+        remote.ReleaseSource = ReleaseSourceType.InteractiveSearch;
+        try
+        {
+            await downloads.GrabAsync(remote, cancellationToken);
+        }
+        catch (ReleaseDownloadException e)
+        {
+            return Results.Conflict(new { message = $"Getting release from indexer failed: {e.Message}" });
+        }
+        catch (DownloadClientException e)
+        {
+            return Results.Conflict(new { message = e.Message });
+        }
+
         return Results.Ok(release);
     }
 

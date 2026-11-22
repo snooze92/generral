@@ -23,6 +23,8 @@ public sealed class DownloadDecisionMaker(TimeProvider time)
         new TorrentSeedingSpecification(),
         new ReleaseRestrictionsSpecification(),
         new MonitoredEpisodeSpecification(),
+        new BlocklistSpecification(),
+        new QueueSpecification(),
     ];
 
     public List<DownloadDecision> GetDecisions(IEnumerable<ReleaseInfo> releases, DecisionContext context) =>

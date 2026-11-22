@@ -4,7 +4,7 @@
 //
 // Ported from Sonarr@51a2412af235 src/NzbDrone.Core/DecisionEngine/Specifications/ (ProtocolSpecification.cs,
 // QualityAllowedByProfileSpecification.cs, UpgradeDiskSpecification.cs, AcceptableSizeSpecification.cs, TorrentSeedingSpecification.cs,
-// ReleaseRestrictionsSpecification.cs, RssSync/MonitoredEpisodeSpecification.cs) and src/NzbDrone.Core/Profiles/Releases/TermMatcherService.cs
+// ReleaseRestrictionsSpecification.cs, RssSync/MonitoredEpisodeSpecification.cs, BlocklistSpecification.cs, QueueSpecification.cs) and src/NzbDrone.Core/Profiles/Releases/TermMatcherService.cs
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Generral.Core.Indexers;
@@ -187,4 +187,19 @@ public sealed class MonitoredEpisodeSpecification : IDecisionSpecification
             _ => "One or more episodes is not monitored",
         };
     }
+}
+
+public sealed class BlocklistSpecification : IDecisionSpecification
+{
+    public string? Check(RemoteEpisode subject, DecisionContext context) =>
+        subject.Series is { } series && context.Blocklist[series.Id].Any(b => b.Matches(subject.Release)) ? "Release is blocklisted" : null;
+}
+
+/// <summary>Without upgrades, any download in the queue for one of the episodes rejects the release.</summary>
+public sealed class QueueSpecification : IDecisionSpecification
+{
+    public string? Check(RemoteEpisode subject, DecisionContext context) =>
+        subject.Episodes.Select(e => context.QueuedEpisodes.GetValueOrDefault(e.Id)).OfType<string>().FirstOrDefault() is { } title
+            ? $"Release in queue already: {title}"
+            : null;
 }

@@ -76,17 +76,17 @@ idempotent and the scheduler re-derives what is due from the database (e.g. `Sou
 Persistence can be added with `System → Tasks` history if needed. A command has a name, body,
 status `queued`/`started`/`completed`/`failed`, message, queued/started/ended times and trigger
 `manual`/`scheduled`; an identical command (same name and body) that is still queued is not queued
-twice. 3 commands run at a time. The scheduler checks every 5 min and enqueues `RefreshSources` when
+twice. 3 commands run at a time. The scheduler checks every minute and enqueues `RefreshSources` when
 an enabled source is due; it is disabled with `GENERRAL__SCHEDULER__ENABLED=false` (the integration
 tests do this). It also enqueues `RssSync` when the RSS interval has elapsed (see 06 § Implementation
-notes (M2c)).)*
+notes (M2c)) and `RefreshMonitoredDownloads` every minute when a download client is enabled.)*
 
 | Task | Default interval | Sonarr equivalent |
 |------|------------------|-------------------|
 | `RefreshSources` | 12 h (per-source override) | Refresh Series |
 | `ApplyMappings` | after every source refresh, plus on mapping save | (n/a) |
 | `RssSync` | 15 min (min 10, configurable; 0 disables) | RSS Sync |
-| `CheckForFinishedDownloads` | 1 min | Check For Finished Download |
+| `RefreshMonitoredDownloads` | 1 min | Check For Finished Download |
 | `MissingEpisodeSearch` | manual / optional schedule | Missing Episode Search |
 | `EpisodeSearch` (on air) | at `airDateUtc + searchDelay` per episode | (Sonarr searches on air via RSS only) |
 | `Housekeeping` | 24 h | Housekeeping |

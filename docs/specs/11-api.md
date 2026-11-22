@@ -30,7 +30,7 @@ Resource shapes reuse Sonarr's where the concept is the same, so that vendored U
 | `release` | `GET /release?episodeId=` (interactive search), `POST /release` (grab, optionally with episode override), `POST /release/push` |
 | `queue`, `history`, `blocklist`, `wanted/missing`, `wanted/cutoff`, `calendar`, `manualimport` | Sonarr-shaped |
 | `indexer`, `downloadclient`, `notification`, `metadata`, `qualityprofile`, `qualitydefinition`, `releaseprofile`, `tag`, `rootfolder`, `remotepathmapping`, `config/{naming,mediamanagement,host,ui,indexer,downloadclient}` | Sonarr-shaped, including `/schema` and `/test` for providers |
-| `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `RenameFiles`, `RenameSeries`, `Renumber`, `DownloadedEpisodesScan`, `Backup`, `CheckHealth`, `Housekeeping` |
+| `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `RefreshMonitoredDownloads`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `RenameFiles`, `RenameSeries`, `Renumber`, `DownloadedEpisodesScan`, `Backup`, `CheckHealth`, `Housekeeping` |
 | `system` | `/system/status`, `/system/task`, `/system/backup`, `/health`, `/log`, `/log/file` |
 
 Source, event and command resources (M1a):

@@ -1,5 +1,17 @@
-using System.Collections.Concurrent;
+// SPDX-FileCopyrightText: 2010-2026 Sonarr Team and contributors
+// SPDX-FileCopyrightText: The Generral contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Ported from Sonarr@51a2412af235 src/NzbDrone.Core/Download/DownloadService.cs and src/NzbDrone.Core/Download/TorrentClientBase.cs
+using Generral.Core.Blocklisting;
+using Generral.Core.Datastore;
 using Generral.Core.DecisionEngine;
+using Generral.Core.Download.TrackedDownloads;
+using Generral.Core.History;
+using Generral.Core.Indexers;
+using Generral.Core.Indexers.Torznab;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Generral.Core.Download;
@@ -7,31 +19,48 @@ namespace Generral.Core.Download;
 /// <summary>Sends a release to a download client.</summary>
 public interface IDownloadService
 {
-    Task GrabAsync(RemoteEpisode remoteEpisode, CancellationToken cancellationToken = default);
+    /// <returns>The download id.</returns>
+    /// <exception cref="DownloadClientException">No usable download client, or it failed.</exception>
+    /// <exception cref="ReleaseDownloadException">The release couldn't be fetched, is blocklisted, or was rejected.</exception>
+    Task<string> GrabAsync(RemoteEpisode remoteEpisode, CancellationToken cancellationToken = default);
 }
 
-public sealed record PendingGrab(string Title, string Guid, int IndexerId, IReadOnlyList<int> EpisodeIds, DateTime Grabbed);
-
-/// <summary>Until download clients exist: remembers the grab (in memory, most recent first) and logs that there is no client.</summary>
-public sealed class PendingGrabDownloadService(TimeProvider time, ILogger<PendingGrabDownloadService> logger) : IDownloadService
+/// <summary>Grab: pick a client, fetch the torrent, add it, record the grab in history and track it in the queue.</summary>
+public sealed class DownloadService(
+    IServiceScopeFactory scopes,
+    DownloadClientProvider provider,
+    TorrentReleaseFetcher fetcher,
+    TrackedDownloadService tracked,
+    ILogger<DownloadService> logger) : IDownloadService
 {
-    public const int Retained = 100;
-
-    private readonly ConcurrentQueue<PendingGrab> _grabs = new();
-
-    public IReadOnlyList<PendingGrab> Grabs => _grabs.Reverse().ToList();
-
-    public Task GrabAsync(RemoteEpisode remoteEpisode, CancellationToken cancellationToken = default)
+    public async Task<string> GrabAsync(RemoteEpisode remoteEpisode, CancellationToken cancellationToken = default)
     {
         var release = remoteEpisode.Release;
-        var episodes = remoteEpisode.Episodes.Select(e => e.Id).ToList();
-        _grabs.Enqueue(new PendingGrab(release.Title, release.Guid, release.IndexerId, episodes, time.GetUtcNow().UtcDateTime));
-        while (_grabs.Count > Retained && _grabs.TryDequeue(out _))
+        if (remoteEpisode.Episodes.Count == 0)
         {
+            throw new ReleaseDownloadException($"{release.Title} isn't matched to any episode");
         }
 
-        logger.LogWarning("No download client: not sending {Title} from {Indexer} for {Episodes}", release.Title, release.Indexer,
-            string.Join(", ", remoteEpisode.Episodes.Select(SearchCandidate.Format)));
-        return Task.CompletedTask;
+        using var scope = scopes.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
+        var indexer = release.IndexerId > 0 ? await db.Indexers.AsNoTracking().SingleOrDefaultAsync(i => i.Id == release.IndexerId, cancellationToken) : null;
+        var clients = await db.DownloadClients.AsNoTracking().ToListAsync(cancellationToken);
+        var client = provider.Select(clients, release.DownloadProtocol, indexer, remoteEpisode.Series?.Tags ?? []);
+        var implementation = provider.Find(client.Implementation)!;
+
+        var torrent = await fetcher.ResolveAsync(release, cancellationToken);
+        var seriesId = remoteEpisode.Series?.Id ?? remoteEpisode.Episodes[0].SeriesId;
+        if (string.IsNullOrWhiteSpace(release.InfoHash) && remoteEpisode.ReleaseSource != ReleaseSourceType.InteractiveSearch &&
+            indexer is not null && TorznabSettings.From(indexer.Settings).RejectBlocklistedTorrentHashesWhileGrabbing &&
+            await scope.ServiceProvider.GetRequiredService<BlocklistService>().IsHashBlocklistedAsync(seriesId, torrent.Hash, cancellationToken))
+        {
+            throw new ReleaseDownloadException("Release previously added to blocklist");
+        }
+
+        var downloadId = await implementation.AddTorrentAsync(client, torrent, remoteEpisode, indexer, cancellationToken);
+        await scope.ServiceProvider.GetRequiredService<HistoryService>().RecordGrabbedAsync(remoteEpisode, client, downloadId, cancellationToken);
+        tracked.TrackGrab(client, downloadId, remoteEpisode);
+        logger.LogInformation("Report sent to {Client} from indexer {Indexer}. {Title}", client.Name, release.Indexer, release.Title);
+        return downloadId;
     }
 }
