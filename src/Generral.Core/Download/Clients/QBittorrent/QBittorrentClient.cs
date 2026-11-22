@@ -65,19 +65,13 @@ public sealed class QBittorrentClient(IHttpClientFactory clients, TimeProvider t
 
         await EnsureCategoriesAsync(settings, cancellationToken);
         var version = await GetApiVersionAsync(settings, cancellationToken);
-        using var form = new MultipartFormDataContent();
-        if (torrent.File is { } file)
+        var fields = new List<(string Name, string Value)>();
+        void Add(string name, string value) => fields.Add((name, value));
+        if (torrent.File is null)
         {
-            var content = new ByteArrayContent(file);
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/x-bittorrent");
-            form.Add(content, "torrents", torrent.FileName);
-        }
-        else
-        {
-            form.Add(new StringContent(torrent.MagnetUrl!), "urls");
+            Add("urls", torrent.MagnetUrl!);
         }
 
-        void Add(string name, string value) => form.Add(new StringContent(value), name);
         if (settings.TvCategory is { } category)
         {
             Add("category", category);
@@ -122,7 +116,7 @@ public sealed class QBittorrentClient(IHttpClientFactory clients, TimeProvider t
         string result;
         try
         {
-            result = await SendAsync(settings, HttpMethod.Post, "/api/v2/torrents/add", () => form, cancellationToken);
+            result = await SendAsync(settings, HttpMethod.Post, "/api/v2/torrents/add", () => AddForm(torrent, fields), cancellationToken);
         }
         catch (DownloadClientException e) when (e.InnerException is HttpRequestException { StatusCode: HttpStatusCode.Conflict })
         {
@@ -152,6 +146,24 @@ public sealed class QBittorrentClient(IHttpClientFactory clients, TimeProvider t
         }
 
         return torrent.Hash.ToUpperInvariant();
+    }
+
+    private static MultipartFormDataContent AddForm(TorrentPayload torrent, List<(string Name, string Value)> fields)
+    {
+        var form = new MultipartFormDataContent();
+        if (torrent.File is { } file)
+        {
+            var content = new ByteArrayContent(file);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/x-bittorrent");
+            form.Add(content, "torrents", torrent.FileName);
+        }
+
+        foreach (var (name, value) in fields)
+        {
+            form.Add(new StringContent(value), name);
+        }
+
+        return form;
     }
 
     public async Task<IReadOnlyList<DownloadClientItem>> GetItemsAsync(DownloadClient client, CancellationToken cancellationToken = default)

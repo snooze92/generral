@@ -184,11 +184,11 @@ public static class ActivityEndpoints
         int page = 1,
         int pageSize = 10,
         string? sortKey = null,
-        SortDirection sortDirection = SortDirection.Descending,
+        string? sortDirection = null,
         int? episodeId = null,
         int? seriesId = null,
         string? downloadId = null,
-        EpisodeHistoryEventType? eventType = null)
+        string? eventType = null)
     {
         var query = db.History.AsNoTracking();
         if (episodeId is { } episode)
@@ -206,12 +206,12 @@ public static class ActivityEndpoints
             query = query.Where(h => h.DownloadId == downloadId);
         }
 
-        if (eventType is { } type)
+        if (Enum.TryParse<EpisodeHistoryEventType>(eventType, ignoreCase: true, out var type))
         {
             query = query.Where(h => h.EventType == type);
         }
 
-        var ascending = sortDirection == SortDirection.Ascending;
+        var ascending = string.Equals(sortDirection, "ascending", StringComparison.OrdinalIgnoreCase);
         var (total, rows) = await PageAsync(ascending ? query.OrderBy(h => h.Date).ThenBy(h => h.Id) : query.OrderByDescending(h => h.Date).ThenByDescending(h => h.Id), page, pageSize, cancellationToken);
         var records = rows.Select(h => new HistoryResource(h.Id, h.EpisodeId, h.SeriesId, h.SourceTitle, [], h.Quality, [], 0, false, h.Date, h.DownloadId, h.EventType, h.Data)).ToList();
         return new PagingResource<HistoryResource>(Math.Max(page, 1), PageSize(pageSize), sortKey ?? "date", ascending ? SortDirection.Ascending : SortDirection.Descending, total, records);
@@ -223,7 +223,7 @@ public static class ActivityEndpoints
         int page = 1,
         int pageSize = 10,
         string? sortKey = null,
-        SortDirection sortDirection = SortDirection.Descending,
+        string? sortDirection = null,
         int? seriesId = null)
     {
         var query = db.Blocklist.AsNoTracking();
@@ -232,7 +232,7 @@ public static class ActivityEndpoints
             query = query.Where(b => b.SeriesId == series);
         }
 
-        var ascending = sortDirection == SortDirection.Ascending;
+        var ascending = string.Equals(sortDirection, "ascending", StringComparison.OrdinalIgnoreCase);
         var (total, rows) = await PageAsync(ascending ? query.OrderBy(b => b.Date).ThenBy(b => b.Id) : query.OrderByDescending(b => b.Date).ThenByDescending(b => b.Id), page, pageSize, cancellationToken);
         var records = rows.Select(b => new BlocklistResource(b.Id, b.SeriesId, b.EpisodeIds, b.SourceTitle, [], b.Quality, [], b.Date, b.Protocol, b.Indexer, b.Message)).ToList();
         return new PagingResource<BlocklistResource>(Math.Max(page, 1), PageSize(pageSize), sortKey ?? "date", ascending ? SortDirection.Ascending : SortDirection.Descending, total, records);
