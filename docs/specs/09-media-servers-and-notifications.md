@@ -17,7 +17,7 @@ announced"), `On Source Failure`.
 
 | Provider | MVP | Notes |
 |----------|-----|-------|
-| **Plex Media Server** | MVP | Port of Sonarr's. Plex.tv OAuth sign-in to obtain a token (or paste a token); host/port/SSL. *Update Library* on import/rename/delete: **partial scan** of the series folder via `GET /library/sections/{id}/refresh?path=<url-encoded folder>`. The section id is discovered by matching section `Location` paths against the series path (with a path mapping setting for when Plex sees different paths). |
+| **Plex Media Server** | MVP | Port of Sonarr's. Plex.tv OAuth sign-in to obtain a token (or paste a token); host/port/SSL. *Update Library* on import/rename/delete: **partial scan** of the series folder via `GET /library/sections/{id}/refresh?path=<url-encoded folder>`. The section id is discovered by matching section `Location` paths against the series path (with a path mapping setting for when Plex sees different paths). Unlike Sonarr, no matching section means no refresh (logged at debug), not a scan of every TV section. |
 | Webhook | MVP | Sonarr-shaped JSON payloads (`eventType`, `series`, `episodes`, `episodeFile`, `release`, …) so that existing Sonarr webhook consumers mostly work. |
 | Discord | MVP | |
 | ntfy, Apprise, Gotify, Pushover, Telegram, Email | Later | Port from Sonarr as needed. |
@@ -39,7 +39,7 @@ and never episode thumbnails.
 ## Plex specifics
 
 - **Health check:** for each series root folder, check that a Plex TV library section contains it.
-  If not, warn: "Plex has no TV library covering `/data/media/sports`".
+  If not, warn: "Plex has no TV library covering `/data/media/generral`".
 - **Agent hint:** if the section's agent is the default *Plex TV Series* (`tv.plex.agents.series`),
   show a one-time informational health message suggesting *Plex NFO Series* or Personal Media Shows,
   since the default agent will try to match "UFC" against TMDB/TVDB and may mis-match.

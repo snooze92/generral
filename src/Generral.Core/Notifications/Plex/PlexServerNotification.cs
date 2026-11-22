@@ -101,13 +101,7 @@ public sealed class PlexServerNotification(IHttpClientFactory clients, ILogger<P
         var matches = sections.Where(s => (s.Locations ?? []).Any(l => Contains(l.Path, path))).ToList();
         if (matches.Count == 0)
         {
-            // Sonarr parity: without a matching location, every TV section is scanned.
-            logger.LogWarning("Plex has no TV library covering {Path}; updating all TV sections", path);
-            foreach (var section in sections)
-            {
-                await GetAsync(settings, $"library/sections/{section.Id.ToString(CultureInfo.InvariantCulture)}/refresh", null, cancellationToken);
-            }
-
+            logger.LogDebug("Plex has no TV library covering {Path}; not refreshing", path);
             return;
         }
 

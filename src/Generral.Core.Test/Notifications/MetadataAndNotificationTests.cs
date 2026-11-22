@@ -101,18 +101,18 @@ public class MetadataAndNotificationTests
     public async Task Plex_refreshes_the_series_folder_in_the_section_whose_location_contains_it()
     {
         _handler.Respond = request => request.RequestUri!.AbsolutePath == "/library/sections"
-            ? """{"MediaContainer":{"Directory":[{"key":"1","type":"movie","Location":[{"id":1,"path":"/media/movies"}]},{"key":"2","type":"show","agent":"tv.plex.agents.none","Location":[{"id":2,"path":"/media/tv"}]},{"key":"3","type":"show","Location":[{"id":3,"path":"/media/sports"}]}]}}"""
+            ? """{"MediaContainer":{"Directory":[{"key":"1","type":"movie","Location":[{"id":1,"path":"/media/movies"}]},{"key":"2","type":"show","agent":"tv.plex.agents.none","Location":[{"id":2,"path":"/media/tv"}]},{"key":"3","type":"show","Location":[{"id":3,"path":"/media/generral"}]}]}}"""
             : "";
         var plex = new PlexServerNotification(_services.GetRequiredService<IHttpClientFactory>(), NullLogger<PlexServerNotification>.Instance);
         var definition = new NotificationDefinition
         {
             Name = "Plex",
             Implementation = PlexServerNotification.Name,
-            Settings = new JsonObject { ["host"] = "plex.lan", ["port"] = 32400, ["authToken"] = "tok", ["mapFrom"] = "/data/sports", ["mapTo"] = "/media/sports" },
+            Settings = new JsonObject { ["host"] = "plex.lan", ["port"] = 32400, ["authToken"] = "tok", ["mapFrom"] = "/data/media/generral", ["mapTo"] = "/media/generral" },
         };
 
         var series = Series();
-        series.Path = "/data/sports/UFC";
+        series.Path = "/data/media/generral/UFC";
         await plex.SendAsync(definition, new DownloadMessage { Series = series, File = File(), SourcePath = "/downloads/x.mkv" });
 
         var refresh = _handler.Requests.Single(r => r.Uri.AbsolutePath.EndsWith("/refresh", StringComparison.Ordinal));
@@ -121,8 +121,29 @@ public class MetadataAndNotificationTests
             Assert.That(_handler.Requests[0].Uri.ToString(), Does.StartWith("http://plex.lan:32400/library/sections?"));
             Assert.That(_handler.Requests.Select(r => r.Token), Is.All.EqualTo("tok"), "token sent as a header, never in the URL");
             Assert.That(refresh.Uri.AbsolutePath, Is.EqualTo("/library/sections/3/refresh"));
-            Assert.That(refresh.Uri.Query, Does.Contain("path=%2Fmedia%2Fsports%2FUFC"));
+            Assert.That(refresh.Uri.Query, Does.Contain("path=%2Fmedia%2Fgenerral%2FUFC"));
         });
+    }
+
+    [Test]
+    public async Task Plex_skips_the_refresh_when_no_library_covers_the_series()
+    {
+        _handler.Respond = request => request.RequestUri!.AbsolutePath == "/library/sections"
+            ? """{"MediaContainer":{"Directory":[{"key":"2","type":"show","Location":[{"id":2,"path":"/media/tv"}]}]}}"""
+            : "";
+        var plex = new PlexServerNotification(_services.GetRequiredService<IHttpClientFactory>(), NullLogger<PlexServerNotification>.Instance);
+        var definition = new NotificationDefinition
+        {
+            Name = "Plex",
+            Implementation = PlexServerNotification.Name,
+            Settings = new JsonObject { ["host"] = "plex.lan", ["port"] = 32400, ["authToken"] = "tok" },
+        };
+
+        var series = Series();
+        series.Path = "/media/generral/Rugby World Cup";
+        await plex.SendAsync(definition, new DownloadMessage { Series = series, File = File(), SourcePath = "/downloads/x.mkv" });
+
+        Assert.That(_handler.Requests.Select(r => r.Uri.AbsolutePath), Is.EqualTo(new[] { "/library/sections" }));
     }
 
     [Test]
