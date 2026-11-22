@@ -224,6 +224,101 @@ namespace Generral.Core.Datastore.Migrations
                     b.ToTable("MappingVersions");
                 });
 
+            modelBuilder.Entity("Generral.Core.Profiles.QualityProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Cutoff")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Items")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<bool>("UpgradeAllowed")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("QualityProfiles");
+                });
+
+            modelBuilder.Entity("Generral.Core.Profiles.ReleaseProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ExcludedTags")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Ignored")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("IndexerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Required")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ReleaseProfiles");
+                });
+
+            modelBuilder.Entity("Generral.Core.Qualities.QualityDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double?>("MaxSize")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("MinSize")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("PreferredSize")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("Quality")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Quality")
+                        .IsUnique();
+
+                    b.ToTable("QualityDefinitions");
+                });
+
             modelBuilder.Entity("Generral.Core.Sources.Event", b =>
                 {
                     b.Property<int>("Id")

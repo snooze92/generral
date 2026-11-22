@@ -6,6 +6,8 @@ using Generral.Core.Lifecycle;
 using Generral.Core.Mappings;
 using Generral.Core.Messaging;
 using Generral.Core.Presets;
+using Generral.Core.Profiles;
+using Generral.Core.Qualities;
 using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Http;
@@ -34,6 +36,9 @@ public static class CoreServiceCollectionExtensions
         services.AddScoped<InitialUserService>();
         services.AddScoped<IUiSettingsService, UiSettingsService>();
         services.AddScoped<TagService>();
+        services.AddScoped<QualityDefinitionService>();
+        services.AddScoped<QualityProfileService>();
+        services.AddScoped<ReleaseProfileService>();
         services.AddScoped<CalendarService>();
         services.AddSingleton<PresetStore>();
 

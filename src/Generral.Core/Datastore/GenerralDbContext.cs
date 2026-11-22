@@ -1,5 +1,7 @@
 using Generral.Core.Indexers;
 using Generral.Core.Mappings;
+using Generral.Core.Profiles;
+using Generral.Core.Qualities;
 using Generral.Core.Sources;
 using Generral.Core.Tags;
 using Generral.Core.Tv;
@@ -34,6 +36,12 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
     public DbSet<Tag> Tags => Set<Tag>();
 
     public DbSet<Indexer> Indexers => Set<Indexer>();
+
+    public DbSet<QualityDefinition> QualityDefinitions => Set<QualityDefinition>();
+
+    public DbSet<QualityProfile> QualityProfiles => Set<QualityProfile>();
+
+    public DbSet<ReleaseProfile> ReleaseProfiles => Set<ReleaseProfile>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -79,6 +87,29 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
             indexer.Property(i => i.Name).UseCollation("NOCASE");
             indexer.Property(i => i.Settings).HasJsonConversion();
             indexer.Property(i => i.Tags).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<QualityDefinition>(definition =>
+        {
+            definition.Property(d => d.Quality).HasConversion(q => q.Id, id => Quality.FindById(id));
+            definition.HasIndex(d => d.Quality).IsUnique();
+            definition.Ignore(d => d.Weight);
+            definition.Ignore(d => d.GroupName);
+        });
+
+        modelBuilder.Entity<QualityProfile>(profile =>
+        {
+            profile.HasIndex(p => p.Name).IsUnique();
+            profile.Property(p => p.Name).UseCollation("NOCASE");
+            profile.Property(p => p.Items).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<ReleaseProfile>(profile =>
+        {
+            profile.Property(p => p.Required).HasJsonConversion();
+            profile.Property(p => p.Ignored).HasJsonConversion();
+            profile.Property(p => p.Tags).HasJsonConversion();
+            profile.Property(p => p.ExcludedTags).HasJsonConversion();
         });
 
         modelBuilder.Entity<Event>(ev =>
