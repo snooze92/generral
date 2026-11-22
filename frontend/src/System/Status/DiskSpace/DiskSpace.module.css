@@ -1,0 +1,6 @@
+/* Adapted from Sonarr (GPL-3.0-or-later): frontend/src/System/Status/DiskSpace/DiskSpace.module.css */
+.space {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 150px;
+}

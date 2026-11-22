@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -5,10 +6,16 @@ import { describe, expect, it } from 'vitest';
 import PageSidebar from './PageSidebar';
 
 function renderSidebar(path: string) {
+  // The System item shows the health issue count.
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(['/health'], []);
+
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <PageSidebar />
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <PageSidebar />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

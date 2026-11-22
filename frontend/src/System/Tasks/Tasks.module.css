@@ -1,0 +1,18 @@
+/* Adapted from Sonarr (GPL-3.0-or-later): frontend/src/System/Tasks/Scheduled/ScheduledTaskRow.module.css */
+.interval {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 150px;
+}
+
+.date {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 180px;
+}
+
+.actions {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 20px;
+}

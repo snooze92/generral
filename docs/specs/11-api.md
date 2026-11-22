@@ -31,7 +31,7 @@ Resource shapes reuse Sonarr's where the concept is the same, so that vendored U
 | `queue`, `history`, `blocklist`, `wanted/missing`, `wanted/cutoff`, `calendar`, `manualimport` | Sonarr-shaped |
 | `indexer`, `downloadclient`, `notification`, `metadata`, `qualityprofile`, `qualitydefinition`, `releaseprofile`, `tag`, `rootfolder`, `remotepathmapping`, `config/{naming,mediamanagement,host,ui,indexer,downloadclient}` | Sonarr-shaped, including `/schema` and `/test` for providers |
 | `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `RefreshMonitoredDownloads`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `OnAirSearch`, `RenameFiles`, `RenameSeries`, `Renumber`, `DownloadedEpisodesScan`, `Backup`, `CheckHealth`, `Housekeeping` |
-| `system` | `/system/status`, `/system/task`, `/system/backup`, `/health`, `/log`, `/log/file` |
+| `system` | `/system/status`, `/system/task`, `/system/backup` (+ `/{id}/download`, `/restore/{id}`, `/restore/upload`), `/health`, `/diskspace`, `/log` (recent in-memory entries, paged, `level=warn\|error`), `/log/file`, `/log/file/{name}` |
 
 Source, event and command resources (M1a):
 
@@ -237,4 +237,4 @@ reporting `Sonarr` would mislead dashboards and support requests.
 | `GET /api/v3/calendar`, `GET /api/v3/queue`, `GET /api/v3/wanted/missing`, `GET /api/v3/history` | Dashboards, Notifiarr |
 | `GET /api/v3/episodefile`, `DELETE /api/v3/episodefile/{id}` | Maintainerr |
 | `POST /api/v3/command` (`RefreshSeries`, `RssSync`, `MissingEpisodeSearch`) | Scripts, Unpackerr's "notify Sonarr" |
-| `GET /api/v3/health`, `GET /api/v3/diskspace` | Dashboards |
+| `GET /api/v3/health`, `GET /api/v3/diskspace` | Dashboards (done in M3c) |

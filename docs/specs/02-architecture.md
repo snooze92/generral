@@ -91,7 +91,7 @@ notes (M2c)) and `RefreshMonitoredDownloads` every minute when a download client
 | `EpisodeSearch` (on air) | at `airDateUtc + searchDelay` per episode | (Sonarr searches on air via RSS only) |
 | `Housekeeping` | 24 h | Housekeeping |
 | `Backup` | 7 days | Backup |
-| `HealthCheck` | 6 h + on relevant events | Check Health |
+| `CheckHealth` | 6 h + on relevant events | Check Health |
 | `ApplicationUpdateCheck` | n/a in Docker (image updates) | Application Update |
 
 ### Event flow (happy path, UC1)
@@ -123,6 +123,14 @@ notes (M2c)) and `RefreshMonitoredDownloads` every minute when a download client
 - **Logging:** Serilog to console + rolling files in `/config/logs`, levels Info/Debug/Trace
   switchable at runtime (Sonarr parity). Secrets (API keys, passwords, cookies) are redacted.
 - **Health checks:** surfaced in *System → Status* and as a badge on the sidebar (Sonarr parity).
+  *(M3c: ports of Sonarr's IndexerRss/IndexerSearch/IndexerStatus, DownloadClient/DownloadClientStatus,
+  RootFolder and RemotePathMapping (completed download's folder missing) checks, plus Generral's
+  SourceRefreshCheck (warning, error once failing for 24 h) and MappingCheck (invalid definition or
+  events with errors). Results and provider failures are in memory, without Sonarr's back-off: an
+  indexer or download client counts as failing until its next success. `CheckHealth` runs every 6 h,
+  and at the next scheduler tick (1 min, Generral's debounce) after a provider outcome changes or a
+  POST/PUT/DELETE on indexers, download clients, root folders, remote path mappings, sources, mappings
+  or series. Prowlarr-sync and Plex checks are `Later`.)*
   Examples: source failing for > 24 h, mapping produces numbering conflicts, no indexers, Prowlarr
   sync stale, download client unreachable, root folder missing/unwritable, remote path mapping
   likely wrong, Plex unreachable.
@@ -135,3 +143,12 @@ notes (M2c)) and `RefreshMonitoredDownloads` every minute when a download client
   covered too). The `Source` client has a 30 s timeout, follows up to 5 redirects and buffers at
   most 10 MiB.
 - **Backups:** zip of DB + `config.yaml` to `/config/Backups`, scheduled and manual, restore from UI.
+  *(M3c: `/config/Backups/{scheduled,manual}/generral_backup_v<version>_<date>.zip` with
+  `generral.db` (SQLite online backup), `config.yaml` and `INFO`. Scheduled every 7 days, counted
+  from the newest scheduled backup on disk; scheduled backups older than 28 days are pruned (not
+  configurable yet). Restore (from a listed backup or an uploaded zip) validates the SQLite header and
+  the YAML, writes `config.yaml` and stages the database as `/config/generral.restore`, which is swapped
+  in before migrations at the next start, as in Sonarr. PostgreSQL is not backed up.)*
+- **Events and log files:** *(M3c)* System → Events shows the last 1000 Info+ log entries kept in
+  memory since the start (Sonarr stores them in a database table); System → Log Files lists
+  `/config/logs/*.txt`. Plain links (log and backup downloads) authenticate with `?apikey=`.
