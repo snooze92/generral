@@ -14,7 +14,7 @@ public class FileNameBuilderTests
     [Test]
     public void UC1_UC2_event_with_part_and_colon()
     {
-        var series = Series("UFC", "/data/media/sports/UFC");
+        var series = Series("UFC", "/data/media/generral/UFC");
         var episode = Episode(2025, 4, "UFC 314: Volkanovski vs. Lopes - Main Card");
         var input = new NamingInput(series, [episode], File(Quality.WEBDL1080p));
 
@@ -22,14 +22,14 @@ public class FileNameBuilderTests
         {
             Assert.That(FileNameBuilder.GetSeriesFolder(series, Defaults), Is.EqualTo("UFC"));
             Assert.That(FileNameBuilder.BuildFilePath(input, Defaults, ".mkv"),
-                Is.EqualTo("/data/media/sports/UFC/Season 2025/UFC - S2025E04 - UFC 314 - Volkanovski vs. Lopes - Main Card [WEBDL-1080p].mkv"));
+                Is.EqualTo("/data/media/generral/UFC/Season 2025/UFC - S2025E04 - UFC 314 - Volkanovski vs. Lopes - Main Card [WEBDL-1080p].mkv"));
         });
     }
 
     [Test]
     public void UC3_tournament_and_series_year_folder()
     {
-        var series = Series("Rugby World Cup", "/data/media/sports/Rugby World Cup");
+        var series = Series("Rugby World Cup", "/data/media/generral/Rugby World Cup");
         var input = new NamingInput(series, [Episode(2027, 1, "Pool A - Australia vs Hong Kong China")], File(Quality.HDTV1080p));
         var withYear = Series("Rugby World Cup", "/x", year: 2027);
 

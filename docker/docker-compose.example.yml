@@ -9,7 +9,7 @@ services:
       - TZ=Europe/London
     volumes:
       - ./config/generral:/config
-      - /srv/data:/data # /data/torrents/generral, /data/media/sports
+      - /srv/data:/data # /data/torrents/generral, /data/media/generral
     ports:
       - 8990:8990
     restart: unless-stopped

@@ -77,7 +77,7 @@ services:
       - TZ=Europe/London
     volumes:
       - ./config/generral:/config
-      - /srv/data:/data            # /data/torrents/generral, /data/media/sports
+      - /srv/data:/data            # /data/torrents/generral, /data/media/generral
     ports:
       - 8990:8990
     restart: unless-stopped
@@ -110,7 +110,7 @@ services:
 
 Wiring: Generral → Download client qBittorrent `qbittorrent:8080`, category `generral` (qBittorrent
 save path `/data/torrents/generral`). Prowlarr → Apps → Sonarr → `http://generral:8990`. Generral →
-Connect → Plex `host.docker.internal` / LAN IP `:32400`. Plex TV library on `/data/media/sports`
+Connect → Plex `host.docker.internal` / LAN IP `:32400`. Plex TV library on `/data/media/generral`
 with agent *Plex NFO Series*.
 
 ## Repository layout (target)
