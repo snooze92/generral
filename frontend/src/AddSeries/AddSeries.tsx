@@ -59,6 +59,7 @@ function AddSeries() {
     monitorNewItems: 'all',
     seasonFolder: true,
     seriesType: 'standard',
+    qualityProfileId: 0,
     tags: [],
   });
 
@@ -150,6 +151,7 @@ function AddSeries() {
             monitored: series.monitored,
             monitorNewItems: series.monitorNewItems,
             seasonFolder: series.seasonFolder,
+            qualityProfileId: series.qualityProfileId,
             tags: series.tags,
             parameters: pick(false),
             secrets: pick(true),

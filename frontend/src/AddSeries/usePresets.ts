@@ -28,7 +28,7 @@ export interface Preset {
 export interface InstantiateRequest
   extends Pick<
     NewSeries,
-    'title' | 'rootFolderPath' | 'monitored' | 'monitorNewItems' | 'seasonFolder' | 'tags'
+    'title' | 'rootFolderPath' | 'monitored' | 'monitorNewItems' | 'seasonFolder' | 'qualityProfileId' | 'tags'
   > {
   parameters: Record<string, string>;
   secrets: Record<string, string>;

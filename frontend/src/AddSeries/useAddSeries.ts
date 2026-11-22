@@ -21,6 +21,7 @@ export type NewSeries = Pick<
   | 'monitorNewItems'
   | 'seasonFolder'
   | 'seriesType'
+  | 'qualityProfileId'
   | 'tags'
 >;
 

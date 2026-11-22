@@ -296,6 +296,7 @@
   "ProviderTestWarning": "{name} test completed with warnings",
   "Quality": "Quality",
   "QualityCutoffNotMet": "Quality cutoff has not been met",
+  "QualityProfile": "Quality Profile",
   "QualitySettingsSummary": "Quality titles used when renaming",
   "Queue": "Queue",
   "RawResponses": "Raw Responses",

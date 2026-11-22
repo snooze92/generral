@@ -76,7 +76,9 @@ Series and episode resources (M1b):
   specials); orphaned episodes without a file are not counted. Validation (400): title required and
   unique case-insensitively, slug format/unique, absolute path unique, root folder absolute,
   distinct non-negative season numbers, existing tags. `DELETE` → 204; seasons, episodes, mappings
-  (and versions) and links cascade. Root folders and quality profiles are not validated yet.
+  (and versions) and links cascade. `qualityProfileId` must exist (400); `0`/missing on `POST`
+  means the profile with the lowest id (*Any* on a fresh install), on `PUT` keeps the stored one.
+  Root folders are not validated yet.
 - `episode`: Sonarr's EpisodeResource (`seriesId, episodeFileId, seasonNumber, episodeNumber,
   absoluteEpisodeNumber, title, airDate, airDateUtc, lastSearchTime, runtime, overview, hasFile,
   monitored, unverifiedSceneNumbering: false, grabbed: false, images`) plus `numberLocked`,
@@ -86,6 +88,22 @@ Series and episode resources (M1b):
   reads `monitored` only; `PUT /episode/monitor { episodeIds[], monitored }` returns the episodes
   (unknown ids ignored, empty list → 400); `PUT /episode/{id}/lock { numberLocked }` locks or
   unlocks the number.
+
+Quality resources (M2b), Sonarr v3-shaped:
+
+- `qualityprofile`: CRUD + `GET /schema` (all qualities, Sonarr's groups, nothing allowed).
+  Sonarr's six default profiles are seeded on start when none exist. Validation follows Sonarr's
+  (name required and unique, every quality exactly once, named groups with ids and ≥ 2 qualities,
+  cutoff = an allowed item, sizes 0–1000 and ordered). `formatItems`/`*FormatScore` are returned
+  fixed (`[]`, `0`, `0`, `1`) and ignored until custom formats. `DELETE` of a profile used by a
+  series → 400 `QualityProfile [name] is in use.`
+- `qualitydefinition`: `GET`, `GET /{id}`, `PUT /{id}`, `PUT /update` (list), `GET /limits`. Only
+  `title` and sizes are writable; size changes are copied into every profile item (Sonarr's
+  `UpdateAllSizeLimits`). `quality` is `{ id, name, source, resolution }` and is read by `id`.
+- `releaseprofile`: `{ id, name, enabled, required[], ignored[], indexerId, tags[], excludedTags[] }`
+  (`required`/`ignored` also accept a comma-separated string). At least one term is required; the
+  indexer and tags must exist; a tag can't be both included and excluded. Sonarr's air-date and
+  season-pack fields are not supported.
 
 Mapping resources (M1b):
 
@@ -125,7 +143,7 @@ Preset resources (M1):
   filled with defaults) and stored as `<config>/presets/<id>.yaml`, replacing an imported preset
   with the same id; a shipped preset's id → 400. Returns the preset (201).
 - `POST /preset/{id}/instantiate { title?, rootFolderPath | path, monitored?, monitorNewItems?,
-  seasonFolder?, tags[], parameters{}, secrets{} }`: fills the placeholders (empty values → the
+  seasonFolder?, qualityProfileId?, tags[], parameters{}, secrets{} }`: fills the placeholders (empty values → the
   defaults; a missing required one → 400), validates the sources (as `source.settings.<field>`),
   mappings and series (as on `POST /series`), then in one transaction reuses an existing source of
   the same type with identical settings or creates one (name suffixed ` (2)` when taken), creates

@@ -6,6 +6,7 @@ import FormLabel from 'Components/Form/FormLabel';
 import FormRow from 'Components/Form/FormRow';
 import { inputTypes } from 'Helpers/Props';
 import { SeriesType } from 'Series/Series';
+import useQualityProfiles from 'Settings/Profiles/Quality/useQualityProfiles';
 import { InputChanged } from 'typings/inputs';
 import { ValidationError } from 'typings/pending';
 import translate from 'Utilities/String/translate';
@@ -26,7 +27,7 @@ const monitorNewItemsOptions = [
   },
 ];
 
-const FIELDS = ['title', 'rootFolderPath', 'path', 'tags'];
+const FIELDS = ['title', 'rootFolderPath', 'path', 'qualityProfileId', 'tags'];
 
 interface OptionsStepProps {
   series: NewSeries;
@@ -41,6 +42,12 @@ function OptionsStep({
   validationErrors,
   onChange,
 }: OptionsStepProps) {
+  const { data: qualityProfiles } = useQualityProfiles();
+  const qualityProfileOptions = qualityProfiles.map((profile) => ({
+    key: profile.id,
+    value: profile.name,
+  }));
+
   const errorsFor = (...names: string[]) =>
     validationErrors.filter((e) => names.includes(e.propertyName));
 
@@ -71,6 +78,20 @@ function OptionsStep({
           value={series.rootFolderPath}
           errors={errorsFor('rootFolderPath', 'path')}
           onChange={onChange}
+        />
+      </FormRow>
+
+      <FormRow>
+        <FormLabel>{translate('QualityProfile')}</FormLabel>
+        <FormInput
+          type={inputTypes.SELECT}
+          name="qualityProfileId"
+          values={qualityProfileOptions}
+          value={series.qualityProfileId || (qualityProfiles[0]?.id ?? 0)}
+          errors={errorsFor('qualityProfileId')}
+          onChange={({ name, value }: InputChanged<string | number>) =>
+            onChange({ name, value: Number(value) })
+          }
         />
       </FormRow>
 

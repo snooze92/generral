@@ -92,6 +92,10 @@ function renderWizard(routes: Record<string, MockRoute> = {}) {
     'GET /api/v1/tag': [{ id: 1, label: 'football' }],
     'POST /api/v1/mapping/preview': preview,
     'GET /api/v1/preset': presets,
+    'GET /api/v1/qualityprofile': [
+      { id: 1, name: 'Any', upgradeAllowed: false, cutoff: 1 },
+      { id: 4, name: 'HD-1080p', upgradeAllowed: false, cutoff: 9 },
+    ],
     ...routes,
   });
 
@@ -201,6 +205,7 @@ describe('Add series', () => {
     fireEvent.change(screen.getByPlaceholderText('/tv'), {
       target: { name: 'rootFolderPath', value: '/sport' },
     });
+    expect(await screen.findByText('Any')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add Cup' }));
 
     expect(await screen.findByText('Series page cup')).toBeTruthy();
@@ -211,6 +216,7 @@ describe('Add series', () => {
       monitorNewItems: 'all',
       seasonFolder: true,
       seriesType: 'standard',
+      qualityProfileId: 0,
       tags: [],
       seasons: [],
     });
@@ -279,6 +285,7 @@ describe('Add series', () => {
       monitored: true,
       monitorNewItems: 'all',
       seasonFolder: true,
+      qualityProfileId: 0,
       tags: [],
       parameters: {},
       secrets: { tsdbKey: 'premium' },
