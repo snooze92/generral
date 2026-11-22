@@ -37,6 +37,7 @@ public static class Logging
             .MinimumLevel.Override("Generral.Http.Authentication", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .WriteTo.Console(new CleansingFormatter(new MessageTemplateTextFormatter(Template)))
+            .WriteTo.Sink(RecentLogSink.Instance, LogEventLevel.Information)
             .WriteTo.File(
                 new CleansingFormatter(new MessageTemplateTextFormatter(Template)),
                 Path.Combine(folders.LogsFolder, "generral.txt"),

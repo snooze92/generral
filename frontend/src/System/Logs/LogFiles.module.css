@@ -1,0 +1,6 @@
+/* Adapted from Sonarr (GPL-3.0-or-later): frontend/src/System/Logs/LogFilesTableRow.module.css */
+.download {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 100px;
+}

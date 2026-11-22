@@ -7,7 +7,6 @@ import Queue from 'Activity/Queue/Queue';
 import AddSeries from 'AddSeries/AddSeries';
 import CalendarPage from 'Calendar/CalendarPage';
 import NotFound from 'Components/NotFound';
-import PlaceholderPage, { Milestone } from 'Components/Page/PlaceholderPage';
 import SeriesDetailsPage from 'Series/Details/SeriesDetailsPage';
 import SeriesIndex from 'Series/Index/SeriesIndex';
 import DownloadClientSettings from 'Settings/DownloadClients/DownloadClientSettings';
@@ -22,59 +21,18 @@ import Settings from 'Settings/Settings';
 import TagSettings from 'Settings/Tags/TagSettings';
 import UISettings from 'Settings/UI/UISettings';
 import Sources from 'Sources/Index/Sources';
+import Backups from 'System/Backup/Backups';
+import Events from 'System/Events/Events';
+import LogFiles from 'System/Logs/LogFiles';
 import Status from 'System/Status/Status';
-import translate from 'Utilities/String/translate';
+import Tasks from 'System/Tasks/Tasks';
+import Updates from 'System/Updates/Updates';
 import WantedPage from 'Wanted/WantedPage';
-
-interface PlaceholderRoute {
-  path: string;
-  scope?: () => string;
-  title: () => string;
-  milestone: Milestone;
-}
-
-// Pages that later milestones will build (docs/specs/13-roadmap.md).
-const PLACEHOLDERS: PlaceholderRoute[] = [
-  { path: '/system/tasks', scope: () => translate('System'), title: () => translate('Tasks'), milestone: 'M3' },
-  {
-    path: '/system/backups',
-    scope: () => translate('System'),
-    title: () => translate('Backups'),
-    milestone: 'M3',
-  },
-  {
-    path: '/system/updates',
-    scope: () => translate('System'),
-    title: () => translate('Updates'),
-    milestone: 'M3',
-  },
-  { path: '/system/events', scope: () => translate('System'), title: () => translate('Events'), milestone: 'M3' },
-  {
-    path: '/system/logs/files',
-    scope: () => translate('System'),
-    title: () => translate('LogFiles'),
-    milestone: 'M3',
-  },
-];
 
 export function appRouteElements() {
   return (
     <>
       <Route path="/" element={<Navigate to="/series" replace={true} />} />
-
-      {PLACEHOLDERS.map(({ path, scope, title, milestone }) => (
-        <Route
-          key={path}
-          path={path}
-          element={
-            <PlaceholderPage
-              scope={scope?.()}
-              title={title()}
-              milestone={milestone}
-            />
-          }
-        />
-      ))}
 
       <Route path="/add/new" element={<AddSeries />} />
 
@@ -128,6 +86,16 @@ export function appRouteElements() {
       <Route path="/settings/metadata" element={<MetadataSettings />} />
 
       <Route path="/system/status" element={<Status />} />
+
+      <Route path="/system/tasks" element={<Tasks />} />
+
+      <Route path="/system/backups" element={<Backups />} />
+
+      <Route path="/system/updates" element={<Updates />} />
+
+      <Route path="/system/events" element={<Events />} />
+
+      <Route path="/system/logs/files" element={<LogFiles />} />
 
       <Route path="*" element={<NotFound />} />
     </>

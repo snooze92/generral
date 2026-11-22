@@ -1,0 +1,8 @@
+/* Adapted from Sonarr (GPL-3.0-or-later): frontend/src/System/Status/Health/Health.module.css */
+.status {
+  width: 20px;
+}
+
+.healthOk {
+  margin-bottom: 25px;
+}

@@ -25,13 +25,13 @@ describe('App', () => {
   });
 
   it('renders the shell with the sidebar and header', async () => {
-    renderApp('/system/tasks');
+    renderApp('/system/updates');
 
     expect(await screen.findByText('Generral')).toBeTruthy();
     expect(
       screen.getByRole('navigation', { name: 'Main Navigation' })
     ).toBeTruthy();
-    expect(await screen.findByText('This page is coming in M3.')).toBeTruthy();
+    expect(await screen.findByText(/there is no in-app updater/)).toBeTruthy();
   });
 
   it('renders Settings → General with the host, security and logging sections', async () => {

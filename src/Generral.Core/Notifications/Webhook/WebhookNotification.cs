@@ -48,6 +48,16 @@ public sealed class WebhookNotification(IHttpClientFactory clients, IServiceScop
     public async Task SendAsync(NotificationDefinition definition, NotificationMessage message, CancellationToken cancellationToken = default) =>
         await PostAsync(definition, await BuildAsync(message, cancellationToken), cancellationToken);
 
+    public Task SendHealthAsync(NotificationDefinition definition, HealthCheck.HealthCheck check, bool restored, CancellationToken cancellationToken = default) =>
+        PostAsync(definition, new WebhookHealthPayload
+        {
+            EventType = restored ? WebhookEventType.HealthRestored : WebhookEventType.Health,
+            InstanceName = hostConfig.Current.InstanceName,
+            Level = check.Type,
+            Message = check.Message,
+            Type = check.Source,
+        }, cancellationToken);
+
     public async Task<IReadOnlyList<IndexerValidationFailure>> TestAsync(NotificationDefinition definition, CancellationToken cancellationToken = default)
     {
         var payload = new WebhookPayload

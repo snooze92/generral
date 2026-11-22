@@ -17,6 +17,7 @@ public sealed class CommandQueue(IEnumerable<ICommandHandler> handlers, TimeProv
     private readonly Dictionary<string, ICommandHandler> _handlers = handlers.ToDictionary(h => h.Name, StringComparer.OrdinalIgnoreCase);
     private readonly Channel<Command> _pending = Channel.CreateUnbounded<Command>();
     private readonly List<Command> _commands = [];
+    private readonly Dictionary<string, (DateTime Started, DateTime Ended)> _lastRuns = new(StringComparer.OrdinalIgnoreCase);
     private readonly Lock _lock = new();
     private int _lastId;
 
@@ -72,6 +73,15 @@ public sealed class CommandQueue(IEnumerable<ICommandHandler> handlers, TimeProv
         }
     }
 
+    /// <summary>When a command with this name last finished (since the start), for System → Tasks.</summary>
+    public (DateTime Started, DateTime Ended)? LastRun(string name)
+    {
+        lock (_lock)
+        {
+            return _lastRuns.TryGetValue(name, out var run) ? run : null;
+        }
+    }
+
     internal async Task ExecuteAsync(Command command, ILogger logger, CancellationToken cancellationToken)
     {
         command.Start(time.GetUtcNow().UtcDateTime);
@@ -92,6 +102,7 @@ public sealed class CommandQueue(IEnumerable<ICommandHandler> handlers, TimeProv
 
         lock (_lock)
         {
+            _lastRuns[command.Name] = (command.Started!.Value, command.Ended!.Value);
             Prune();
         }
     }

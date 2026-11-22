@@ -1,5 +1,6 @@
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
+using Generral.Core.HealthCheck;
 using Generral.Core.Lifecycle;
 using Microsoft.AspNetCore.Routing;
 
@@ -20,6 +21,8 @@ public static class SonarrShimEndpoints
     {
         api.MapGet("/system/status", (IHostConfigProvider config, IAppFolders folders, IRuntimeInfo runtime, IHostEnvironment environment, GenerralDbContext db) =>
             SystemEndpoints.GetStatus(config, folders, runtime, environment, db) with { Version = Version, GenerralVersion = BuildInfo.Version });
+        api.MapGet("/health", (HealthCheckService health) => SystemHealthEndpoints.Health(health));
+        api.MapGet("/diskspace", SystemHealthEndpoints.DiskSpaceAsync);
 
         api.MapIndexerEndpoints();
         api.MapTagEndpoints();

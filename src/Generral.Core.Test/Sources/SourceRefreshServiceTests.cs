@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Generral.Core.Datastore;
+using Generral.Core.HealthCheck;
 using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Types;
@@ -32,6 +33,7 @@ public class SourceRefreshServiceTests
         services.AddSingleton<TimeProvider>(_time);
         services.AddSingleton<ISourceType>(_type);
         services.AddSingleton<SourceTypeRegistry>();
+        services.AddSingleton<ProviderStatusTracker>();
         services.AddSingleton<SourceRefreshService>();
         _services = services.BuildServiceProvider();
 

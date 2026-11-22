@@ -20,6 +20,7 @@ import OverlayScroller from 'Components/Scroller/OverlayScroller';
 import Scroller from 'Components/Scroller/Scroller';
 import { icons } from 'Helpers/Props';
 import dimensions from 'Styles/Variables/dimensions';
+import HealthStatus from 'System/Status/Health/HealthStatus';
 import translate from 'Utilities/String/translate';
 import PageSidebarItem from './PageSidebarItem';
 import styles from './PageSidebar.module.css';
@@ -36,6 +37,7 @@ interface SidebarItem {
   title: string | (() => string);
   to: string;
   alias?: string;
+  statusComponent?: React.ElementType;
   children?: SidebarChild[];
 }
 
@@ -116,6 +118,7 @@ export const GROUPS: SidebarGroup[] = [
         title: () => translate('System'),
         to: '/system/status',
         alias: '/system',
+        statusComponent: HealthStatus,
         children: [
           { title: () => translate('Status'), to: '/system/status' },
           { title: () => translate('Tasks'), to: '/system/tasks' },
@@ -286,6 +289,7 @@ function PageSidebar() {
                       iconName={link.iconName}
                       title={link.title}
                       to={link.to}
+                      statusComponent={link.statusComponent}
                       isActive={pathname === link.to && !hasActiveChild}
                       isActiveParent={isActiveParent}
                       isParentItem={!!link.children}
