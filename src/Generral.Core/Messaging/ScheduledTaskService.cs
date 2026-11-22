@@ -1,5 +1,6 @@
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
+using Generral.Core.Download.TrackedDownloads;
 using Generral.Core.IndexerSearch;
 using Generral.Core.Sources;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,7 @@ public sealed class ScheduledTaskService(
     ILogger<ScheduledTaskService> logger) : BackgroundService
 {
     public const string EnabledKey = "GENERRAL:SCHEDULER:ENABLED";
-    public static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -61,6 +62,11 @@ public sealed class ScheduledTaskService(
         if (rssInterval > 0 && (lastRss is null || lastRss.Value.AddMinutes(rssInterval) <= now.AddSeconds(30)))
         {
             queue.Enqueue(RssSyncHandler.CommandName, trigger: CommandTrigger.Scheduled);
+        }
+
+        if (await db.DownloadClients.AnyAsync(c => c.Enable, cancellationToken))
+        {
+            queue.Enqueue(RefreshMonitoredDownloadsHandler.CommandName, trigger: CommandTrigger.Scheduled);
         }
     }
 }

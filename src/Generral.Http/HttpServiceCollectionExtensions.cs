@@ -128,6 +128,8 @@ public static partial class HttpServiceCollectionExtensions
         api.MapSourceEndpoints();
         api.MapTagEndpoints();
         api.MapIndexerEndpoints();
+        api.MapDownloadClientEndpoints();
+        api.MapActivityEndpoints();
         api.MapQualityProfileEndpoints();
         api.MapQualityDefinitionEndpoints();
         api.MapReleaseProfileEndpoints();

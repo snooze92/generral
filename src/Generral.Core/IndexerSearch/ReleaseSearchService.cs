@@ -8,6 +8,7 @@ using System.Linq.Expressions;
 using Generral.Core.Datastore;
 using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
+using Generral.Core.Download.TrackedDownloads;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
 using Generral.Core.Tv;
@@ -28,6 +29,7 @@ public sealed class ReleaseSearchService(
     TorznabClient torznab,
     DownloadDecisionMaker decisionMaker,
     IDownloadService downloads,
+    TrackedDownloadService trackedDownloads,
     TimeProvider time,
     ILogger<ReleaseSearchService> logger)
 {
@@ -48,7 +50,7 @@ public sealed class ReleaseSearchService(
     public async Task<SearchResult> AutomaticSearchAsync(Expression<Func<Episode, bool>> episodes, bool userInvoked, CancellationToken cancellationToken = default)
     {
         var (decisions, searched) = await SearchAsync(episodes, interactive: false, userInvoked, cancellationToken);
-        var grabbed = await GrabAsync(decisions, cancellationToken);
+        var grabbed = await GrabAsync(decisions, userInvoked ? ReleaseSourceType.UserInvokedSearch : ReleaseSourceType.Search, cancellationToken);
         return new SearchResult(decisions, searched, grabbed);
     }
 
@@ -74,7 +76,7 @@ public sealed class ReleaseSearchService(
             .ToList();
         var context = await ContextAsync(db, candidates, null, indexers, userInvoked: false, cancellationToken);
         var decisions = decisionMaker.GetDecisions(Distinct(releases), context);
-        var grabbed = await GrabAsync(decisions, cancellationToken);
+        var grabbed = await GrabAsync(decisions, ReleaseSourceType.Rss, cancellationToken);
         logger.LogInformation("RSS sync: {Releases} release(s) from {Indexers} indexer(s), {Grabbed} grabbed", decisions.Count, indexers.Count, grabbed);
         return new SearchResult(decisions, candidates.Count, grabbed);
     }
@@ -135,7 +137,7 @@ public sealed class ReleaseSearchService(
     }
 
     /// <summary>Like Sonarr's <c>ProcessDecisions</c>: best first, never two releases for the same episode.</summary>
-    private async Task<int> GrabAsync(List<DownloadDecision> decisions, CancellationToken cancellationToken)
+    private async Task<int> GrabAsync(List<DownloadDecision> decisions, ReleaseSourceType source, CancellationToken cancellationToken)
     {
         var grabbedEpisodes = new HashSet<int>();
         var grabbed = 0;
@@ -149,6 +151,7 @@ public sealed class ReleaseSearchService(
 
             try
             {
+                decision.RemoteEpisode.ReleaseSource = source;
                 await downloads.GrabAsync(decision.RemoteEpisode, cancellationToken);
                 grabbedEpisodes.UnionWith(episodes.Select(e => e.Id));
                 grabbed++;
@@ -168,7 +171,10 @@ public sealed class ReleaseSearchService(
         IReadOnlySet<int>? requested,
         IReadOnlyList<Indexer>? indexers,
         bool userInvoked,
-        CancellationToken cancellationToken = default) => new()
+        CancellationToken cancellationToken = default)
+    {
+        var seriesIds = candidates.Select(c => c.Episode.SeriesId).Distinct().ToList();
+        return new DecisionContext
         {
             Scope = candidates,
             Requested = requested,
@@ -176,7 +182,10 @@ public sealed class ReleaseSearchService(
             ReleaseProfiles = await db.ReleaseProfiles.AsNoTracking().ToListAsync(cancellationToken),
             Indexers = (indexers ?? await db.Indexers.AsNoTracking().ToListAsync(cancellationToken)).ToDictionary(i => i.Id),
             UserInvoked = userInvoked,
+            Blocklist = (await db.Blocklist.AsNoTracking().Where(b => seriesIds.Contains(b.SeriesId)).ToListAsync(cancellationToken)).ToLookup(b => b.SeriesId),
+            QueuedEpisodes = trackedDownloads.QueuedEpisodes(),
         };
+    }
 
     public static async Task<List<SearchCandidate>> LoadCandidatesAsync(GenerralDbContext db, IQueryable<Episode> episodes, CancellationToken cancellationToken = default) =>
         (await episodes.AsNoTracking().Include(e => e.Series).OrderBy(e => e.SeriesId).ThenBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToListAsync(cancellationToken))

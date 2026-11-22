@@ -65,6 +65,9 @@ public static class SettingsEndpoints
 
         settings.MapGet("/indexer", (IndexerConfigService indexer, CancellationToken cancellationToken) => indexer.GetAsync(cancellationToken));
         settings.MapPut("/indexer", SaveIndexer);
+
+        settings.MapGet("/downloadclient", (DownloadClientConfigService config, CancellationToken cancellationToken) => config.GetAsync(cancellationToken));
+        settings.MapPut("/downloadclient", SaveDownloadClient);
     }
 
     private static GeneralSettingsResource ToResource(IHostConfigProvider config, IUserService users)
@@ -198,6 +201,18 @@ public static class SettingsEndpoints
         catch (ArgumentException e)
         {
             return ValidationFailure.BadRequest(new ValidationFailure("rssSyncInterval", e.Message));
+        }
+    }
+
+    private static async Task<IResult> SaveDownloadClient(DownloadClientConfig settings, DownloadClientConfigService config)
+    {
+        try
+        {
+            return Results.Ok(await config.SaveAsync(settings));
+        }
+        catch (ArgumentException e)
+        {
+            return ValidationFailure.BadRequest(new ValidationFailure("stalledDownloadTimeout", e.Message));
         }
     }
 }

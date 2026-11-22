@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Nodes;
 using Generral.Core.Datastore;
+using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
@@ -15,6 +16,7 @@ namespace Generral.Integration.Test;
 
 public class ReleaseApiTests
 {
+    private readonly RecordingDownloadService _grabs = new();
     private TorznabHandler _handler = null!;
     private GenerralTestHost _host = null!;
     private HttpClient _client = null!;
@@ -23,9 +25,13 @@ public class ReleaseApiTests
     public async Task SetUp()
     {
         _handler = new TorznabHandler();
+        _grabs.Grabs.Clear();
         _host = await GenerralTestHost.StartAsync(services: services =>
+        {
             services.PostConfigure<HttpClientFactoryOptions>(TorznabClient.ClientName,
-                o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _handler)));
+                o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _handler));
+            services.AddSingleton<IDownloadService>(_grabs);
+        });
         _client = _host.CreateClient();
         _client.DefaultRequestHeaders.Add("X-Api-Key", _host.ApiKey);
     }
@@ -49,7 +55,7 @@ public class ReleaseApiTests
             ["episodeIds"] = new JsonArray(prelimsId, mainCardId),
         });
         var finished = await WaitAsync((int)(await command.Content.ReadFromJsonAsync<JsonObject>())!["id"]!);
-        var grabs = _host.Services.GetRequiredService<PendingGrabDownloadService>().Grabs;
+        var grabs = _grabs.Grabs;
         var searched = await _host.Services.CreateScope().ServiceProvider.GetRequiredService<GenerralDbContext>().Episodes.Where(e => e.LastSearchTime != null).CountAsync();
 
         Assert.Multiple(() =>
@@ -87,7 +93,7 @@ public class ReleaseApiTests
         var unknown = await _client.PostAsJsonAsync("/api/v1/release", new JsonObject { ["guid"] = "nope", ["indexerId"] = 1 });
         var invalid = await _client.PostAsJsonAsync("/api/v1/release", new JsonObject());
         var missing = await _client.GetAsync("/api/v1/release");
-        var grabs = _host.Services.GetRequiredService<PendingGrabDownloadService>().Grabs;
+        var grabs = _grabs.Grabs;
 
         Assert.Multiple(() =>
         {
@@ -119,7 +125,7 @@ public class ReleaseApiTests
 
         var command = await _client.PostAsJsonAsync("/api/v1/command", new JsonObject { ["name"] = "RssSync" });
         var finished = await WaitAsync((int)(await command.Content.ReadFromJsonAsync<JsonObject>())!["id"]!);
-        var grabs = _host.Services.GetRequiredService<PendingGrabDownloadService>().Grabs;
+        var grabs = _grabs.Grabs;
         var settings = await _client.GetFromJsonAsync<JsonObject>("/api/v1/settings/indexer");
         var badInterval = await _client.PutAsJsonAsync("/api/v1/settings/indexer", new JsonObject { ["rssSyncInterval"] = 5 });
 
@@ -224,5 +230,21 @@ public class ReleaseApiTests
             <size>{(long)gigabytes << 30}</size><link>https://tracker.example/dl/{Uri.EscapeDataString(title)}</link>
             <torznab:attr name="seeders" value="{seeders}" /><torznab:attr name="peers" value="{seeders + 10}" /></item>
             """;
+    }
+
+    /// <summary>Records grabs, most recent first.</summary>
+    private sealed class RecordingDownloadService : IDownloadService
+    {
+        public List<(string Title, IReadOnlyList<int> EpisodeIds)> Grabs { get; } = [];
+
+        public Task<string> GrabAsync(RemoteEpisode remoteEpisode, CancellationToken cancellationToken = default)
+        {
+            lock (Grabs)
+            {
+                Grabs.Insert(0, (remoteEpisode.Release.Title, remoteEpisode.Episodes.Select(e => e.Id).ToList()));
+            }
+
+            return Task.FromResult(remoteEpisode.Release.Guid);
+        }
     }
 }

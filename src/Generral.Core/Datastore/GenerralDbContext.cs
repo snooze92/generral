@@ -1,3 +1,6 @@
+using Generral.Core.Blocklisting;
+using Generral.Core.Download;
+using Generral.Core.History;
 using Generral.Core.Indexers;
 using Generral.Core.Mappings;
 using Generral.Core.Profiles;
@@ -36,6 +39,12 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
     public DbSet<Tag> Tags => Set<Tag>();
 
     public DbSet<Indexer> Indexers => Set<Indexer>();
+
+    public DbSet<DownloadClient> DownloadClients => Set<DownloadClient>();
+
+    public DbSet<EpisodeHistory> History => Set<EpisodeHistory>();
+
+    public DbSet<Blocklist> Blocklist => Set<Blocklist>();
 
     public DbSet<QualityDefinition> QualityDefinitions => Set<QualityDefinition>();
 
@@ -87,6 +96,34 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
             indexer.Property(i => i.Name).UseCollation("NOCASE");
             indexer.Property(i => i.Settings).HasJsonConversion();
             indexer.Property(i => i.Tags).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<DownloadClient>(client =>
+        {
+            client.HasIndex(c => c.Name).IsUnique();
+            client.Property(c => c.Name).UseCollation("NOCASE");
+            client.Property(c => c.Settings).HasJsonConversion();
+            client.Property(c => c.Tags).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<EpisodeHistory>(history =>
+        {
+            history.ToTable("History");
+            history.HasIndex(h => h.EpisodeId);
+            history.HasIndex(h => h.DownloadId);
+            history.HasIndex(h => h.Date);
+            history.HasOne<Episode>().WithMany().HasForeignKey(h => h.EpisodeId).OnDelete(DeleteBehavior.Cascade);
+            history.Property(h => h.Quality).HasJsonConversion();
+            history.Property(h => h.Data).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<Blocklist>(blocklist =>
+        {
+            blocklist.ToTable("Blocklist");
+            blocklist.HasIndex(b => b.SeriesId);
+            blocklist.HasOne<Series>().WithMany().HasForeignKey(b => b.SeriesId).OnDelete(DeleteBehavior.Cascade);
+            blocklist.Property(b => b.EpisodeIds).HasJsonConversion();
+            blocklist.Property(b => b.Quality).HasJsonConversion();
         });
 
         modelBuilder.Entity<QualityDefinition>(definition =>

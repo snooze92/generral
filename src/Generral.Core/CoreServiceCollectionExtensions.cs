@@ -1,8 +1,12 @@
 using Generral.Core.Authentication;
+using Generral.Core.Blocklisting;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
+using Generral.Core.Download.Clients.QBittorrent;
+using Generral.Core.Download.TrackedDownloads;
+using Generral.Core.History;
 using Generral.Core.Indexers.Torznab;
 using Generral.Core.IndexerSearch;
 using Generral.Core.Lifecycle;
@@ -53,8 +57,16 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<TorznabClient>();
         services.AddScoped<IndexerConfigService>();
         services.AddSingleton<DownloadDecisionMaker>();
-        services.AddSingleton<PendingGrabDownloadService>();
-        services.AddSingleton<IDownloadService>(sp => sp.GetRequiredService<PendingGrabDownloadService>());
+        services.AddHttpClient(QBittorrentClient.ClientName, QBittorrentClient.ConfigureClient)
+            .ConfigurePrimaryHttpMessageHandler(QBittorrentClient.CreateHandler);
+        services.AddSingleton<IDownloadClient, QBittorrentClient>();
+        services.AddSingleton<DownloadClientProvider>();
+        services.AddSingleton<TorrentReleaseFetcher>();
+        services.AddScoped<DownloadClientConfigService>();
+        services.AddScoped<HistoryService>();
+        services.AddScoped<BlocklistService>();
+        services.AddSingleton<TrackedDownloadService>();
+        services.TryAddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<ReleaseSearchService>();
 
         services.AddSingleton<CommandQueue>();
@@ -69,6 +81,7 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<ICommandHandler, SeriesSearchHandler>();
         services.AddSingleton<ICommandHandler, MissingEpisodeSearchHandler>();
         services.AddSingleton<ICommandHandler, RssSyncHandler>();
+        services.AddSingleton<ICommandHandler, RefreshMonitoredDownloadsHandler>();
         services.AddHostedService<CommandWorker>();
         services.AddHostedService<ScheduledTaskService>();
 
