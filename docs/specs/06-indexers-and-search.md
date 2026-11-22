@@ -150,6 +150,38 @@ score → *(Later: custom format score)* → proper/repack → indexer priority 
 preferred) → age (newer). This is the same ordering as Sonarr's `DownloadDecisionComparer`, with
 seeders before size.
 
+### Implementation notes (M2c)
+
+- Search settings of an episode are its `searchTerms` with the series' `searchSettings` as
+  per-key defaults. Without `dateWindow`, the window is `{ before: 1d, after: 365d }`. An episode
+  with no `must` and no `any` rule never matches (otherwise every title would). Invalid regexes
+  reject with "Invalid search rule"; regexes time out after 100 ms.
+- Scope: a search matches releases against **all active episodes of the searched series**, so a
+  prelims release found while searching the main card is recognised (rejected "Matches S2026E12,
+  which wasn't requested") rather than mis-assigned; releases matching nothing get "Does not match
+  S…: <first failing rule>" when one episode was searched. If a title matches several episodes
+  but only one is inside its date window, that one wins.
+- Queries: per indexer, each query in order (`first-with-results` stops at the first non-empty
+  answer; `all` runs every one); identical `(indexer, query, categories)` run once per search.
+  Results are de-duplicated by infohash, else indexer+guid. Only Torznab indexers are queried.
+- Implemented specifications: protocol (Usenet → "Usenet is not supported"), quality allowed by
+  profile, existing file (no upgrades until episode files exist), size (MB/min × runtime, default
+  120 min), minimum seeders (indexer setting), release profile required/ignored terms (Sonarr
+  term matcher: `/regex/i` or substring; tags and indexer scope), monitored (automatic/RSS only).
+  Not yet: blocklist, queue/already imported, retention, packs, release-profile scores.
+- Commands: `EpisodeSearch { episodeIds }` (any state), `SeasonSearch { seriesId, seasonNumber }`,
+  `SeriesSearch { seriesId }` and `MissingEpisodeSearch` (monitored, aired, no file; Missing also
+  needs a monitored series). Each grabs the best accepted release per episode set and never two
+  for the same episode. `LastSearchTime` is set on searched episodes. Unmonitored episodes may be
+  grabbed only when the command is manual.
+- RSS sync: indexers with *Enable RSS*; candidates are active episodes without a file whose date
+  window contains now. Interval: `PUT /settings/indexer { rssSyncInterval }` (minutes, 0 off, else
+  10–120, default 15); the last run is kept in memory, so it runs at the first scheduler check after
+  a start.
+- Grabs go through `IDownloadService`; until download clients exist it keeps the last 100 grabs in
+  memory and logs "No download client".
+- Interactive results are ordered accepted → rejected matches → unmatched, each best first.
+
 ## Quality
 
 Port Sonarr's quality list unchanged so that profiles look identical:

@@ -34,11 +34,14 @@ public sealed class ReleaseSearchService(
     /// <summary>In memory: after a restart RSS sync runs at the first scheduler check.</summary>
     public DateTime? LastRssSync { get; private set; }
 
-    /// <summary>Interactive search: every decision, best first, nothing grabbed.</summary>
+    /// <summary>Interactive search: every decision, nothing grabbed. Accepted first, then rejected matches, then unmatched releases, each best first.</summary>
     public async Task<List<DownloadDecision>> InteractiveSearchAsync(int episodeId, CancellationToken cancellationToken = default)
     {
         var (decisions, _) = await SearchAsync(e => e.Id == episodeId, interactive: true, userInvoked: true, cancellationToken);
-        return DownloadDecisionComparer.Prioritize(decisions);
+        return decisions
+            .OrderBy(d => d.Approved ? 0 : d.RemoteEpisode.Episodes.Count > 0 ? 1 : 2)
+            .ThenByDescending(d => d, DownloadDecisionComparer.Instance)
+            .ToList();
     }
 
     /// <summary>Automatic search (EpisodeSearch, SeasonSearch, SeriesSearch, MissingEpisodeSearch): grabs the best accepted releases.</summary>

@@ -100,6 +100,15 @@ Quality resources (M2b), Sonarr v3-shaped:
 - `qualitydefinition`: `GET`, `GET /{id}`, `PUT /{id}`, `PUT /update` (list), `GET /limits`. Only
   `title` and sizes are writable; size changes are copied into every profile item (Sonarr's
   `UpdateAllSizeLimits`). `quality` is `{ id, name, source, resolution }` and is read by `id`.
+- `release` (M2c): `GET /release?episodeId=` runs an interactive search and returns Sonarr's
+  `ReleaseResource` (`guid, quality, qualityWeight, age, ageHours, ageMinutes, size, indexerId,
+  indexer, title, mappedSeriesId, mappedSeasonNumber, mappedEpisodeNumbers, mappedEpisodeInfo[],
+  approved, rejected, rejections[], publishDate, downloadUrl, magnetUrl, infoHash, infoUrl,
+  commentUrl, seeders, leechers, protocol, indexerFlags, episodeRequested, downloadAllowed,
+  releaseWeight`; no scene/TVDB/language/custom-format fields). Results are cached 30 min;
+  `POST /release { guid, indexerId, episodeIds? }` grabs a cached one (rejected ones too),
+  `episodeIds` (one series) overriding the match; unknown → 404, missing guid/indexerId → 400.
+  `/release/push` is not implemented yet. `GET/PUT /settings/indexer { rssSyncInterval }`.
 - `releaseprofile`: `{ id, name, enabled, required[], ignored[], indexerId, tags[], excludedTags[] }`
   (`required`/`ignored` also accept a comma-separated string). At least one term is required; the
   indexer and tags must exist; a tag can't be both included and excluded. Sonarr's air-date and

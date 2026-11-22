@@ -78,7 +78,8 @@ status `queued`/`started`/`completed`/`failed`, message, queued/started/ended ti
 `manual`/`scheduled`; an identical command (same name and body) that is still queued is not queued
 twice. 3 commands run at a time. The scheduler checks every 5 min and enqueues `RefreshSources` when
 an enabled source is due; it is disabled with `GENERRAL__SCHEDULER__ENABLED=false` (the integration
-tests do this). Only `RefreshSources` and `RefreshSource` exist so far.)*
+tests do this). It also enqueues `RssSync` when the RSS interval has elapsed (see 06 § Implementation
+notes (M2c)).)*
 
 | Task | Default interval | Sonarr equivalent |
 |------|------------------|-------------------|
