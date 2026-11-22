@@ -6,6 +6,7 @@
 using Generral.Core.Blocklisting;
 using Generral.Core.Indexers;
 using Generral.Core.Languages;
+using Generral.Core.MediaFiles;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
 using Generral.Core.Tv;
@@ -83,6 +84,9 @@ public sealed record DecisionContext
 
     /// <summary>Blocklist entries of the series in scope, by series id.</summary>
     public ILookup<int, Blocklist> Blocklist { get; init; } = Array.Empty<Blocklist>().ToLookup(b => b.SeriesId);
+
+    /// <summary>Existing files of the episodes in scope, by id.</summary>
+    public IReadOnlyDictionary<int, EpisodeFile> EpisodeFiles { get; init; } = new Dictionary<int, EpisodeFile>();
 
     /// <summary>Episodes with a download in the queue, and its title.</summary>
     public IReadOnlyDictionary<int, string> QueuedEpisodes { get; init; } = new Dictionary<int, string>();

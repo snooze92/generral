@@ -369,6 +369,56 @@ namespace Generral.Core.Datastore.Migrations
                     b.ToTable("MappingVersions");
                 });
 
+            modelBuilder.Entity("Generral.Core.MediaFiles.EpisodeFile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateAdded")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Languages")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginalFilePath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Quality")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReleaseGroup")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SceneName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SeasonNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SeriesId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeriesId");
+
+                    b.ToTable("EpisodeFiles");
+                });
+
             modelBuilder.Entity("Generral.Core.Profiles.QualityProfile", b =>
                 {
                     b.Property<int>("Id")
@@ -465,6 +515,50 @@ namespace Generral.Core.Datastore.Migrations
                         .IsUnique();
 
                     b.ToTable("QualityDefinitions");
+                });
+
+            modelBuilder.Entity("Generral.Core.RemotePathMappings.RemotePathMapping", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LocalPath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RemotePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Host", "RemotePath")
+                        .IsUnique();
+
+                    b.ToTable("RemotePathMappings");
+                });
+
+            modelBuilder.Entity("Generral.Core.RootFolders.RootFolder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Path")
+                        .IsUnique();
+
+                    b.ToTable("RootFolders");
                 });
 
             modelBuilder.Entity("Generral.Core.Sources.Event", b =>
@@ -912,6 +1006,15 @@ namespace Generral.Core.Datastore.Migrations
                         .IsRequired();
 
                     b.Navigation("Mapping");
+                });
+
+            modelBuilder.Entity("Generral.Core.MediaFiles.EpisodeFile", b =>
+                {
+                    b.HasOne("Generral.Core.Tv.Series", null)
+                        .WithMany()
+                        .HasForeignKey("SeriesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Generral.Core.Sources.Event", b =>

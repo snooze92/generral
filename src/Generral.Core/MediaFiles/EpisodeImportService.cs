@@ -1,0 +1,427 @@
+// SPDX-FileCopyrightText: 2010-2026 Sonarr Team and contributors
+// SPDX-FileCopyrightText: The Generral contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Ported from Sonarr@51a2412af235 src/NzbDrone.Core/MediaFiles/DownloadedEpisodesImportService.cs, DiskScanService.cs (exclusions),
+// EpisodeImport/ImportApprovedEpisodes.cs, EpisodeImport/Specifications/ (FreeSpace, Upgrade, NotSample, NotUnpacking, AlreadyImported),
+// EpisodeFileMovingService.cs, UpgradeMediaFileService.cs and src/NzbDrone.Core/Extras/ExistingExtraFileService.cs (subtitles only)
+using System.Text.RegularExpressions;
+using Generral.Core.Configuration;
+using Generral.Core.Datastore;
+using Generral.Core.DecisionEngine;
+using Generral.Core.History;
+using Generral.Core.Mappings;
+using Generral.Core.Organizer;
+using Generral.Core.Profiles;
+using Generral.Core.Qualities;
+using Generral.Core.RootFolders;
+using Generral.Core.Tv;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace Generral.Core.MediaFiles;
+
+/// <summary>One file to import for given episodes (assigned automatically from the grab, or by the user in manual import).</summary>
+public sealed record ImportItem
+{
+    public required string Path { get; init; }
+
+    public required int SeriesId { get; init; }
+
+    public required IReadOnlyList<int> EpisodeIds { get; init; }
+
+    public required QualityModel Quality { get; init; }
+
+    /// <summary>The grabbed release title, stored as the file's scene name.</summary>
+    public string? SceneName { get; init; }
+
+    public string? ReleaseGroup { get; init; }
+
+    public string? DownloadId { get; init; }
+
+    /// <summary>Folder the file was found in, for <c>{Original Filename}</c> and history.</summary>
+    public string? SourceFolder { get; init; }
+
+    public string? DownloadClient { get; init; }
+
+    public string? DownloadClientName { get; init; }
+}
+
+public sealed record ImportResult(string Path, IReadOnlyList<int> EpisodeIds, EpisodeFile? File, IReadOnlyList<string> Errors)
+{
+    public bool Imported => File is not null;
+}
+
+/// <summary>A video file found in a download folder, with the episodes it was assigned to (empty when none could be).</summary>
+public sealed record LocalEpisodeFile(string Path, long Size, IReadOnlyList<int> EpisodeIds, string? Rejection);
+
+public sealed partial class EpisodeImportService(
+    GenerralDbContext db,
+    NamingConfigService naming,
+    MediaManagementConfigService mediaManagement,
+    QualityDefinitionService qualityDefinitions,
+    DiskTransferService transfer,
+    RecycleBinProvider recycleBin,
+    TimeProvider time,
+    ILogger<EpisodeImportService> logger)
+{
+    /// <summary>Spec 08 § Completed download handling, step 3.</summary>
+    public static readonly IReadOnlySet<string> VideoExtensions = new HashSet<string>([".mkv", ".mp4", ".avi", ".m4v", ".ts", ".mov", ".wmv", ".webm"], StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A file smaller than this share of the largest one is a sample.</summary>
+    public const double SampleRatio = 0.05;
+
+    /// <summary>Video files of a download (a file or a folder), without samples, extras or hidden folders, largest first.</summary>
+    public static List<FileInfo> VideoFiles(string path)
+    {
+        if (File.Exists(path))
+        {
+            return VideoExtensions.Contains(System.IO.Path.GetExtension(path)) ? [new FileInfo(path)] : [];
+        }
+
+        if (!Directory.Exists(path))
+        {
+            return [];
+        }
+
+        var files = Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
+            .Where(f => VideoExtensions.Contains(System.IO.Path.GetExtension(f)))
+            .Where(f => !ExcludedSubFoldersRegex().IsMatch(System.IO.Path.GetRelativePath(path, f)) && !ExcludedExtrasSubFolderRegex().IsMatch(System.IO.Path.GetRelativePath(path, f)))
+            .Where(f => !ExcludedExtraFilesRegex().IsMatch(System.IO.Path.GetFileName(f)) && !ExcludedFilesRegex().IsMatch(System.IO.Path.GetFileName(f)))
+            .Select(f => new FileInfo(f))
+            .OrderByDescending(f => f.Length)
+            .ToList();
+        var largest = files.FirstOrDefault()?.Length ?? 0;
+        return files.Where(f => !SampleNameRegex().IsMatch(System.IO.Path.GetFileNameWithoutExtension(f.Name)) && f.Length >= largest * SampleRatio).ToList();
+    }
+
+    /// <summary>
+    /// Spec 08 step 4: one episode + one file, or one file for several episodes (multi-episode file), or each file matched against the episodes'
+    /// rules (<c>must</c>/<c>mustNot</c>/<c>any</c>, event and part); anything else is left for manual import.
+    /// </summary>
+    public async Task<List<LocalEpisodeFile>> AssignAsync(string path, IReadOnlyList<int> episodeIds, CancellationToken cancellationToken = default)
+    {
+        var files = VideoFiles(path);
+        if (files.Count == 0 || episodeIds.Count == 0)
+        {
+            return files.Select(f => new LocalEpisodeFile(f.FullName, f.Length, [], null)).ToList();
+        }
+
+        if (files.Count == 1)
+        {
+            return [new LocalEpisodeFile(files[0].FullName, files[0].Length, episodeIds, null)];
+        }
+
+        if (episodeIds.Count == 1)
+        {
+            return files.Select(f => new LocalEpisodeFile(f.FullName, f.Length, [], "Several video files for a single episode: manual import required")).ToList();
+        }
+
+        var candidates = await ReleaseSearchCandidatesAsync(episodeIds, cancellationToken);
+        var matches = files.Select(f => (File: f, Episodes: candidates.Where(c => c.HasRules && ReleaseTitleMatcher.Check(c.Terms, f.Name) is null).ToList())).ToList();
+        var claimed = matches.Where(m => m.Episodes.Count == 1).GroupBy(m => m.Episodes[0].Episode.Id).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
+        return matches.Select(m => m.Episodes switch
+        {
+            [] => new LocalEpisodeFile(m.File.FullName, m.File.Length, [], "Matches none of the release's episodes: manual import required"),
+            [var one] when claimed.Contains(one.Episode.Id) => new LocalEpisodeFile(m.File.FullName, m.File.Length, [], $"Several files match {one.Label}: manual import required"),
+            [var one] => new LocalEpisodeFile(m.File.FullName, m.File.Length, [one.Episode.Id], null),
+            var several => new LocalEpisodeFile(m.File.FullName, m.File.Length, [], $"Ambiguous: matches {string.Join(", ", several.Select(c => c.Label))}: manual import required"),
+        }).ToList();
+    }
+
+    /// <summary>Checks the specifications, then transfers, renames and records the file (spec 08 steps 5–10).</summary>
+    public async Task<ImportResult> ImportAsync(ImportItem item, TransferMode mode, CancellationToken cancellationToken = default)
+    {
+        var series = await db.Series.SingleOrDefaultAsync(s => s.Id == item.SeriesId, cancellationToken);
+        var episodes = await db.Episodes.Where(e => item.EpisodeIds.Contains(e.Id) && e.SeriesId == item.SeriesId)
+            .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToListAsync(cancellationToken);
+        if (series is null || episodes.Count == 0 || episodes.Count != item.EpisodeIds.Distinct().Count())
+        {
+            return Reject(item, "Unknown series or episodes");
+        }
+
+        if (episodes.Select(e => e.SeasonNumber).Distinct().Count() > 1)
+        {
+            return Reject(item, "Episodes of several seasons can't share one file");
+        }
+
+        var config = await mediaManagement.GetAsync(cancellationToken);
+        var namingConfig = await naming.GetAsync(cancellationToken);
+        var profile = await db.QualityProfiles.AsNoTracking().SingleOrDefaultAsync(p => p.Id == series.QualityProfileId, cancellationToken);
+        var existingIds = episodes.Select(e => e.EpisodeFileId).OfType<int>().Distinct().ToList();
+        var existing = await db.EpisodeFiles.Where(f => existingIds.Contains(f.Id)).ToListAsync(cancellationToken);
+        var size = new FileInfo(item.Path).Length;
+
+        if (await RejectionAsync(item, series, existing, profile, size, config, cancellationToken) is { } rejection)
+        {
+            return Reject(item, rejection);
+        }
+
+        var extension = System.IO.Path.GetExtension(item.Path);
+        var file = new EpisodeFile
+        {
+            SeriesId = series.Id,
+            SeasonNumber = episodes[0].SeasonNumber,
+            RelativePath = "",
+            Path = "",
+            Size = size,
+            DateAdded = time.GetUtcNow().UtcDateTime,
+            SceneName = item.SceneName,
+            ReleaseGroup = item.ReleaseGroup ?? ReleaseGroupParser.Parse(item.SceneName ?? System.IO.Path.GetFileName(item.Path)),
+            Quality = item.Quality,
+            Languages = DownloadDecisionMaker.ParseLanguages(item.SceneName ?? System.IO.Path.GetFileName(item.Path)),
+            OriginalFilePath = item.SourceFolder is null ? System.IO.Path.GetFileName(item.Path) : System.IO.Path.GetRelativePath(item.SourceFolder, item.Path),
+        };
+        var input = await NamingInputAsync(series, episodes, file, cancellationToken);
+        var destination = FileNameBuilder.BuildFilePath(input, namingConfig, extension);
+
+        try
+        {
+            foreach (var old in existing)
+            {
+                await DeleteAsync(old, series, config, "Upgrade", cancellationToken);
+            }
+
+            var parent = System.IO.Path.GetDirectoryName(destination)!;
+            var created = !Directory.Exists(parent);
+            var used = transfer.TransferFile(item.Path, destination, mode);
+            SetPermissions(config, created ? parent : null, destination);
+            if (config.ImportExtraFiles)
+            {
+                ImportSubtitles(config, item.Path, destination, mode);
+            }
+
+            logger.LogInformation("Imported {Source} to {Destination} ({Mode})", item.Path, destination, used);
+        }
+        catch (IOException e)
+        {
+            logger.LogWarning(e, "Couldn't import {Path}", item.Path);
+            return Reject(item, $"Couldn't import the file: {e.Message}");
+        }
+
+        file.Path = destination;
+        file.RelativePath = System.IO.Path.GetRelativePath(series.Path, destination);
+        db.EpisodeFiles.Add(file);
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var episode in episodes)
+        {
+            episode.EpisodeFileId = file.Id;
+        }
+
+        RecordImported(item, series, episodes, file);
+        await db.SaveChangesAsync(cancellationToken);
+        return new ImportResult(item.Path, item.EpisodeIds, file, []);
+    }
+
+    /// <summary>Deletes (or recycles) the file on disk and its record; the episodes lose their file.</summary>
+    /// <exception cref="IOException">The file couldn't be recycled.</exception>
+    public async Task DeleteAsync(EpisodeFile file, Series series, MediaManagementConfig config, string reason, CancellationToken cancellationToken = default)
+    {
+        if (File.Exists(file.Path))
+        {
+            var subfolder = System.IO.Path.GetRelativePath(System.IO.Path.GetDirectoryName(series.Path) ?? series.Path, System.IO.Path.GetDirectoryName(file.Path)!);
+            recycleBin.DeleteFile(config, file.Path, subfolder.StartsWith("..", StringComparison.Ordinal) ? "" : subfolder);
+        }
+
+        var episodes = await db.Episodes.Where(e => e.EpisodeFileId == file.Id).ToListAsync(cancellationToken);
+        foreach (var episode in episodes)
+        {
+            episode.EpisodeFileId = null;
+            db.History.Add(new EpisodeHistory
+            {
+                EpisodeId = episode.Id,
+                SeriesId = file.SeriesId,
+                SourceTitle = file.SceneName ?? System.IO.Path.GetFileNameWithoutExtension(file.Path),
+                Quality = file.Quality,
+                Date = time.GetUtcNow().UtcDateTime,
+                EventType = EpisodeHistoryEventType.EpisodeFileDeleted,
+                Data = new Dictionary<string, string?> { ["reason"] = reason, ["releaseGroup"] = file.ReleaseGroup, ["size"] = file.Size.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+            });
+        }
+
+        db.EpisodeFiles.Remove(file);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<NamingInput> NamingInputAsync(Series series, IReadOnlyList<Episode> episodes, EpisodeFile file, CancellationToken cancellationToken = default)
+    {
+        var ids = episodes.Select(e => e.Id).ToList();
+        var links = await db.EpisodeLinks.AsNoTracking().Include(l => l.Event).Include(l => l.Mapping)
+            .Where(l => ids.Contains(l.EpisodeId)).OrderBy(l => l.Mapping!.Priority).ThenBy(l => l.Id).ToListAsync(cancellationToken);
+        var info = new Dictionary<int, EpisodeNamingInfo>();
+        foreach (var link in links.Where(l => !info.ContainsKey(l.EpisodeId)))
+        {
+            var partKey = link.PartKey == EpisodeLink.NoPart ? null : link.PartKey;
+            info[link.EpisodeId] = new EpisodeNamingInfo(link.Event?.Key, partKey, partKey is null ? null : PartTitle(link.Mapping, partKey), link.Event?.Fields);
+        }
+
+        var season = episodes.Min(e => e.SeasonNumber);
+        var seasonTitle = await db.Seasons.AsNoTracking().Where(s => s.SeriesId == series.Id && s.SeasonNumber == season).Select(s => s.Title).FirstOrDefaultAsync(cancellationToken);
+        var titles = (await qualityDefinitions.AllAsync()).ToDictionary(d => d.Quality.Id, d => d.Title);
+        return new NamingInput(series, episodes, file) { Info = info, QualityTitles = titles, SeasonTitle = seasonTitle };
+    }
+
+    private async Task<string?> RejectionAsync(ImportItem item, Series series, List<EpisodeFile> existing, QualityProfile? profile, long size, MediaManagementConfig config, CancellationToken cancellationToken)
+    {
+        if (UnpackingRegex().IsMatch(item.Path))
+        {
+            return "File is still being unpacked";
+        }
+
+        if (item.DownloadId is { } downloadId)
+        {
+            var imported = await db.History.AsNoTracking()
+                .Where(h => h.DownloadId == downloadId && h.EventType == EpisodeHistoryEventType.DownloadFolderImported && item.EpisodeIds.Contains(h.EpisodeId))
+                .Select(h => h.Date).ToListAsync(cancellationToken);
+            if (imported.Count >= item.EpisodeIds.Count && existing.Count > 0)
+            {
+                return $"Episode file already imported at {imported.Max():u}";
+            }
+        }
+
+        if (profile is not null && existing.Select(f => UpgradeRejection(profile, f.Quality, item.Quality)).FirstOrDefault(r => r is not null) is { } notUpgrade)
+        {
+            return notUpgrade;
+        }
+
+        if (!config.SkipFreeSpaceCheckWhenImporting && FreeSpace(series) is { } free && free - size < config.MinimumFreeSpaceWhenImporting * 1024L * 1024L)
+        {
+            return "Not enough free space";
+        }
+
+        return null;
+    }
+
+    private static string? UpgradeRejection(QualityProfile profile, QualityModel existing, QualityModel candidate)
+    {
+        var compare = UpgradableSpecification.Compare(profile, candidate.Quality, existing.Quality);
+        if (compare < 0)
+        {
+            return $"Not an upgrade for existing episode file(s). Existing quality: {existing.Quality}. New Quality {candidate.Quality}.";
+        }
+
+        return compare == 0 && candidate.Revision.CompareTo(existing.Revision) < 0 ? "Not a quality revision upgrade for existing episode file(s)" : null;
+    }
+
+    /// <summary>Free space of the series folder, or of its nearest existing ancestor.</summary>
+    private static long? FreeSpace(Series series)
+    {
+        var path = series.Path;
+        while (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
+        {
+            path = System.IO.Path.GetDirectoryName(path);
+        }
+
+        return string.IsNullOrEmpty(path) ? null : RootFolderService.DiskSpace(path).Free;
+    }
+
+    private void RecordImported(ImportItem item, Series series, List<Episode> episodes, EpisodeFile file)
+    {
+        foreach (var episode in episodes)
+        {
+            db.History.Add(new EpisodeHistory
+            {
+                EpisodeId = episode.Id,
+                SeriesId = series.Id,
+                SourceTitle = file.SceneName ?? System.IO.Path.GetFileNameWithoutExtension(item.Path),
+                Quality = file.Quality,
+                Date = file.DateAdded,
+                EventType = EpisodeHistoryEventType.DownloadFolderImported,
+                DownloadId = item.DownloadId,
+                Data = new Dictionary<string, string?>
+                {
+                    ["fileId"] = file.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["droppedPath"] = item.Path,
+                    ["importedPath"] = file.Path,
+                    [EpisodeHistory.DownloadClient] = item.DownloadClient,
+                    [EpisodeHistory.DownloadClientName] = item.DownloadClientName,
+                    ["releaseGroup"] = file.ReleaseGroup,
+                    [EpisodeHistory.Size] = file.Size.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                },
+            });
+        }
+    }
+
+    /// <summary>Subtitles next to the video with the same base name (<c>name.en.srt</c>) follow it as <c>&lt;new name&gt;.en.srt</c>.</summary>
+    private void ImportSubtitles(MediaManagementConfig config, string source, string destination, TransferMode mode)
+    {
+        var extensions = config.ExtraFileExtensions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(e => "." + e.TrimStart('.')).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var folder = System.IO.Path.GetDirectoryName(source)!;
+        var baseName = System.IO.Path.GetFileNameWithoutExtension(source);
+        var destinationBase = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(destination)!, System.IO.Path.GetFileNameWithoutExtension(destination));
+        foreach (var extra in Directory.EnumerateFiles(folder, baseName + ".*").Where(f => extensions.Contains(System.IO.Path.GetExtension(f))))
+        {
+            var suffix = System.IO.Path.GetFileName(extra)[baseName.Length..];
+            try
+            {
+                transfer.TransferFile(extra, destinationBase + suffix, mode == TransferMode.Move ? TransferMode.Move : TransferMode.Copy, overwrite: true);
+            }
+            catch (IOException e)
+            {
+                logger.LogWarning("Couldn't import extra file {Path}: {Message}", extra, e.Message);
+            }
+        }
+    }
+
+    private void SetPermissions(MediaManagementConfig config, string? createdFolder, string file)
+    {
+        if (!config.SetPermissionsLinux || OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            var folderMode = (UnixFileMode)Convert.ToInt32(config.ChmodFolder, 8);
+            if (createdFolder is not null)
+            {
+                File.SetUnixFileMode(createdFolder, folderMode);
+            }
+
+            // Sonarr derives the file mode from the folder's, without the execute bits.
+            File.SetUnixFileMode(file, folderMode & ~(UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Couldn't set permissions on {Path}: {Message}", file, e.Message);
+        }
+    }
+
+    private async Task<List<SearchCandidate>> ReleaseSearchCandidatesAsync(IReadOnlyList<int> episodeIds, CancellationToken cancellationToken) =>
+        (await db.Episodes.AsNoTracking().Include(e => e.Series).Where(e => episodeIds.Contains(e.Id)).ToListAsync(cancellationToken))
+        .Select(e => new SearchCandidate(e, SearchTerms.From(e.SearchTerms, e.Series?.SearchSettings)))
+        .ToList();
+
+    private static string? PartTitle(Mapping? mapping, string partKey)
+    {
+        try
+        {
+            return mapping is null ? null : MappingDefinitionParser.FromYaml(mapping.Definition).Parts?.FirstOrDefault(p => p.Key == partKey)?.Values["title"]?.ToString();
+        }
+        catch (MappingDefinitionException)
+        {
+            return null;
+        }
+    }
+
+    private static ImportResult Reject(ImportItem item, string reason) => new(item.Path, item.EpisodeIds, null, [reason]);
+
+    [GeneratedRegex(@"(?:\\|\/|^)(?:extras|extrafanart|behind the scenes|deleted scenes|featurettes|interviews|other|scenes|samples|shorts|trailers|theme[-_. ]music|backdrops)(?:\\|\/)", RegexOptions.IgnoreCase)]
+    private static partial Regex ExcludedExtrasSubFolderRegex();
+
+    [GeneratedRegex(@"(?:\\|\/|^)(?:@eadir|\.@__thumb|plex versions|\.[^\\/]+)(?:\\|\/)", RegexOptions.IgnoreCase)]
+    private static partial Regex ExcludedSubFoldersRegex();
+
+    [GeneratedRegex(@"(-(trailer|other|behindthescenes|deleted|featurette|interview|scene|short)\.[^.]+$)", RegexOptions.IgnoreCase)]
+    private static partial Regex ExcludedExtraFilesRegex();
+
+    [GeneratedRegex(@"^\.(_|unmanic|DS_Store$)|^Thumbs\.db$", RegexOptions.IgnoreCase)]
+    private static partial Regex ExcludedFilesRegex();
+
+    [GeneratedRegex(@"(?:^|[-._ ])sample(?:$|[-._ ])", RegexOptions.IgnoreCase)]
+    private static partial Regex SampleNameRegex();
+
+    [GeneratedRegex(@"(?:\\|\/)_(?:UNPACK|FAILED)_", RegexOptions.IgnoreCase)]
+    private static partial Regex UnpackingRegex();
+}

@@ -19,7 +19,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Generral.Core.Download.TrackedDownloads;
 
-public sealed record RefreshResult(int Tracked, int Failed, IReadOnlyList<IReadOnlyList<int>> Redownload);
+public sealed record RefreshResult(int Tracked, int Failed, int Imported, IReadOnlyList<IReadOnlyList<int>> Redownload);
 
 /// <summary>
 /// The downloads of every enabled client (in memory, rebuilt from the clients and the grab history), their state, and failed
@@ -38,9 +38,9 @@ public sealed class TrackedDownloadService(IServiceScopeFactory scopes, Download
     private readonly ConcurrentDictionary<(int ClientId, string DownloadId), TrackedDownload> _tracked = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    /// <summary>The queue: every tracked download except ignored ones, soonest finished first.</summary>
+    /// <summary>The queue: every tracked download except ignored and imported ones, soonest finished first.</summary>
     public IReadOnlyList<TrackedDownload> Queue() =>
-        _tracked.Values.Where(t => t.State != TrackedDownloadState.Ignored)
+        _tracked.Values.Where(t => t.State is not (TrackedDownloadState.Ignored or TrackedDownloadState.Imported))
             .OrderBy(t => t.Item?.RemainingTime ?? TimeSpan.MaxValue).ThenBy(t => t.Added)
             .ToList();
 
@@ -50,7 +50,7 @@ public sealed class TrackedDownloadService(IServiceScopeFactory scopes, Download
     public IReadOnlyDictionary<int, string> QueuedEpisodes()
     {
         var queued = new Dictionary<int, string>();
-        foreach (var download in _tracked.Values.Where(t => t.SeriesId is not null && t.State is not (TrackedDownloadState.Failed or TrackedDownloadState.FailedPending or TrackedDownloadState.Ignored)))
+        foreach (var download in _tracked.Values.Where(t => t.SeriesId is not null && t.State is not (TrackedDownloadState.Failed or TrackedDownloadState.FailedPending or TrackedDownloadState.Ignored or TrackedDownloadState.Imported)))
         {
             foreach (var episodeId in download.EpisodeIds)
             {
@@ -89,11 +89,13 @@ public sealed class TrackedDownloadService(IServiceScopeFactory scopes, Download
             var services = scope.ServiceProvider;
             var db = services.GetRequiredService<GenerralDbContext>();
             var history = services.GetRequiredService<HistoryService>();
+            var completed = services.GetRequiredService<CompletedDownloadService>();
             var config = await services.GetRequiredService<DownloadClientConfigService>().GetAsync(cancellationToken);
             var clients = await db.DownloadClients.AsNoTracking().Where(c => c.Enable).ToListAsync(cancellationToken);
             var now = time.GetUtcNow().UtcDateTime;
             var redownload = new List<IReadOnlyList<int>>();
             var failed = 0;
+            var imported = 0;
 
             foreach (var key in _tracked.Keys.Where(k => clients.All(c => c.Id != k.ClientId)))
             {
@@ -139,6 +141,15 @@ public sealed class TrackedDownloadService(IServiceScopeFactory scopes, Download
                             redownload.Add(ids);
                         }
                     }
+                    else if (tracked.State == TrackedDownloadState.ImportPending)
+                    {
+                        await completed.ImportAsync(client, tracked, cancellationToken);
+                        imported += tracked.State == TrackedDownloadState.Imported ? 1 : 0;
+                    }
+                    else if (tracked.State == TrackedDownloadState.Imported)
+                    {
+                        await completed.RemoveIfSeededAsync(client, tracked, cancellationToken);
+                    }
                 }
 
                 foreach (var (key, tracked) in _tracked.Where(p => p.Key.ClientId == client.Id && !seen.Contains(p.Key.DownloadId)))
@@ -150,7 +161,7 @@ public sealed class TrackedDownloadService(IServiceScopeFactory scopes, Download
                 }
             }
 
-            return new RefreshResult(_tracked.Count, failed, redownload);
+            return new RefreshResult(_tracked.Count, failed, imported, redownload);
         }
         finally
         {
@@ -324,6 +335,10 @@ public sealed class TrackedDownloadService(IServiceScopeFactory scopes, Download
         {
             tracked.State = TrackedDownloadState.Ignored;
         }
+        else if (await history.ImportedEpisodesAsync(item.DownloadId, cancellationToken) is var imported && tracked.EpisodeIds.All(imported.Contains))
+        {
+            tracked.State = TrackedDownloadState.Imported;
+        }
         else if (await history.HasEventAsync(item.DownloadId, EpisodeHistoryEventType.DownloadFailed, cancellationToken))
         {
             tracked.State = TrackedDownloadState.Failed;
@@ -350,6 +365,6 @@ public sealed class RefreshMonitoredDownloadsHandler(TrackedDownloadService trac
             context.Enqueue(EpisodeSearchHandler.CommandName, new JsonObject { ["episodeIds"] = new JsonArray(episodeIds.Select(id => (JsonNode)id).ToArray()) });
         }
 
-        return $"{result.Tracked} download(s) tracked, {result.Failed} failed";
+        return $"{result.Tracked} download(s) tracked, {result.Imported} imported, {result.Failed} failed";
     }
 }

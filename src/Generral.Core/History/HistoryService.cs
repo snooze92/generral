@@ -63,6 +63,13 @@ public sealed class HistoryService(GenerralDbContext db, TimeProvider time)
     public async Task<bool> HasEventAsync(string downloadId, EpisodeHistoryEventType eventType, CancellationToken cancellationToken = default) =>
         await db.History.AnyAsync(h => h.DownloadId == downloadId && h.EventType == eventType, cancellationToken);
 
+    /// <summary>Episodes imported from a download.</summary>
+    public async Task<HashSet<int>> ImportedEpisodesAsync(string downloadId, CancellationToken cancellationToken = default) =>
+        (await db.History.AsNoTracking()
+            .Where(h => h.DownloadId == downloadId && h.EventType == EpisodeHistoryEventType.DownloadFolderImported)
+            .Select(h => h.EpisodeId).Distinct().ToListAsync(cancellationToken))
+        .ToHashSet();
+
     /// <summary>Writes one row per grabbed episode for a failed or ignored download.</summary>
     public async Task RecordAsync(IReadOnlyList<EpisodeHistory> grabbed, EpisodeHistoryEventType eventType, string message, string? source, CancellationToken cancellationToken = default)
     {

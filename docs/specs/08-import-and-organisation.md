@@ -37,6 +37,16 @@ Sonarr parity, with matching driven by the tracked download rather than by parsi
 11. Mark the item imported in the client (post-import category), and remove it once seeding goals
     are met if *Remove Completed* is on.
 
+Implementation notes (M3a): a file smaller than 5 % of the largest *or* with `sample` as a word in its
+name is a sample; Sonarr's extras folders/files (`Featurettes/`, `-trailer.mkv`, …) and hidden
+folders are skipped. Pack assignment uses each episode's resolved `must`/`mustNot`/`any` rules on the
+file name; a file matching several episodes, or several files matching one, is left for manual import.
+Specifications: not unpacking (`_UNPACK_`), not already imported (history of the download id), is an
+upgrade of every existing file, free space (`minimumFreeSpaceWhenImporting`, default 100 MB). The
+series folder default is `{Series TitleYear}` (renders the plain title without a year). Imported
+downloads leave the queue; `removeCompletedDownloads` removes them from qBittorrent once seeding goals
+are met (`canBeRemoved`). Recycle bin cleanup (`CleanUpRecycleBin`) runs daily.
+
 **Manual import** (*Wanted → Manual Import* and the queue action): browse a folder, list videos,
 choose series/season/episode(s), quality and release group for each file (with suggestions from
 part rules and the source filename), then import with *Move* or *Copy/Hardlink*.

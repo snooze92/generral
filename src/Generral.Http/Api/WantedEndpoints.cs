@@ -35,6 +35,20 @@ public static class WantedEndpoints
         var query = db.Episodes.AsNoTracking().Include(e => e.Series)
             .Where(e => e.Status == EpisodeStatus.Active && e.EpisodeFileId == null && e.AirDateUtc <= now)
             .Where(e => (e.Monitored && e.Series!.Monitored) == monitored);
+        return await PageAsync(db, time, query, page, pageSize, sortKey, sortDirection, includeSeries, cancellationToken);
+    }
+
+    private static async Task<PagingResource<EpisodeResource>> PageAsync(
+        GenerralDbContext db,
+        TimeProvider time,
+        IQueryable<Episode> query,
+        int page,
+        int pageSize,
+        string? sortKey,
+        string? sortDirection,
+        bool includeSeries,
+        CancellationToken cancellationToken)
+    {
         var descending = string.Equals(sortDirection, "descending", StringComparison.OrdinalIgnoreCase);
         var key = sortKey ?? "episodes.airDateUtc";
         IOrderedQueryable<Episode> ordered = key switch
@@ -59,8 +73,22 @@ public static class WantedEndpoints
         return new PagingResource<EpisodeResource>(current, size, key, descending ? SortDirection.Descending : SortDirection.Ascending, total, resources);
     }
 
-    /// <summary>Episodes whose file is below the profile cutoff: always empty until episode files exist (M3).</summary>
-    private static PagingResource<EpisodeResource> GetCutoff(int page = 1, int pageSize = 10, string? sortKey = null, string? sortDirection = null) =>
-        new(Math.Max(page, 1), Math.Clamp(pageSize, 1, 1000), sortKey ?? "episodes.airDateUtc",
-            string.Equals(sortDirection, "descending", StringComparison.OrdinalIgnoreCase) ? SortDirection.Descending : SortDirection.Ascending, 0, []);
+    /// <summary>Active episodes whose file is below the profile cutoff (Sonarr's <c>EpisodesWhereCutoffUnmet</c>), same parameters as missing.</summary>
+    private static async Task<PagingResource<EpisodeResource>> GetCutoff(
+        GenerralDbContext db,
+        TimeProvider time,
+        CancellationToken cancellationToken,
+        int page = 1,
+        int pageSize = 10,
+        string? sortKey = null,
+        string? sortDirection = null,
+        bool includeSeries = false,
+        bool monitored = true)
+    {
+        var ids = await EpisodeCutoffService.CutoffUnmetEpisodeIdsAsync(db, cancellationToken);
+        var query = db.Episodes.AsNoTracking().Include(e => e.Series)
+            .Where(e => ids.Contains(e.Id))
+            .Where(e => (e.Monitored && e.Series!.Monitored) == monitored);
+        return await PageAsync(db, time, query, page, pageSize, sortKey, sortDirection, includeSeries, cancellationToken);
+    }
 }

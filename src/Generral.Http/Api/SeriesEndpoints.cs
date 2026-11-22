@@ -450,6 +450,8 @@ public static partial class SeriesEndpoints
                 EpisodeFileCount = stats.Sum(s => s.EpisodeFileCount),
                 EpisodeCount = stats.Sum(s => s.EpisodeCount),
                 TotalEpisodeCount = stats.Sum(s => s.TotalEpisodeCount),
+                SizeOnDisk = stats.Sum(s => s.SizeOnDisk),
+                ReleaseGroups = stats.SelectMany(s => s.ReleaseGroups).Distinct().ToList(),
             },
             Guid = series.Guid,
             SearchSettings = series.SearchSettings,
@@ -464,16 +466,22 @@ public static partial class SeriesEndpoints
         EpisodeFileCount = episodes.Count(e => e.HasFile),
         EpisodeCount = episodes.Count(e => (e.Monitored && e.AirDateUtc <= now) || e.HasFile),
         TotalEpisodeCount = episodes.Count,
+        SizeOnDisk = episodes.Where(e => e.FileId is not null).DistinctBy(e => e.FileId).Sum(e => e.FileSize ?? 0),
+        ReleaseGroups = episodes.Select(e => e.ReleaseGroup).OfType<string>().Distinct().ToList(),
     };
 
-    private sealed record EpisodeStat(int SeriesId, int SeasonNumber, bool Monitored, DateTime? AirDateUtc, bool HasFile);
+    private sealed record EpisodeStat(int SeriesId, int SeasonNumber, bool Monitored, DateTime? AirDateUtc, int? FileId, long? FileSize, string? ReleaseGroup)
+    {
+        public bool HasFile => FileId is not null;
+    }
 
     /// <summary>Orphaned episodes without a file are hidden, so they are not counted.</summary>
     private static Task<List<EpisodeStat>> EpisodeStatsAsync(GenerralDbContext db, List<int> seriesIds) =>
         db.Episodes.AsNoTracking()
             .Where(e => seriesIds.Contains(e.SeriesId))
             .Where(e => e.Status == EpisodeStatus.Active || e.EpisodeFileId != null)
-            .Select(e => new EpisodeStat(e.SeriesId, e.SeasonNumber, e.Monitored, e.AirDateUtc, e.EpisodeFileId != null))
+            .GroupJoin(db.EpisodeFiles, e => e.EpisodeFileId, f => f.Id, (e, files) => new { e, files })
+            .SelectMany(x => x.files.DefaultIfEmpty(), (x, f) => new EpisodeStat(x.e.SeriesId, x.e.SeasonNumber, x.e.Monitored, x.e.AirDateUtc, f == null ? null : f.Id, f == null ? null : f.Size, f == null ? null : f.ReleaseGroup))
             .ToListAsync();
 
     private static int? Year(SeriesResource resource) => resource.Year > 0 ? resource.Year : null;
