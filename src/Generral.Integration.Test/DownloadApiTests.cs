@@ -36,6 +36,7 @@ public class DownloadApiTests
         {
             services.PostConfigure<HttpClientFactoryOptions>(QBittorrentClient.ClientName, o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _qbit));
             services.PostConfigure<HttpClientFactoryOptions>(TorznabClient.ClientName, o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _tracker));
+            services.PostConfigure<HttpClientFactoryOptions>(TorrentReleaseFetcher.ClientName, o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _tracker));
             services.PostConfigure<HttpClientFactoryOptions>(NotificationService.ClientName, o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _webhook));
         });
         _client = _host.CreateClient();
