@@ -13,7 +13,7 @@ public static class ExtractionDefinitionParser
 {
     private static readonly string[] RequestKeys = ["url", "foreach", "pagination"];
     private static readonly string[] PaginationKeys = ["next", "page_param", "start", "until_empty", "max_pages"];
-    private static readonly string[] FieldKeys = ["path", "text", "filters", "optional", "default"];
+    private static readonly string[] FieldKeys = ["path", "selector", "attribute", "remove", "text", "filters", "optional", "default"];
     private static readonly string[] FilterKeys = ["name", "args"];
 
     /// <exception cref="ExtractionDefinitionException">Invalid YAML or definition.</exception>
@@ -138,6 +138,9 @@ public static class ExtractionDefinitionParser
         {
             Name = name,
             Path = String(obj["path"], $"{location}.path"),
+            Selector = String(obj["selector"], $"{location}.selector"),
+            Attribute = String(obj["attribute"], $"{location}.attribute"),
+            Remove = String(obj["remove"], $"{location}.remove"),
             Text = String(obj["text"], $"{location}.text"),
             Filters = obj["filters"] switch
             {
@@ -149,14 +152,20 @@ public static class ExtractionDefinitionParser
             Default = obj["default"]?.DeepClone(),
         };
 
-        if (field.Path is not null && field.Text is not null)
+        var sources = new[] { field.Path, field.Selector, field.Text }.Count(s => s is not null);
+        if (sources > 1)
         {
-            throw Error(location, "set either 'path' or 'text', not both");
+            throw Error(location, "set only one of 'path', 'selector' and 'text'");
         }
 
-        if (field.Path is null && field.Text is null && field.Default is null)
+        if (sources == 0 && field.Default is null)
         {
-            throw Error(location, "set 'path', 'text' or 'default'");
+            throw Error(location, "set 'path', 'selector', 'text' or 'default'");
+        }
+
+        if (field.Selector is null && (field.Attribute is not null || field.Remove is not null))
+        {
+            throw Error(location, "'attribute' and 'remove' need a 'selector'");
         }
 
         return field;

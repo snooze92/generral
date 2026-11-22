@@ -17,7 +17,7 @@ public class SourceTypesTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(types.All.Select(t => t.Id), Is.EquivalentTo(new[] { "thesportsdb", "http-json", "ical", "static" }));
+            Assert.That(types.All.Select(t => t.Id), Is.EquivalentTo(new[] { "thesportsdb", "http-json", "http-html", "ical", "static" }));
             Assert.That(client.Timeout, Is.EqualTo(TimeSpan.FromSeconds(30)));
             Assert.That(client.DefaultRequestHeaders.UserAgent.ToString(), Is.EqualTo(BuildInfo.UserAgent));
         });

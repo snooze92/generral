@@ -67,7 +67,7 @@ public class ExtractionDefinitionParserTests
     [TestCase("requests: [https://x.org]\nfields: { key: { path: $.a } }", "items")]
     [TestCase("requests: [https://x.org]\nitems: $\nfields: {}", "fields")]
     [TestCase("requests: [https://x.org]\nitems: $\nfields: { key: { xpath: a } }", "unknown property 'xpath'")]
-    [TestCase("requests: [https://x.org]\nitems: $\nfields: { key: { path: $.a, text: b } }", "not both")]
+    [TestCase("requests: [https://x.org]\nitems: $\nfields: { key: { path: $.a, text: b } }", "set only one of")]
     [TestCase("requests: [https://x.org]\nitems: $\nfields: { key: { optional: true } }", "fields.key")]
     [TestCase("requests: [https://x.org]\nitems: $\nfields: { key: { path: $.a, optional: maybe } }", "optional")]
     [TestCase("requests: [{ url: https://x.org, pagination: { start: 1 } }]\nitems: $\nfields: { key: { path: $.a } }", "pagination")]

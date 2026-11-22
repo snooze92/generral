@@ -12,7 +12,7 @@ public class SourceTypeRegistryTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(host.Types.All.Select(t => t.Id), Is.EquivalentTo(new[] { "thesportsdb", "http-json", "ical", "static" }));
+            Assert.That(host.Types.All.Select(t => t.Id), Is.EquivalentTo(new[] { "thesportsdb", "http-json", "http-html", "ical", "static" }));
             Assert.That(host.Types.Find("HTTP-JSON"), Is.Not.Null);
             Assert.That(host.Types.Find("rss"), Is.Null);
         });
