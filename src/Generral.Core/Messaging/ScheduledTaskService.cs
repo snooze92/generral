@@ -1,4 +1,6 @@
+using Generral.Core.Configuration;
 using Generral.Core.Datastore;
+using Generral.Core.IndexerSearch;
 using Generral.Core.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -52,6 +54,13 @@ public sealed class ScheduledTaskService(
         if (sources.Any(s => SourceRefreshService.IsDue(s, now)))
         {
             queue.Enqueue(RefreshSourcesHandler.CommandName, trigger: CommandTrigger.Scheduled);
+        }
+
+        var rssInterval = (await scope.ServiceProvider.GetRequiredService<IndexerConfigService>().GetAsync(cancellationToken)).RssSyncInterval;
+        var lastRss = scope.ServiceProvider.GetRequiredService<ReleaseSearchService>().LastRssSync;
+        if (rssInterval > 0 && (lastRss is null || lastRss.Value.AddMinutes(rssInterval) <= now.AddSeconds(30)))
+        {
+            queue.Enqueue(RssSyncHandler.CommandName, trigger: CommandTrigger.Scheduled);
         }
     }
 }

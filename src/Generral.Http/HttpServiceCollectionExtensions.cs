@@ -30,6 +30,7 @@ public static partial class HttpServiceCollectionExtensions
             .PersistKeysToFileSystem(new DirectoryInfo(folders.DataProtectionFolder));
 
         services.TryAddSingleton(TimeProvider.System);
+        services.AddMemoryCache();
         services.AddSingleton<LoginThrottle>();
         services.AddSingleton<IRestartService, RestartService>();
 
@@ -130,6 +131,7 @@ public static partial class HttpServiceCollectionExtensions
         api.MapQualityProfileEndpoints();
         api.MapQualityDefinitionEndpoints();
         api.MapReleaseProfileEndpoints();
+        api.MapReleaseEndpoints();
         api.MapSeriesEndpoints();
         api.MapEpisodeEndpoints();
         api.MapMappingEndpoints();

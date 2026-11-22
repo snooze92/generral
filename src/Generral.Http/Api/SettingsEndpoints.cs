@@ -62,6 +62,9 @@ public static class SettingsEndpoints
 
         settings.MapGet("/ui", (IUiSettingsService ui) => ui.Get());
         settings.MapPut("/ui", SaveUi);
+
+        settings.MapGet("/indexer", (IndexerConfigService indexer, CancellationToken cancellationToken) => indexer.GetAsync(cancellationToken));
+        settings.MapPut("/indexer", SaveIndexer);
     }
 
     private static GeneralSettingsResource ToResource(IHostConfigProvider config, IUserService users)
@@ -183,6 +186,18 @@ public static class SettingsEndpoints
         catch (ArgumentException e)
         {
             return ValidationFailure.BadRequest(new ValidationFailure(string.Empty, e.Message));
+        }
+    }
+
+    private static async Task<IResult> SaveIndexer(IndexerConfig settings, IndexerConfigService indexer)
+    {
+        try
+        {
+            return Results.Ok(await indexer.SaveAsync(settings));
+        }
+        catch (ArgumentException e)
+        {
+            return ValidationFailure.BadRequest(new ValidationFailure("rssSyncInterval", e.Message));
         }
     }
 }
