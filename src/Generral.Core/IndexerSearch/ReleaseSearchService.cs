@@ -60,7 +60,7 @@ public sealed class ReleaseSearchService(
     }
 
     /// <summary>
-    /// RSS sync: each RSS-enabled indexer's latest releases against every active episode without a file whose date window is open
+    /// RSS sync: each RSS-enabled indexer's latest releases against every active episode without a file (or below its cutoff) whose date window is open
     /// (spec 06 § Search triggers); unmonitored ones only serve to detect ambiguity.
     /// </summary>
     public async Task<SearchResult> RssSyncAsync(CancellationToken cancellationToken = default)
@@ -72,7 +72,8 @@ public sealed class ReleaseSearchService(
         var releases = await QueryIndexersAsync(indexers, async (indexer, found, token) => found.AddRange(await FetchAsync(indexer, new TorznabSearch(), token)), cancellationToken);
 
         var now = time.GetUtcNow().UtcDateTime;
-        var candidates = (await LoadCandidatesAsync(db, db.Episodes.Where(e => e.Status == EpisodeStatus.Active && e.EpisodeFileId == null && e.AirDateUtc != null), cancellationToken))
+        var upgradable = await EpisodeCutoffService.CutoffUnmetEpisodeIdsAsync(db, cancellationToken);
+        var candidates = (await LoadCandidatesAsync(db, db.Episodes.Where(e => e.Status == EpisodeStatus.Active && (e.EpisodeFileId == null || upgradable.Contains(e.Id)) && e.AirDateUtc != null), cancellationToken))
             .Where(c => c.Episode.AirDateUtc - c.Terms.Before <= now && now <= c.Episode.AirDateUtc + c.Terms.After)
             .ToList();
         var context = await ContextAsync(db, candidates, null, indexers, userInvoked: false, cancellationToken);
@@ -174,8 +175,10 @@ public sealed class ReleaseSearchService(
         CancellationToken cancellationToken = default)
     {
         var seriesIds = candidates.Select(c => c.Episode.SeriesId).Distinct().ToList();
+        var fileIds = candidates.Select(c => c.Episode.EpisodeFileId).OfType<int>().Distinct().ToList();
         return new DecisionContext
         {
+            EpisodeFiles = await db.EpisodeFiles.AsNoTracking().Where(f => fileIds.Contains(f.Id)).ToDictionaryAsync(f => f.Id, cancellationToken),
             Scope = candidates,
             Requested = requested,
             QualityProfiles = await db.QualityProfiles.AsNoTracking().ToDictionaryAsync(p => p.Id, cancellationToken),

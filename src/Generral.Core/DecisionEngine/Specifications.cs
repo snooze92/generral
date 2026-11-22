@@ -63,11 +63,27 @@ public sealed class LanguageSpecification : IDecisionSpecification
     }
 }
 
-/// <summary>Episode files don't exist yet; until they do, an episode with a file is never upgraded.</summary>
+/// <summary>Every episode with a file must be upgradable by the release (cutoff not met, better quality or revision, upgrades allowed).</summary>
 public sealed class UpgradeDiskSpecification : IDecisionSpecification
 {
-    public string? Check(RemoteEpisode subject, DecisionContext context) =>
-        subject.Episodes.Count > 0 && subject.Episodes.All(e => e.HasFile) ? "Existing file on disk, upgrades are not supported yet" : null;
+    public string? Check(RemoteEpisode subject, DecisionContext context)
+    {
+        if (subject.QualityProfile is not { } profile)
+        {
+            return null;
+        }
+
+        foreach (var episode in subject.Episodes.Where(e => e.EpisodeFileId is not null))
+        {
+            if (context.EpisodeFiles.GetValueOrDefault(episode.EpisodeFileId!.Value) is { } file &&
+                UpgradableSpecification.Rejection(profile, file.Quality, subject.Quality) is { } rejection)
+            {
+                return rejection;
+            }
+        }
+
+        return null;
+    }
 }
 
 public sealed class AcceptableSizeSpecification : IDecisionSpecification

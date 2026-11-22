@@ -149,6 +149,139 @@ public class DownloadApiTests
         });
     }
 
+    [Test]
+    public async Task Completed_download_is_imported_through_a_remote_path_mapping_and_an_upgrade_recycles_the_old_file()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "generral-import-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var downloads = Directory.CreateDirectory(Path.Combine(root, "downloads", "UFC 314")).FullName;
+            var library = Directory.CreateDirectory(Path.Combine(root, "tv")).FullName;
+            var bin = Path.Combine(root, "bin");
+            await File.WriteAllBytesAsync(Path.Combine(downloads, "ufc.314.main.card.1080p.web-dl-GRP.mkv"), new byte[2000]);
+            await File.WriteAllBytesAsync(Path.Combine(downloads, "ufc.314.main.card.1080p.web-dl-GRP.en.srt"), new byte[10]);
+            await File.WriteAllBytesAsync(Path.Combine(downloads, "sample.mkv"), new byte[2000]);
+            _qbit.SavePath = "/remote/";
+
+            await CreateClientAsync();
+            var episodeId = await SeedAsync(Path.Combine(library, "UFC"));
+            var rootFolder = await _client.PostAsJsonAsync("/api/v1/rootfolder", new JsonObject { ["path"] = library });
+            var mapping = await _client.PostAsJsonAsync("/api/v1/remotepathmapping", new JsonObject { ["host"] = "localhost", ["remotePath"] = "/remote", ["localPath"] = Path.Combine(root, "downloads") });
+            var media = (await _client.GetFromJsonAsync<JsonObject>("/api/v1/config/mediamanagement"))!;
+            media["recycleBin"] = bin;
+            Assert.That((await _client.PutAsJsonAsync("/api/v1/config/mediamanagement", media)).StatusCode, Is.EqualTo(HttpStatusCode.Accepted));
+
+            await RunAsync("EpisodeSearch", new JsonObject { ["episodeIds"] = new JsonArray(episodeId) });
+            _qbit.State = "stoppedUP";
+            var refresh = await RunAsync(RefreshMonitoredDownloadsHandler.CommandName);
+
+            var queue = (await _client.GetFromJsonAsync<JsonObject>("/api/v1/queue"))!;
+            var episode = (await _client.GetFromJsonAsync<JsonObject>($"/api/v1/episode/{episodeId}"))!;
+            var files = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/episodefile?seriesId={(int)episode["seriesId"]!}"))!;
+            var imported = (await _client.GetFromJsonAsync<JsonObject>("/api/v1/history?eventType=downloadFolderImported"))!;
+            var series = (await _client.GetFromJsonAsync<JsonObject>($"/api/v1/series/{(int)episode["seriesId"]!}"))!;
+            var roots = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/rootfolder"))!;
+            var expected = Path.Combine(library, "UFC", "Season 2026", "UFC - S2026E03 - UFC 314 - Main Card [WEBDL-1080p].mkv");
+            var source = Path.Combine(downloads, "ufc.314.main.card.1080p.web-dl-GRP.mkv");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(rootFolder.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(mapping.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+                Assert.That((string)refresh["message"]!, Does.Contain("1 imported"), (string?)refresh["message"]);
+                Assert.That((int)queue["totalRecords"]!, Is.EqualTo(0), "imported downloads leave the queue");
+                Assert.That(File.Exists(expected), expected);
+                Assert.That(File.Exists(Path.ChangeExtension(expected, ".en.srt")), "subtitle carried over");
+                Assert.That(File.Exists(source), "the torrent keeps seeding");
+                Assert.That(IsHardLink(source, expected), "hardlinked");
+                Assert.That((bool)episode["hasFile"]!, Is.True);
+                Assert.That((int)episode["episodeFileId"]!, Is.EqualTo((int)files.Single()!["id"]!));
+                Assert.That((string)files[0]!["relativePath"]!, Is.EqualTo(Path.Combine("Season 2026", "UFC - S2026E03 - UFC 314 - Main Card [WEBDL-1080p].mkv")));
+                Assert.That((string)files[0]!["releaseGroup"]!, Is.EqualTo("GRP"));
+                Assert.That((string)files[0]!["sceneName"]!, Is.EqualTo("UFC.314.1080p.WEB-DL.h264-GRP"));
+                Assert.That((int)imported["totalRecords"]!, Is.EqualTo(1));
+                Assert.That((long)series["statistics"]!["sizeOnDisk"]!, Is.EqualTo(2000));
+                Assert.That((int)series["statistics"]!["episodeFileCount"]!, Is.EqualTo(1));
+                Assert.That((bool)roots.Single()!["accessible"]!, Is.True);
+                Assert.That(roots[0]!["unmappedFolders"]!.AsArray(), Is.Empty, "the series folder is mapped");
+            });
+
+            // The HD-1080p profile's cutoff is HDTV-1080p and WEBDL-1080p is above it, so search rejects; a manual Bluray import upgrades.
+            var releases = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/release?episodeId={episodeId}"))!;
+            var better = Path.Combine(root, "manual", "UFC.314.Main.Card.1080p.BluRay.x264-HD.mkv");
+            Directory.CreateDirectory(Path.GetDirectoryName(better)!);
+            await File.WriteAllBytesAsync(better, new byte[3000]);
+            var listed = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/manualimport?folder={Uri.EscapeDataString(Path.GetDirectoryName(better)!)}&seriesId={(int)episode["seriesId"]!}"))!;
+            var manual = await RunAsync("ManualImport", new JsonObject
+            {
+                ["importMode"] = "move",
+                ["files"] = new JsonArray(new JsonObject { ["path"] = better, ["seriesId"] = (int)episode["seriesId"]!, ["episodeIds"] = new JsonArray(episodeId) }),
+            });
+            var worse = await RunAsync("ManualImport", new JsonObject
+            {
+                ["files"] = new JsonArray(new JsonObject { ["path"] = source, ["seriesId"] = (int)episode["seriesId"]!, ["episodeIds"] = new JsonArray(episodeId) }),
+            });
+            var after = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/episodefile?seriesId={(int)episode["seriesId"]!}"))!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(releases.Single()!["rejections"]!.AsArray().Select(r => (string)r!), Has.Some.StartsWith("Existing file meets cutoff"));
+                Assert.That((string)listed.Single()!["quality"]!["quality"]!["name"]!, Is.EqualTo("Bluray-1080p"));
+                Assert.That((string)manual["status"]!, Is.EqualTo("completed"), (string?)manual["message"]);
+                Assert.That((string)after.Single()!["quality"]!["quality"]!["name"]!, Is.EqualTo("Bluray-1080p"));
+                Assert.That(File.Exists(better), Is.False, "moved");
+                Assert.That(File.Exists(expected), Is.False);
+                Assert.That(File.Exists(Path.Combine(bin, "UFC", "Season 2026", Path.GetFileName(expected))), "old file recycled");
+                Assert.That((string)worse["status"]!, Is.EqualTo("failed"));
+                Assert.That((string)worse["message"]!, Does.Contain("Not an upgrade for existing episode file(s)"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task Failed_import_shows_the_reason_in_the_queue()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "generral-import-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var downloads = Directory.CreateDirectory(Path.Combine(root, "UFC 314")).FullName;
+            await File.WriteAllBytesAsync(Path.Combine(downloads, "readme.txt"), new byte[10]);
+            _qbit.SavePath = root + "/";
+            await CreateClientAsync();
+            var episodeId = await SeedAsync(Path.Combine(root, "tv", "UFC"));
+            await RunAsync("EpisodeSearch", new JsonObject { ["episodeIds"] = new JsonArray(episodeId) });
+            _qbit.State = "stoppedUP";
+            await RunAsync(RefreshMonitoredDownloadsHandler.CommandName);
+            var item = (await _client.GetFromJsonAsync<JsonObject>("/api/v1/queue"))!["records"]![0]!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That((string)item["trackedDownloadState"]!, Is.EqualTo("importBlocked"));
+                Assert.That((string)item["trackedDownloadStatus"]!, Is.EqualTo("warning"));
+                Assert.That((string)item["statusMessages"]![0]!["messages"]![0]!, Does.StartWith("No files found are eligible for import"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>Writing through one path changes the other only when both are the same inode.</summary>
+    private static bool IsHardLink(string a, string b)
+    {
+        using (var stream = new FileStream(a, FileMode.Open, FileAccess.Write))
+        {
+            stream.WriteByte(42);
+        }
+
+        return File.ReadAllBytes(b)[0] == 42;
+    }
+
     private async Task<JsonObject> CreateClientAsync()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/downloadclient", ClientResource("secret"));
@@ -168,12 +301,12 @@ public class DownloadApiTests
             new JsonObject { ["name"] = "password", ["value"] = password }),
     };
 
-    private async Task<int> SeedAsync()
+    private async Task<int> SeedAsync(string seriesPath = "/tv/UFC")
     {
         using var scope = _host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
         var profileId = await db.QualityProfiles.Where(p => p.Name == "HD-1080p").Select(p => p.Id).SingleAsync();
-        var series = new Series { Title = "UFC", SortTitle = "ufc", CleanTitle = "ufc", TitleSlug = "ufc", Path = "/tv/UFC", RootFolderPath = "/tv", QualityProfileId = profileId };
+        var series = new Series { Title = "UFC", SortTitle = "ufc", CleanTitle = "ufc", TitleSlug = "ufc", Path = seriesPath, RootFolderPath = Path.GetDirectoryName(seriesPath)!, QualityProfileId = profileId };
         var episode = new Episode
         {
             Series = series,
@@ -185,6 +318,7 @@ public class DownloadApiTests
             SearchTerms = new JsonObject { ["queries"] = new JsonArray("UFC 314"), ["must"] = new JsonArray(@"\bUFC ?314\b") },
         };
         db.Episodes.Add(episode);
+        db.Seasons.Add(new Season { Series = series, SeasonNumber = 2026 });
         db.Indexers.Add(new Indexer
         {
             Name = "Tracker",

@@ -33,9 +33,7 @@ public sealed class CompletedDownloadService(
             return;
         }
 
-        var host = client.Settings["host"]?.GetValue<string>() ?? "";
-        var mappings = await db.RemotePathMappings.AsNoTracking().ToListAsync(cancellationToken);
-        var outputPath = RemotePathMappingService.RemapRemoteToLocal(mappings, host, item.OutputPath);
+        var outputPath = await LocalOutputPathAsync(client, item.OutputPath, cancellationToken);
         if (!Path.IsPathFullyQualified(outputPath) || (!Directory.Exists(outputPath) && !File.Exists(outputPath)))
         {
             Block(tracked, $"Download client {client.Name} reports files in {outputPath} but this path doesn't exist in Generral. You may need a Remote Path Mapping.");
@@ -94,6 +92,14 @@ public sealed class CompletedDownloadService(
                 .. results.Where(r => !r.Imported).OrderBy(r => r.Path, StringComparer.Ordinal).Select(r => new TrackedDownloadStatusMessage(Path.GetFileName(r.Path), r.Errors)),
             ];
         logger.LogWarning("Couldn't import {Title}: {Messages}", tracked.Title, string.Join("; ", tracked.StatusMessages.SelectMany(m => m.Messages)));
+    }
+
+    /// <summary>The download client's path as Generral sees it, through the remote path mappings of the client's host.</summary>
+    public async Task<string> LocalOutputPathAsync(DownloadClient client, string outputPath, CancellationToken cancellationToken = default)
+    {
+        var host = client.Settings["host"]?.GetValue<string>() ?? "";
+        var mappings = await db.RemotePathMappings.AsNoTracking().ToListAsync(cancellationToken);
+        return RemotePathMappingService.RemapRemoteToLocal(mappings, host, outputPath);
     }
 
     /// <summary>Removes an imported download from the client once it reached its seeding goals, when the client removes completed downloads.</summary>

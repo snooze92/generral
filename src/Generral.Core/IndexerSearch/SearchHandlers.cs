@@ -6,8 +6,10 @@
 // and src/NzbDrone.Core/Indexers/RssSyncService.cs
 using System.Linq.Expressions;
 using System.Text.Json.Nodes;
+using Generral.Core.Datastore;
 using Generral.Core.Messaging;
 using Generral.Core.Tv;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Generral.Core.IndexerSearch;
 
@@ -101,15 +103,25 @@ public sealed class MissingEpisodeSearchHandler(ReleaseSearchService search, Tim
     }
 }
 
-/// <summary><c>CutoffUnmetEpisodeSearch</c>: Wanted → Cutoff Unmet. Nothing is upgradable until episode files exist (M3).</summary>
-public sealed class CutoffUnmetEpisodeSearchHandler : ICommandHandler
+/// <summary><c>CutoffUnmetEpisodeSearch</c>: Wanted → Cutoff Unmet, i.e. monitored, aired episodes of monitored series whose file is below the cutoff.</summary>
+public sealed class CutoffUnmetEpisodeSearchHandler(ReleaseSearchService search, IServiceScopeFactory scopes, TimeProvider time) : ICommandHandler
 {
     public const string CommandName = "CutoffUnmetEpisodeSearch";
 
     public string Name => CommandName;
 
-    public Task<string?> ExecuteAsync(JsonObject body, CommandContext context, CancellationToken cancellationToken) =>
-        Task.FromResult<string?>("0 episode(s) searched: no episode has a file below its cutoff");
+    public async Task<string?> ExecuteAsync(JsonObject body, CommandContext context, CancellationToken cancellationToken)
+    {
+        HashSet<int> ids;
+        using (var scope = scopes.CreateScope())
+        {
+            ids = await EpisodeCutoffService.CutoffUnmetEpisodeIdsAsync(scope.ServiceProvider.GetRequiredService<GenerralDbContext>(), cancellationToken);
+        }
+
+        var now = time.GetUtcNow().UtcDateTime;
+        var result = await search.AutomaticSearchAsync(e => ids.Contains(e.Id) && e.Monitored && e.Series!.Monitored && e.AirDateUtc <= now, context.Trigger == CommandTrigger.Manual, cancellationToken);
+        return result.Summary;
+    }
 }
 
 public sealed class RssSyncHandler(ReleaseSearchService search) : ICommandHandler

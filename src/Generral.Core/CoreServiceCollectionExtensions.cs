@@ -79,6 +79,7 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<DiskTransferService>();
         services.AddSingleton<RecycleBinProvider>();
         services.AddSingleton<ICommandHandler, CleanUpRecycleBinHandler>();
+        services.AddSingleton<ICommandHandler, ManualImportHandler>();
         services.TryAddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<ReleaseSearchService>();
 

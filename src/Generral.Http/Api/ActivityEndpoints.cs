@@ -139,13 +139,19 @@ public static class ActivityEndpoints
         api.MapDelete("/blocklist/{id:int}", DeleteBlocklist);
     }
 
-    private static PagingResource<QueueResource> GetQueue(TrackedDownloadService tracked, TimeProvider time, int page = 1, int pageSize = 10, bool includeUnknownSeriesItems = false)
+    private static async Task<PagingResource<QueueResource>> GetQueue(
+        TrackedDownloadService tracked,
+        GenerralDbContext db,
+        TimeProvider time,
+        int page = 1,
+        int pageSize = 10,
+        bool includeUnknownSeriesItems = false)
     {
         var now = time.GetUtcNow().UtcDateTime;
-        var queue = tracked.Queue()
-            .Where(t => includeUnknownSeriesItems || t.SeriesId is not null)
-            .Select(t => ToResource(t, now))
-            .ToList();
+        var downloads = tracked.Queue().Where(t => includeUnknownSeriesItems || t.SeriesId is not null).ToList();
+        var episodeIds = downloads.SelectMany(t => t.EpisodeIds.Take(1)).ToList();
+        var withFile = (await db.Episodes.AsNoTracking().Where(e => episodeIds.Contains(e.Id) && e.EpisodeFileId != null).Select(e => e.Id).ToListAsync()).ToHashSet();
+        var queue = downloads.Select(t => ToResource(t, now) with { EpisodeHasFile = t.EpisodeIds.Count > 0 && withFile.Contains(t.EpisodeIds[0]) }).ToList();
         return Page(queue, page, pageSize, "timeleft", SortDirection.Ascending);
     }
 
