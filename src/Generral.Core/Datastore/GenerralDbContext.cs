@@ -4,8 +4,11 @@ using Generral.Core.History;
 using Generral.Core.Indexers;
 using Generral.Core.Languages;
 using Generral.Core.Mappings;
+using Generral.Core.MediaFiles;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
+using Generral.Core.RemotePathMappings;
+using Generral.Core.RootFolders;
 using Generral.Core.Sources;
 using Generral.Core.Tags;
 using Generral.Core.Tv;
@@ -52,6 +55,12 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
     public DbSet<QualityProfile> QualityProfiles => Set<QualityProfile>();
 
     public DbSet<ReleaseProfile> ReleaseProfiles => Set<ReleaseProfile>();
+
+    public DbSet<EpisodeFile> EpisodeFiles => Set<EpisodeFile>();
+
+    public DbSet<RootFolder> RootFolders => Set<RootFolder>();
+
+    public DbSet<RemotePathMapping> RemotePathMappings => Set<RemotePathMapping>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -191,7 +200,20 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
             episode.HasOne(e => e.Series).WithMany().HasForeignKey(e => e.SeriesId).OnDelete(DeleteBehavior.Cascade);
             episode.Property(e => e.Images).HasJsonConversion();
             episode.Property(e => e.SearchTerms).HasJsonConversion();
+            episode.HasOne<EpisodeFile>().WithMany().HasForeignKey(e => e.EpisodeFileId).OnDelete(DeleteBehavior.SetNull);
         });
+
+        modelBuilder.Entity<EpisodeFile>(file =>
+        {
+            file.HasIndex(f => f.SeriesId);
+            file.HasOne<Series>().WithMany().HasForeignKey(f => f.SeriesId).OnDelete(DeleteBehavior.Cascade);
+            file.Property(f => f.Quality).HasJsonConversion();
+            file.Property(f => f.Languages).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<RootFolder>(folder => folder.HasIndex(f => f.Path).IsUnique());
+
+        modelBuilder.Entity<RemotePathMapping>(mapping => mapping.HasIndex(m => new { m.Host, m.RemotePath }).IsUnique());
 
         modelBuilder.Entity<Mapping>(mapping =>
         {

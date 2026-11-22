@@ -11,10 +11,14 @@ using Generral.Core.Indexers.Torznab;
 using Generral.Core.IndexerSearch;
 using Generral.Core.Lifecycle;
 using Generral.Core.Mappings;
+using Generral.Core.MediaFiles;
 using Generral.Core.Messaging;
+using Generral.Core.Organizer;
 using Generral.Core.Presets;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
+using Generral.Core.RemotePathMappings;
+using Generral.Core.RootFolders;
 using Generral.Core.Sources;
 using Generral.Core.Sources.Extraction;
 using Generral.Core.Sources.Http;
@@ -56,6 +60,10 @@ public static class CoreServiceCollectionExtensions
             .ConfigurePrimaryHttpMessageHandler(SourceFetcherFactory.CreateHandler);
         services.AddSingleton<TorznabClient>();
         services.AddScoped<IndexerConfigService>();
+        services.AddScoped<NamingConfigService>();
+        services.AddScoped<MediaManagementConfigService>();
+        services.AddScoped<RootFolderService>();
+        services.AddScoped<RemotePathMappingService>();
         services.AddSingleton<DownloadDecisionMaker>();
         services.AddHttpClient(QBittorrentClient.ClientName, QBittorrentClient.ConfigureClient)
             .ConfigurePrimaryHttpMessageHandler(QBittorrentClient.CreateHandler);
