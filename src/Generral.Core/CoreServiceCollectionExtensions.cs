@@ -1,7 +1,10 @@
 using Generral.Core.Authentication;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
+using Generral.Core.DecisionEngine;
+using Generral.Core.Download;
 using Generral.Core.Indexers.Torznab;
+using Generral.Core.IndexerSearch;
 using Generral.Core.Lifecycle;
 using Generral.Core.Mappings;
 using Generral.Core.Messaging;
@@ -48,6 +51,11 @@ public static class CoreServiceCollectionExtensions
         services.AddHttpClient(TorznabClient.ClientName, TorznabClient.ConfigureClient)
             .ConfigurePrimaryHttpMessageHandler(SourceFetcherFactory.CreateHandler);
         services.AddSingleton<TorznabClient>();
+        services.AddScoped<IndexerConfigService>();
+        services.AddSingleton<DownloadDecisionMaker>();
+        services.AddSingleton<PendingGrabDownloadService>();
+        services.AddSingleton<IDownloadService>(sp => sp.GetRequiredService<PendingGrabDownloadService>());
+        services.AddSingleton<ReleaseSearchService>();
 
         services.AddSingleton<CommandQueue>();
         services.AddSingleton<ICommandHandler, RefreshSourcesHandler>();
@@ -56,6 +64,11 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<ApplyMappingsService>();
         services.AddSingleton<ICommandHandler, ApplyMappingsHandler>();
         services.AddSingleton<ICommandHandler, RenumberHandler>();
+        services.AddSingleton<ICommandHandler, EpisodeSearchHandler>();
+        services.AddSingleton<ICommandHandler, SeasonSearchHandler>();
+        services.AddSingleton<ICommandHandler, SeriesSearchHandler>();
+        services.AddSingleton<ICommandHandler, MissingEpisodeSearchHandler>();
+        services.AddSingleton<ICommandHandler, RssSyncHandler>();
         services.AddHostedService<CommandWorker>();
         services.AddHostedService<ScheduledTaskService>();
 
