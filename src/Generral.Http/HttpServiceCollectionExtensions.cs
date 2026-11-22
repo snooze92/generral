@@ -140,6 +140,7 @@ public static partial class HttpServiceCollectionExtensions
         api.MapMappingEndpoints();
         api.MapPresetEndpoints();
         api.MapCalendarEndpoints();
+        api.MapWantedEndpoints();
         api.MapCommandEndpoints();
         api.MapOpenApi("/openapi.json");
 

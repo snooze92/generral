@@ -18,7 +18,7 @@ public static class MappingDefinitionParser
     private static readonly string[] EpisodeKeys = ["strategy", "order", "value", "onInsert"];
     private static readonly string[] ImageKeys = ["thumb"];
     private static readonly string[] SearchTemplateKeys = ["queries", "must", "mustNot", "any"];
-    private static readonly string[] SearchSettingKeys = ["categories", "queryMode", "dateWindow"];
+    private static readonly string[] SearchSettingKeys = ["categories", "queryMode", "dateWindow", "searchSchedule"];
 
     /// <exception cref="MappingDefinitionException">Invalid YAML or definition.</exception>
     public static MappingDefinition FromYaml(string yaml)

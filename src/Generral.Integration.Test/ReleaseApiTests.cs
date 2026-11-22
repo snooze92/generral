@@ -162,6 +162,22 @@ public class ReleaseApiTests
     }
 
     [Test]
+    public async Task On_air_search_grabs_due_monitored_episodes_once_per_slot()
+    {
+        var (_, mainCardId) = await SeedAsync();
+
+        var first = await RunAsync("OnAirSearch");
+        var second = await RunAsync("OnAirSearch");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That((string)first["message"]!, Is.EqualTo("1 episode(s) searched, 5 release(s) found, 1 grabbed"));
+            Assert.That(_grabs.Grabs.Single().EpisodeIds, Is.EqualTo(new[] { mainCardId }));
+            Assert.That((string)second["message"]!, Is.EqualTo("No episode due"));
+        });
+    }
+
+    [Test]
     public async Task Rss_sync_grabs_releases_for_wanted_episodes()
     {
         var (_, mainCardId) = await SeedAsync();
@@ -219,6 +235,12 @@ public class ReleaseApiTests
         await db.SaveChangesAsync();
         _handler.PublishDate = air.AddHours(3);
         return (prelims.Id, mainCard.Id);
+    }
+
+    private async Task<JsonObject> RunAsync(string name)
+    {
+        var command = await _client.PostAsJsonAsync("/api/v1/command", new JsonObject { ["name"] = name });
+        return await WaitAsync((int)(await command.Content.ReadFromJsonAsync<JsonObject>())!["id"]!);
     }
 
     private async Task<JsonObject> WaitAsync(int id)

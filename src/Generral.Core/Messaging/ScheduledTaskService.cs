@@ -64,6 +64,13 @@ public sealed class ScheduledTaskService(
             queue.Enqueue(RssSyncHandler.CommandName, trigger: CommandTrigger.Scheduled);
         }
 
+        var queued = scope.ServiceProvider.GetRequiredService<TrackedDownloadService>().QueuedEpisodes();
+        var onAirRunning = queue.All().Any(c => c.Name == OnAirSearchHandler.CommandName && c.Status is CommandStatus.Queued or CommandStatus.Started);
+        if (!onAirRunning && (await OnAirSchedule.DueEpisodesAsync(db, queued, now, cancellationToken)).Count > 0)
+        {
+            queue.Enqueue(OnAirSearchHandler.CommandName, trigger: CommandTrigger.Scheduled);
+        }
+
         if (await db.DownloadClients.AnyAsync(c => c.Enable, cancellationToken))
         {
             queue.Enqueue(RefreshMonitoredDownloadsHandler.CommandName, trigger: CommandTrigger.Scheduled);

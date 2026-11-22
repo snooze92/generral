@@ -82,6 +82,7 @@ search:
   mustNot:  [ 'fight[ ._-]?night' ]                  # none may match
   any:      []                                        # at least one must match (if non-empty)
   dateWindow: { before: 2d, after: 60d }  # release publishDate relative to airDateUtc
+  searchSchedule: [1h, 3h, 6h, 12h, 24h, 48h, 3d, 4d, 5d, 6d, 7d, 8d, 9d]  # on-air searches (default); [] = off
   parts: { <partKey>: { must: [...], mustNot: [...] } }   # merged with event-level rules
   pack:                                    # optional: releases covering several episodes
     must: [ '\bUFC[ ._-]?{{ vars.number }}\b' ]
@@ -188,6 +189,15 @@ seeders before size.
 - Grabs go through `IDownloadService`, which sends them to a download client (spec 07 § Implementation notes (M2d)).
   A failed grab is logged and the next best release for the same episodes is tried.
 - Interactive results are ordered accepted → rejected matches → unmatched, each best first.
+  Any matched release can be grabbed (`POST /release`), rejected ones included (date window, quality…);
+  unmatched ones need `episodeIds`.
+- On-air search: the scheduler (every minute) queues `OnAirSearch` when a monitored episode of a
+  monitored series, without a file or queued download, has a passed slot it wasn't searched since
+  (`lastSearchTime` < slot). Slots: `airDateUtc` + 1h, 3h, 6h, 12h, 24h, 48h, then daily from day 3 to
+  day 9. A slot missed by more than 1 day (downtime) is skipped; offsets beyond 60 d are ignored.
+  Per series/mapping: `searchSchedule: [1h, 6h, 2d]` in the search settings (`[]` disables).
+  It is an automatic search (monitored only, grabs the best accepted release).
+- `CutoffUnmetEpisodeSearch` exists but searches nothing until episode files exist (M3).
 
 ## Languages
 

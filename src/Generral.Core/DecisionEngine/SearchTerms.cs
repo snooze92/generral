@@ -40,6 +40,9 @@ public sealed record SearchTerms
 
     public TimeSpan After { get; init; } = DefaultAfter;
 
+    /// <summary>On-air search offsets from <c>airDateUtc</c> (<c>searchSchedule</c>; <c>[]</c> disables), ascending.</summary>
+    public IReadOnlyList<TimeSpan> Schedule { get; init; } = IndexerSearch.OnAirSchedule.Default;
+
     /// <summary>Episode keys win over the series defaults, key by key.</summary>
     public static SearchTerms From(JsonObject episodeTerms, JsonObject? seriesDefaults = null)
     {
@@ -58,6 +61,9 @@ public sealed record SearchTerms
             QueryMode = Get("queryMode") is JsonValue mode && mode.TryGetValue<string>(out var text) && text == "all" ? QueryMode.All : QueryMode.FirstWithResults,
             Before = Duration(window?["before"]) ?? DefaultBefore,
             After = Duration(window?["after"]) ?? DefaultAfter,
+            Schedule = Get("searchSchedule") is JsonArray schedule
+                ? schedule.Select(Duration).OfType<TimeSpan>().Order().ToList()
+                : IndexerSearch.OnAirSchedule.Default,
         };
     }
 

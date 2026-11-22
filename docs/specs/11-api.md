@@ -30,7 +30,7 @@ Resource shapes reuse Sonarr's where the concept is the same, so that vendored U
 | `release` | `GET /release?episodeId=` (interactive search), `POST /release` (grab, optionally with episode override), `POST /release/push` |
 | `queue`, `history`, `blocklist`, `wanted/missing`, `wanted/cutoff`, `calendar`, `manualimport` | Sonarr-shaped |
 | `indexer`, `downloadclient`, `notification`, `metadata`, `qualityprofile`, `qualitydefinition`, `releaseprofile`, `tag`, `rootfolder`, `remotepathmapping`, `config/{naming,mediamanagement,host,ui,indexer,downloadclient}` | Sonarr-shaped, including `/schema` and `/test` for providers |
-| `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `RefreshMonitoredDownloads`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `RenameFiles`, `RenameSeries`, `Renumber`, `DownloadedEpisodesScan`, `Backup`, `CheckHealth`, `Housekeeping` |
+| `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `RefreshMonitoredDownloads`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `OnAirSearch`, `RenameFiles`, `RenameSeries`, `Renumber`, `DownloadedEpisodesScan`, `Backup`, `CheckHealth`, `Housekeeping` |
 | `system` | `/system/status`, `/system/task`, `/system/backup`, `/health`, `/log`, `/log/file` |
 
 Source, event and command resources (M1a):
@@ -112,6 +112,11 @@ Quality resources (M2b), Sonarr v3-shaped:
   `POST /release { guid, indexerId, episodeIds? }` grabs a cached one (rejected ones too),
   `episodeIds` (one series) overriding the match; unknown → 404, missing guid/indexerId → 400.
   `/release/push` is not implemented yet. `GET/PUT /settings/indexer { rssSyncInterval }`.
+- `wanted` (M2): `GET /wanted/missing?page&pageSize&sortKey&sortDirection&includeSeries&monitored`
+  returns Sonarr's `PagingResource<EpisodeResource>` of aired active episodes without a file;
+  `monitored=true` (default) = episode and series monitored, `false` = either unmonitored. Sort keys
+  `episodes.airDateUtc` (default, ascending), `episodes.lastSearchTime`, `series.sortTitle`.
+  `GET /wanted/cutoff` (same parameters) is always empty until episode files exist (M3).
 - `releaseprofile`: `{ id, name, enabled, required[], ignored[], indexerId, tags[], excludedTags[] }`
   (`required`/`ignored` also accept a comma-separated string). At least one term is required; the
   indexer and tags must exist; a tag can't be both included and excluded. Sonarr's air-date and
