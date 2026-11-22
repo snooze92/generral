@@ -18,6 +18,12 @@ The original use-case is sport:
 …but nothing in Generral is sport-specific. Anything that can be scraped into a list of dated,
 identifiable events can be turned into a series.
 
+## Legal use
+
+Generral organises media you are legally entitled to access. Only use it with content you have the
+rights to. You are responsible for complying with the laws and terms of service that apply to you.
+Generral ships with no presets, sources or other content.
+
 ## Status
 
 **Early development, not usable yet.** The specs are the source of truth; start reading at
@@ -82,8 +88,6 @@ anything listed in `frontend/scripts/sonarr-files.txt`. After changing entities,
 | 11 | [HTTP API](docs/specs/11-api.md)                                     | Native API + Sonarr-compat shim for Prowlarr     |
 | 12 | [Deployment](docs/specs/12-deployment.md)                            | Docker image, volumes, compose, CI               |
 | 13 | [Roadmap](docs/specs/13-roadmap.md)                                  | Milestones, MVP scope, open questions            |
-
-Worked mapping examples live in [`docs/specs/examples/`](docs/specs/examples/).
 
 ## License
 

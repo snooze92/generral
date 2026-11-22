@@ -51,15 +51,15 @@ const preview: MappingPreview = {
 
 const presets = [
   {
-    id: 'ufc-numbered',
-    name: 'UFC – Numbered events',
-    description: 'Every numbered UFC event',
-    seriesTitle: 'UFC',
+    id: 'example-fight-league',
+    name: 'Example Fight League – Numbered events',
+    description: 'Every numbered event of the fictional Example Fight League',
+    seriesTitle: 'EFL',
     tags: ['sport'],
     sourceType: 'thesportsdb',
     requiredSecrets: [],
     parameters: [
-      { name: 'tsdbKey', label: 'TheSportsDB API key', default: '123', secret: true },
+      { name: 'tsdbKey', label: 'API key', default: '123', secret: true },
       { name: 'seasons', label: 'Seasons', default: 'current', secret: false },
     ],
     shipped: true,
@@ -261,26 +261,46 @@ describe('Add series', () => {
     expect(requests(fetchMock, 'POST', '/api/v1/series')).toHaveLength(2);
   });
 
-  it('instantiates a preset with its parameters, then opens the series', async () => {
+  it('offers Import and From scratch with an empty gallery, and selects an imported preset', async () => {
     const fetchMock = renderWizard({
-      'POST /api/v1/preset/ufc-numbered/instantiate': { ...created, title: 'UFC', titleSlug: 'ufc' },
+      'GET /api/v1/preset': [],
+      'POST /api/v1/preset/import': presets[0],
     });
 
-    fireEvent.click(await screen.findByRole('option', { name: /UFC – Numbered events/ }));
+    expect(await screen.findByRole('option', { name: /From scratch/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('option', { name: /Import preset/ }));
+    fireEvent.change(screen.getByPlaceholderText('https://'), {
+      target: { name: 'url', value: 'https://example.org/preset.yaml' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+
+    await waitFor(() =>
+      expect(requests(fetchMock, 'POST', '/api/v1/preset/import')).toEqual([
+        { url: 'https://example.org/preset.yaml' },
+      ])
+    );
+  });
+
+  it('instantiates a preset with its parameters, then opens the series', async () => {
+    const fetchMock = renderWizard({
+      'POST /api/v1/preset/example-fight-league/instantiate': { ...created, title: 'EFL', titleSlug: 'efl' },
+    });
+
+    fireEvent.click(await screen.findByRole('option', { name: /Example Fight League – Numbered events/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-    expect(screen.getByDisplayValue('UFC').getAttribute('name')).toBe('title');
+    expect(screen.getByDisplayValue('EFL').getAttribute('name')).toBe('title');
     fireEvent.change(screen.getByPlaceholderText('/tv'), {
       target: { name: 'rootFolderPath', value: '/sport' },
     });
     fireEvent.change(screen.getByPlaceholderText('123'), {
       target: { name: 'tsdbKey', value: 'premium' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Add UFC' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add EFL' }));
 
-    expect(await screen.findByText('Series page ufc')).toBeTruthy();
-    expect(requests(fetchMock, 'POST', '/api/v1/preset/ufc-numbered/instantiate')[0]).toEqual({
-      title: 'UFC',
+    expect(await screen.findByText('Series page efl')).toBeTruthy();
+    expect(requests(fetchMock, 'POST', '/api/v1/preset/example-fight-league/instantiate')[0]).toEqual({
+      title: 'EFL',
       rootFolderPath: '/sport',
       monitored: true,
       monitorNewItems: 'all',
