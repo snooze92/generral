@@ -1,32 +1,15 @@
-import ModelBase from 'App/ModelBase';
-import Field from 'typings/Field';
+import { ProviderBase } from 'Settings/Provider/Provider';
 
 export type EventStatus =
   'scheduled' | 'postponed' | 'cancelled' | 'completed' | 'unknown' | 'gone';
 
-export interface SourceSelectOption {
-  value: string;
-  name: string;
-  hint?: string;
-}
-
-export interface SourceField extends Omit<Field, 'value'> {
-  value?: unknown;
-  helpText?: string;
-  unit?: string;
-  placeholder?: string;
-  selectOptions?: SourceSelectOption[];
-}
-
-interface Source extends ModelBase {
-  name: string;
+interface Source extends ProviderBase {
   type: string;
   typeName?: string;
   enabled: boolean;
   /** Minutes. */
   refreshInterval: number;
   tags: number[];
-  fields: SourceField[];
   lastRefresh?: string;
   lastSuccess?: string;
   lastError?: string;

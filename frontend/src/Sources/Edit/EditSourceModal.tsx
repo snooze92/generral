@@ -1,8 +1,8 @@
-// Adapted from Sonarr (GPL-3.0-or-later): frontend/src/Settings/Indexers/Indexers/EditIndexerModal.tsx
-import React, { useState } from 'react';
-import Modal from 'Components/Modal/Modal';
-import { sizes } from 'Helpers/Props';
-import AddSourceModalContent from './AddSourceModalContent';
+import React from 'react';
+import ProviderModal from 'Settings/Provider/ProviderModal';
+import Source from 'Sources/Source';
+import { PATH } from 'Sources/useSources';
+import translate from 'Utilities/String/translate';
 import EditSourceModalContent, {
   EditSourceModalContentProps,
 } from './EditSourceModalContent';
@@ -14,6 +14,9 @@ interface EditSourceModalProps extends Omit<
   isOpen: boolean;
 }
 
+const getTypes = (schema: Source[]) =>
+  schema.map((s) => ({ key: s.type, name: s.typeName ?? s.type, hint: s.type }));
+
 /** Edits a source, or without an id, picks a type and then adds a source of that type. */
 function EditSourceModal({
   isOpen,
@@ -21,33 +24,24 @@ function EditSourceModal({
   onModalClose,
   ...otherProps
 }: EditSourceModalProps) {
-  const [type, setType] = useState<string>();
-
-  const handleModalClose = () => {
-    setType(undefined);
-    onModalClose();
-  };
-
   return (
-    <Modal
-      size={id || type ? sizes.LARGE : sizes.MEDIUM}
+    <ProviderModal<Source>
       isOpen={isOpen}
-      onModalClose={handleModalClose}
-    >
-      {id || type ? (
+      id={id}
+      path={PATH}
+      title={translate('AddSource')}
+      errorMessage={translate('AddSourceError')}
+      getTypes={getTypes}
+      renderEdit={(type, onClose) => (
         <EditSourceModalContent
           {...otherProps}
           id={id}
           type={type}
-          onModalClose={handleModalClose}
-        />
-      ) : (
-        <AddSourceModalContent
-          onTypeSelect={setType}
-          onModalClose={handleModalClose}
+          onModalClose={onClose}
         />
       )}
-    </Modal>
+      onModalClose={onModalClose}
+    />
   );
 }
 
