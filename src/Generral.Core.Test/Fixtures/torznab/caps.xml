@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<caps>
+  <server title="Synthetic tracker" />
+  <limits default="50" max="200" />
+  <searching>
+    <search available="yes" supportedParams="q" />
+    <tv-search available="yes" supportedParams="q,season,ep" />
+    <movie-search available="no" supportedParams="q" />
+  </searching>
+  <categories>
+    <category id="2000" name="Movies" />
+    <category id="5000" name="TV">
+      <subcat id="5040" name="TV/HD" />
+      <subcat id="5060" name="TV/Sport" />
+    </category>
+  </categories>
+</caps>

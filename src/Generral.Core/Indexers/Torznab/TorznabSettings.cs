@@ -100,14 +100,14 @@ public sealed partial record TorznabSettings
 
     private static double? Number(JsonObject settings, string name) => settings[name] switch
     {
-        JsonValue v when v.GetValueKind() == JsonValueKind.Number => v.GetValue<double>(),
+        JsonValue v when v.GetValueKind() == JsonValueKind.Number => v.Deserialize<double>(),
         JsonValue v when v.GetValueKind() == JsonValueKind.String && double.TryParse(v.GetValue<string>(), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) => d,
         _ => null,
     };
 
     private static List<int>? Ints(JsonObject settings, string name) => settings[name] switch
     {
-        JsonArray a => a.OfType<JsonValue>().Where(v => v.GetValueKind() == JsonValueKind.Number).Select(v => (int)v.GetValue<double>()).ToList(),
+        JsonArray a => a.OfType<JsonValue>().Where(v => v.GetValueKind() == JsonValueKind.Number).Select(v => (int)v.Deserialize<double>()).ToList(),
         JsonValue v when v.GetValueKind() == JsonValueKind.String => v.GetValue<string>()
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Select(s => int.TryParse(s, CultureInfo.InvariantCulture, out var i) ? (int?)i : null).OfType<int>().ToList(),

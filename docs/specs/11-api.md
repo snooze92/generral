@@ -12,8 +12,8 @@ Three route families, a split also used by Sportarr:
 > using `/api/v1` for the native API doesn't collide with anything a Sonarr client expects.
 
 Auth for all: `X-Api-Key` header or `?apikey=`. Forms-auth cookies are also accepted for the UI.
-Every response carries `X-Application-Version: <generral version>`, and the shim reports a
-Sonarr-compatible version (see below).
+Every response carries `X-Application-Version: <generral version>`, except `/api/v3/*` responses,
+which carry the Sonarr-compatible shim version (see below) because Prowlarr parses that header.
 
 ## Native API (selected resources)
 
@@ -170,9 +170,12 @@ See [06 – Prowlarr integration](06-indexers-and-search.md#prowlarr-integration
 
 | Endpoint | Notes |
 |----------|-------|
-| `GET /api/v3/system/status` | `appName: "Generral"`, `instanceName: "Generral"`, and `version` set to a plain 4-part string that parses as a .NET `System.Version` ≥ 4.0 (e.g. `4.90.0.123`, with major `4` reserved for the shim and the real Generral version in `generralVersion`). Prowlarr only parses `version`. |
+| `GET /api/v3/system/status` | `appName: "Generral"`, `instanceName: "Generral"`, and `version` set to a plain 4-part string that parses as a .NET `System.Version` ≥ 4.0: `4.<major>.<minor>.<patch>` of Generral (0.1.0 → `4.0.1.0`), with the real Generral version in `generralVersion`. Prowlarr only parses `version`. |
 | `GET /api/v3/indexer/schema` | Torznab + Newznab schemas. |
-| `GET/POST /api/v3/indexer`, `GET/PUT/DELETE /api/v3/indexer/{id}`, `POST /api/v3/indexer/test` | `forceSave` query support. |
+| `GET/POST /api/v3/indexer`, `GET/PUT/DELETE /api/v3/indexer/{id}`, `POST /api/v3/indexer/test` | `forceSave` query support. Same handlers as `/api/v1/indexer`. |
+| `GET/POST /api/v3/tag`, `GET/PUT/DELETE /api/v3/tag/{id}` | Not called by Prowlarr today; cheap, kept for Sonarr clients. |
+
+The shim accepts the API key only (no UI cookie).
 
 The `appName` question is settled in favour of **`Generral`**: Prowlarr doesn't check it, and
 reporting `Sonarr` would mislead dashboards and support requests.
