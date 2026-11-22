@@ -35,14 +35,18 @@ function SourceEventsModalContent({
       <ModalHeader subtitle={source.name}>{translate('Events')}</ModalHeader>
 
       <ModalBody>
-        <label className={styles.toggle}>
+        <div className={styles.toggle}>
           <CheckInput
+            id="includeGone"
+            containerClassName={styles.checkContainer}
             name="includeGone"
             value={includeGone}
             onChange={({ value }) => setIncludeGone(value)}
           />
-          {translate('ShowGoneEvents')}
-        </label>
+          <label htmlFor="includeGone" className={styles.toggleLabel}>
+            {translate('ShowGoneEvents')}
+          </label>
+        </div>
 
         {isLoading ? <LoadingIndicator /> : null}
 
