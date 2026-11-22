@@ -353,6 +353,57 @@ describe('Series details', () => {
     );
   });
 
+  it('searches the series, a season and an episode, and shows queued episodes', async () => {
+    const fetchMock = renderAt('/series/formula-1', {
+      'GET /api/v1/queue': {
+        page: 1,
+        pageSize: 1000,
+        totalRecords: 1,
+        records: [
+          {
+            id: 7,
+            seriesId: 1,
+            episodeIds: [12],
+            size: 100,
+            sizeleft: 50,
+            title: 'Formula1.2026.Round02',
+            status: 'downloading',
+            trackedDownloadStatus: 'ok',
+            trackedDownloadState: 'downloading',
+            statusMessages: [],
+          },
+        ],
+      },
+      'POST /api/v1/command': ({ body }: MockRequest) => ({
+        id: 1,
+        ...(body as object),
+        status: 'completed',
+      }),
+    });
+
+    await screen.findByText('Grand Prix 2');
+    expect(
+      await within(row('Grand Prix 2')).findByTitle('Downloading (50.0%)')
+    ).toBeTruthy();
+    expect(within(row('Grand Prix 1')).queryByTitle(/Downloading/)).toBeNull();
+
+    fireEvent.click(screen.getByText('Search Monitored'));
+    fireEvent.click(
+      screen.getAllByLabelText(
+        'Search for monitored episodes in this season'
+      )[0]
+    );
+    fireEvent.click(within(row('Grand Prix 1')).getByLabelText('Automatic Search'));
+
+    await waitFor(() =>
+      expect(requests(fetchMock, 'POST', '/api/v1/command')).toEqual([
+        { name: 'SeriesSearch', seriesId: 1 },
+        { name: 'SeasonSearch', seriesId: 1, seasonNumber: 2026 },
+        { name: 'EpisodeSearch', episodeIds: [11] },
+      ])
+    );
+  });
+
   it('deletes the series after confirmation and goes back to the index', async () => {
     const fetchMock = renderAt('/series/formula-1', {
       'DELETE /api/v1/series/1': new Response(null, { status: 204 }),

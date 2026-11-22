@@ -1,9 +1,12 @@
 // Adapted from Sonarr (GPL-3.0-or-later): frontend/src/Series/Details/SeriesDetailsSeason.tsx
 import React, { useCallback, useMemo, useRef } from 'react';
+import { useQueueDetails } from 'Activity/Queue/useQueue';
+import useSearchCommand from 'Commands/useSearchCommand';
 import Icon from 'Components/Icon';
 import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
 import Link from 'Components/Link/Link';
+import SpinnerIconButton from 'Components/Link/SpinnerIconButton';
 import Menu from 'Components/Menu/Menu';
 import MenuButton from 'Components/Menu/MenuButton';
 import MenuContent from 'Components/Menu/MenuContent';
@@ -32,6 +35,7 @@ const columns: Column[] = [
   { name: 'title', label: () => translate('Title'), isVisible: true },
   { name: 'airDateUtc', label: () => translate('AirDate'), isVisible: true },
   { name: 'status', label: () => translate('Status'), isVisible: true },
+  { name: 'actions', label: '', isVisible: true },
 ];
 
 export function getSeasonTitle(seasonNumber: number) {
@@ -83,6 +87,17 @@ function SeriesDetailsSeason({
   const { toggleEpisodesMonitored, togglingEpisodeIds } =
     useToggleEpisodesMonitored();
   const lastToggledEpisode = useRef<number | null>(null);
+  const { search, isSearching } = useSearchCommand();
+  const queue = useQueueDetails();
+  const queueByEpisode = useMemo(
+    () =>
+      new Map(
+        queue.flatMap((item) =>
+          item.episodeIds.map((episodeId) => [episodeId, item] as const)
+        )
+      ),
+    [queue]
+  );
 
   const {
     episodeCount = 0,
@@ -217,6 +232,19 @@ function SeriesDetailsSeason({
         </Link>
 
         <div className={styles.actions}>
+          <SpinnerIconButton
+            className={styles.actionButton}
+            name={icons.SEARCH}
+            title={translate('SearchForMonitoredEpisodesSeason')}
+            aria-label={translate('SearchForMonitoredEpisodesSeason')}
+            size={20}
+            isSpinning={isSearching}
+            isDisabled={!seriesMonitored || !monitored}
+            onPress={() =>
+              search({ name: 'SeasonSearch', seriesId, seasonNumber })
+            }
+          />
+
           <Menu className={styles.actionsMenu} alignMenu="right">
             <MenuButton
               className={styles.actionsMenuButton}
@@ -258,6 +286,7 @@ function SeriesDetailsSeason({
                   <EpisodeRow
                     key={episode.id}
                     episode={episode}
+                    queueItem={queueByEpisode.get(episode.id)}
                     seriesMonitored={seriesMonitored}
                     isSaving={togglingEpisodeIds.includes(episode.id)}
                     onMonitorEpisodePress={handleMonitorEpisodePress}

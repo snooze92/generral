@@ -1,5 +1,9 @@
 # Sonarr frontend files vendored verbatim (plus the transforms in vendor-sonarr.mjs).
 # Paths are relative to frontend/src, at the revision pinned in vendor-sonarr.mjs.
+Activity/Queue/ProtocolLabel.module.css
+Activity/Queue/ProtocolLabel.tsx
+Activity/Queue/TimeLeftCell.module.css
+Activity/Queue/TimeLeftCell.tsx
 App/ApplyTheme.tsx
 App/ModelBase.ts
 App/State/AppSectionState.ts
@@ -286,6 +290,9 @@ Components/Tooltip/Popover.tsx
 Components/Tooltip/Tooltip.module.css
 Components/Tooltip/Tooltip.tsx
 Components/keyboardShortcuts.tsx
+DownloadClient/DownloadProtocol.ts
+Episode/EpisodeQuality.module.css
+Episode/EpisodeQuality.tsx
 Filters/Filter.ts
 Helpers/Hooks/useApiMutation.ts
 Helpers/Hooks/useApiQuery.ts
@@ -299,6 +306,7 @@ Helpers/Hooks/useModalCloseGuard.ts
 Helpers/Hooks/useModalOpenState.ts
 Helpers/Hooks/useOptionsStore.ts
 Helpers/Hooks/usePage.ts
+Helpers/Hooks/usePagedApiQuery.ts
 Helpers/Hooks/usePendingChangesStore.ts
 Helpers/Hooks/usePendingFieldsStore.ts
 Helpers/Hooks/usePendingItemsStore.ts
@@ -328,6 +336,8 @@ Helpers/Props/sortDirections.ts
 Helpers/Props/tooltipPositions.ts
 Helpers/createPersist.ts
 Helpers/scrollPositions.ts
+InteractiveSearch/Peers.tsx
+Quality/Quality.ts
 Series/Details/SeasonInfo.module.css
 Series/Details/SeasonInfo.tsx
 Series/Details/SeriesDetails.module.css

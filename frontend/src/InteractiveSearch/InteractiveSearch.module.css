@@ -1,0 +1,45 @@
+.protocol {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 80px;
+}
+
+.age,
+.size {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 90px;
+  white-space: nowrap;
+}
+
+.title {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  overflow-wrap: anywhere;
+}
+
+.indexer {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 110px;
+}
+
+.peers {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 80px;
+}
+
+.quality {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 130px;
+}
+
+.rejected,
+.download {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 40px;
+  text-align: center;
+}
