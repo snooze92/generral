@@ -30,6 +30,12 @@
   width: 80px;
 }
 
+.languages {
+  composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
+
+  width: 150px;
+}
+
 .quality {
   composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
 

@@ -30,6 +30,7 @@ function release(guid: string, changes = {}) {
     seeders: 60,
     leechers: 4,
     protocol: 'torrent',
+    languages: [{ id: 1, name: 'English' }],
     ...changes,
   };
 }
@@ -68,6 +69,7 @@ describe('Interactive search', () => {
     expect(approvedRow.getByText('4 GiB')).toBeTruthy();
     expect(approvedRow.getByText('60 / 4')).toBeTruthy();
     expect(approvedRow.getByText('2 days')).toBeTruthy();
+    expect(approvedRow.getByText('English')).toBeTruthy();
     expect(approvedRow.queryByLabelText('Release Rejected')).toBeNull();
 
     const rejectedRow = within(

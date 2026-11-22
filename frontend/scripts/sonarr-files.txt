@@ -291,6 +291,7 @@ Components/Tooltip/Tooltip.module.css
 Components/Tooltip/Tooltip.tsx
 Components/keyboardShortcuts.tsx
 DownloadClient/DownloadProtocol.ts
+Episode/EpisodeLanguages.tsx
 Episode/EpisodeQuality.module.css
 Episode/EpisodeQuality.tsx
 Filters/Filter.ts
@@ -337,6 +338,7 @@ Helpers/Props/tooltipPositions.ts
 Helpers/createPersist.ts
 Helpers/scrollPositions.ts
 InteractiveSearch/Peers.tsx
+Language/Language.ts
 Quality/Quality.ts
 Series/Details/SeasonInfo.module.css
 Series/Details/SeasonInfo.tsx

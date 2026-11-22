@@ -23,6 +23,7 @@ const columns: Column[] = [
   { name: 'indexer', label: () => translate('Indexer'), isVisible: true },
   { name: 'size', label: () => translate('Size'), isVisible: true },
   { name: 'peers', label: () => translate('Peers'), isVisible: true },
+  { name: 'languages', label: () => translate('Languages'), isVisible: true },
   { name: 'quality', label: () => translate('Quality'), isVisible: true },
   { name: 'rejections', label: '', isVisible: true },
   { name: 'download', label: '', isVisible: true },

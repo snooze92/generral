@@ -21,6 +21,7 @@ import UISettings from 'Settings/UI/UISettings';
 import Sources from 'Sources/Index/Sources';
 import Status from 'System/Status/Status';
 import translate from 'Utilities/String/translate';
+import WantedPage from 'Wanted/WantedPage';
 
 interface PlaceholderRoute {
   path: string;
@@ -31,18 +32,6 @@ interface PlaceholderRoute {
 
 // Pages that later milestones will build (docs/specs/13-roadmap.md).
 const PLACEHOLDERS: PlaceholderRoute[] = [
-  {
-    path: '/wanted/missing',
-    scope: () => translate('Wanted'),
-    title: () => translate('Missing'),
-    milestone: 'M2',
-  },
-  {
-    path: '/wanted/cutoffunmet',
-    scope: () => translate('Wanted'),
-    title: () => translate('CutoffUnmet'),
-    milestone: 'M2',
-  },
   {
     path: '/settings/mediamanagement',
     scope: () => translate('Settings'),
@@ -111,6 +100,13 @@ export function appRouteElements() {
       <Route path="/sources" element={<Sources />} />
 
       <Route path="/calendar" element={<CalendarPage />} />
+
+      <Route path="/wanted/missing" element={<WantedPage kind="missing" />} />
+
+      <Route
+        path="/wanted/cutoffunmet"
+        element={<WantedPage kind="cutoffUnmet" />}
+      />
 
       <Route path="/activity/queue" element={<Queue />} />
 

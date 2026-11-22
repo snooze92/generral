@@ -1,5 +1,6 @@
 import ModelBase from 'App/ModelBase';
 import useApiQuery from 'Helpers/Hooks/useApiQuery';
+import Language from 'Language/Language';
 
 export interface Quality {
   id: number;
@@ -19,6 +20,7 @@ export interface QualityProfile extends ModelBase {
   name: string;
   upgradeAllowed: boolean;
   cutoff: number;
+  language: Language;
   /** Lowest to highest preference. */
   items: QualityProfileItem[];
 }

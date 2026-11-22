@@ -3,13 +3,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PATH as QUEUE_PATH } from 'Activity/Queue/useQueue';
 import DownloadProtocol from 'DownloadClient/DownloadProtocol';
 import useApiQuery from 'Helpers/Hooks/useApiQuery';
+import Language from 'Language/Language';
 import { QualityModel } from 'Quality/Quality';
 import fetchJson, { ApiError } from 'Utilities/Fetch/fetchJson';
 import getQueryPath from 'Utilities/Fetch/getQueryPath';
 
 const PATH = '/release';
 
-/** The `/release` resource (Sonarr's `ReleaseResource` without scene/language/custom-format fields). */
+/** The `/release` resource (Sonarr's `ReleaseResource` without scene/custom-format fields). */
 export interface Release {
   guid: string;
   quality: QualityModel;
@@ -31,6 +32,7 @@ export interface Release {
   seeders?: number;
   leechers?: number;
   protocol: DownloadProtocol;
+  languages: Language[];
 }
 
 const NO_RELEASES: Release[] = [];

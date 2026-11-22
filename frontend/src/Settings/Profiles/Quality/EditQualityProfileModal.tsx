@@ -15,6 +15,7 @@ import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import { inputTypes, kinds, sizes } from 'Helpers/Props';
+import useLanguages from 'Language/useLanguages';
 import useManageItem from 'Settings/Profiles/useManageItem';
 import editProviderStyles from 'Settings/Provider/EditProviderModalContent.module.css';
 import { InputChanged } from 'typings/inputs';
@@ -80,7 +81,25 @@ function EditQualityProfileModalContent({
     [current?.cutoff, updateValue]
   );
 
-  const { name, upgradeAllowed, cutoff } = settings;
+  const { data: languages } = useLanguages();
+
+  const languageValues = useMemo(
+    () => languages.map(({ id, name }) => ({ key: id, value: name })),
+    [languages]
+  );
+
+  const handleLanguageChange = useCallback(
+    ({ value }: InputChanged<number>) => {
+      const language = languages.find((l) => l.id === value);
+
+      if (language) {
+        updateValue('language', language);
+      }
+    },
+    [languages, updateValue]
+  );
+
+  const { name, upgradeAllowed, cutoff, language } = settings;
 
   return (
     <ModalContent onModalClose={onModalClose}>
@@ -135,6 +154,21 @@ function EditQualityProfileModalContent({
               />
             </FormRow>
           ) : null}
+
+          <FormRow>
+            <FormLabel>{translate('Language')}</FormLabel>
+            <FormInputHelpText
+              text={translate('QualityProfileLanguageHelpText')}
+            />
+            <FormInput
+              type={inputTypes.SELECT}
+              name="language"
+              values={languageValues}
+              {...language}
+              value={language?.value?.id}
+              onChange={handleLanguageChange}
+            />
+          </FormRow>
 
           <FormRow>
             <FormLabel>{translate('Qualities')}</FormLabel>
