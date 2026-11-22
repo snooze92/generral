@@ -161,6 +161,16 @@ Per-episode `<file base name>.nfo`:
 - NFO is rewritten when episode metadata changes (title update at the source). Then a Plex
   partial refresh of that path is triggered.
 - `season.nfo` is not written (Plex ignores it).
+- Implementation (M3b): the *Plex NFO* consumer (`/api/v1/metadata`) has Sonarr-style checkboxes
+  (series metadata, episode metadata, series/season/episode images). Turning both metadata options
+  off gives approach B (artwork only). Written files are tracked in `MetadataFiles` with a content
+  hash (or the image URL). A series is re-synced after each import or file deletion, after each
+  mapping apply or renumber, and when the series or metadata settings change. Only changed files
+  are rewritten, and a Plex partial refresh follows when something changed. The settings are global
+  (not per root folder or series) for now.
+- **Spoiler-free mode** (UI setting, on by default): once an episode's air time has passed, the
+  episode NFO leaves out `<plot>` and no episode thumbnail is written. The same rule applies to
+  notifications. Titles are always kept (mapping templates keep them spoiler-free).
 
 ### Artwork
 
@@ -176,7 +186,9 @@ Plex local-asset file names:
 | Episode thumb | `<episode base name>.jpg` | Mapping `images.thumb` |
 
 Images are cached in `/config/MediaCover/<seriesId>/` (Sonarr parity, served to the UI at
-`/MediaCover/...`) and copied to the library on import and when they change.
+`/MediaCover/...`) and copied to the library on import and when they change. *M3b: no cache yet.
+Images are downloaded straight into the library when their URL changes, and season posters are
+named `SeasonNN.jpg` (`Season2025.jpg`).*
 
 ## Rename & organise existing files
 

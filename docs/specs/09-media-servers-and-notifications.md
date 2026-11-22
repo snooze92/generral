@@ -25,6 +25,15 @@ announced"), `On Source Failure`.
 | Kodi | Later | |
 | Custom script | Later | Environment variables `generral_*`, mirroring Sonarr's `sonarr_*`. |
 
+**M3b implementation notes.** Triggers raised: grab, import (download), upgrade, series add and
+delete, episode file delete (and delete for upgrade). Rename, health and the Generral additions come
+with those features. Plex takes a pasted `X-Plex-Token`, sent as a header. The plex.tv sign-in is
+not built yet. Plex is also refreshed when only NFO files changed (a source title update). Webhook
+payloads use Sonarr's shape with `tvdbId`/`tmdbId`/`tvMazeId` = 0. Discord sends Sonarr's embed
+with a fixed field set (no per-field selection yet). Both send episode overviews only when
+spoiler-free mode allows ([08](08-import-and-organisation.md#a-nfo-files-kodi-format-plex-nfo-agent-subset)),
+and never episode thumbnails.
+
 ## Plex specifics
 
 - **Health check:** for each series root folder, check that a Plex TV library section contains it.
