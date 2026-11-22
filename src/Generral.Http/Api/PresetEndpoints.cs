@@ -4,6 +4,7 @@ using Generral.Core.Datastore;
 using Generral.Core.Extensions;
 using Generral.Core.Mappings;
 using Generral.Core.Messaging;
+using Generral.Core.Notifications;
 using Generral.Core.Presets;
 using Generral.Core.Sources;
 using Generral.Core.Sources.Http;
@@ -132,6 +133,7 @@ public static class PresetEndpoints
         MappingEngine engine,
         TagService tags,
         CommandQueue queue,
+        NotificationService notifications,
         TimeProvider time)
     {
         if (store.Find(id) is not { } stored)
@@ -207,6 +209,8 @@ public static class PresetEndpoints
         {
             queue.Enqueue(RefreshSourceHandler.CommandName, new JsonObject { ["sourceId"] = source.Id });
         }
+
+        await notifications.NotifyAsync(NotificationTrigger.SeriesAdd, new SeriesAddMessage { Series = created });
 
         return Results.Created($"series/{created.Id}", await SeriesEndpoints.ToResourceAsync(db, created, time));
     }

@@ -10,6 +10,7 @@ using Generral.Core.Download.TrackedDownloads;
 using Generral.Core.History;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
+using Generral.Core.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -60,6 +61,19 @@ public sealed class DownloadService(
         var downloadId = await implementation.AddTorrentAsync(client, torrent, remoteEpisode, indexer, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<HistoryService>().RecordGrabbedAsync(remoteEpisode, client, downloadId, cancellationToken);
         tracked.TrackGrab(client, downloadId, remoteEpisode);
+        if ((remoteEpisode.Series ?? await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seriesId, cancellationToken)) is { } series)
+        {
+            await scope.ServiceProvider.GetRequiredService<NotificationService>().NotifyAsync(NotificationTrigger.Grab, new GrabMessage
+            {
+                Series = series,
+                Episodes = remoteEpisode.Episodes,
+                Remote = remoteEpisode,
+                DownloadClientName = client.Name,
+                DownloadClientType = client.Implementation,
+                DownloadId = downloadId,
+            }, cancellationToken);
+        }
+
         logger.LogInformation("Report sent to {Client} from indexer {Indexer}. {Title}", client.Name, release.Indexer, release.Title);
         return downloadId;
     }

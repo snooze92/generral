@@ -9,6 +9,7 @@ using Generral.Core.Download.TrackedDownloads;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
 using Generral.Core.Messaging;
+using Generral.Core.Notifications;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,17 +24,19 @@ public class DownloadApiTests
 
     private FakeQBittorrent _qbit = null!;
     private FakeTracker _tracker = null!;
+    private FakeWebhook _webhook = null!;
     private GenerralTestHost _host = null!;
     private HttpClient _client = null!;
 
     [SetUp]
     public async Task SetUp()
     {
-        (_qbit, _tracker) = (new FakeQBittorrent(), new FakeTracker());
+        (_qbit, _tracker, _webhook) = (new FakeQBittorrent(), new FakeTracker(), new FakeWebhook());
         _host = await GenerralTestHost.StartAsync(services: services =>
         {
             services.PostConfigure<HttpClientFactoryOptions>(QBittorrentClient.ClientName, o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _qbit));
             services.PostConfigure<HttpClientFactoryOptions>(TorznabClient.ClientName, o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _tracker));
+            services.PostConfigure<HttpClientFactoryOptions>(NotificationService.ClientName, o => o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = _webhook));
         });
         _client = _host.CreateClient();
         _client.DefaultRequestHeaders.Add("X-Api-Key", _host.ApiKey);
@@ -46,6 +49,7 @@ public class DownloadApiTests
         await _host.DisposeAsync();
         _qbit.Dispose();
         _tracker.Dispose();
+        _webhook.Dispose();
     }
 
     [Test]
@@ -170,6 +174,7 @@ public class DownloadApiTests
             var media = (await _client.GetFromJsonAsync<JsonObject>("/api/v1/config/mediamanagement"))!;
             media["recycleBin"] = bin;
             Assert.That((await _client.PutAsJsonAsync("/api/v1/config/mediamanagement", media)).StatusCode, Is.EqualTo(HttpStatusCode.Accepted));
+            await AddConnectionsAsync();
 
             await RunAsync("EpisodeSearch", new JsonObject { ["episodeIds"] = new JsonArray(episodeId) });
             _qbit.State = "stoppedUP";
@@ -204,6 +209,9 @@ public class DownloadApiTests
                 Assert.That((int)series["statistics"]!["episodeFileCount"]!, Is.EqualTo(1));
                 Assert.That((bool)roots.Single()!["accessible"]!, Is.True);
                 Assert.That(roots[0]!["unmappedFolders"]!.AsArray(), Is.Empty, "the series folder is mapped");
+                Assert.That(File.ReadAllText(Path.ChangeExtension(expected, ".nfo")), Does.Contain("<title>UFC 314 - Main Card</title>").And.Contain($"<uniqueid type=\"generral\" default=\"true\">ep-{episodeId}</uniqueid>"));
+                Assert.That(File.ReadAllText(Path.Combine(library, "UFC", "tvshow.nfo")), Does.Contain("<title>UFC</title>"));
+                Assert.That(_webhook.EventTypes, Is.EqualTo(new[] { "Test", "Grab", "Download" }));
             });
 
             // The HD-1080p profile's cutoff is HDTV-1080p and WEBDL-1080p is above it, so search rejects; a manual Bluray import upgrades.
@@ -234,6 +242,9 @@ public class DownloadApiTests
                 Assert.That(File.Exists(Path.Combine(bin, "UFC", "Season 2026", Path.GetFileName(expected))), "old file recycled");
                 Assert.That((string)worse["status"]!, Is.EqualTo("failed"));
                 Assert.That((string)worse["message"]!, Does.Contain("Not an upgrade for existing episode file(s)"));
+                Assert.That(_webhook.EventTypes.Skip(3), Is.EqualTo(new[] { "EpisodeFileDelete", "Download" }), "upgrade: old file deleted, then imported");
+                Assert.That(File.Exists(Path.ChangeExtension(expected, ".nfo")), Is.False, "the old file's NFO is removed with it");
+                Assert.That(Directory.GetFiles(Path.Combine(library, "UFC", "Season 2026"), "*.nfo").Single(), Does.Contain("Bluray-1080p"));
             });
         }
         finally
@@ -280,6 +291,35 @@ public class DownloadApiTests
         }
 
         return File.ReadAllBytes(b)[0] == 42;
+    }
+
+    /// <summary>Plex NFO metadata and a webhook for every trigger, through the API.</summary>
+    private async Task AddConnectionsAsync()
+    {
+        var metadataSchema = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/metadata/schema"))!.Single()!.AsObject();
+        metadataSchema["name"] = "Plex NFO";
+        metadataSchema["enable"] = true;
+        var metadata = await _client.PostAsJsonAsync("/api/v1/metadata", metadataSchema);
+        var schema = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/notification/schema"))!;
+        var webhook = schema.Single(s => (string)s!["implementation"]! == "Webhook")!.AsObject();
+        webhook["name"] = "Hook";
+        webhook["fields"]!.AsArray().Single(f => (string)f!["name"]! == "url")!["value"] = "https://hook.example/generral";
+        foreach (var trigger in new[] { "onGrab", "onDownload", "onUpgrade", "onEpisodeFileDelete", "onEpisodeFileDeleteForUpgrade" })
+        {
+            webhook[trigger] = true;
+        }
+
+        var created = await _client.PostAsJsonAsync("/api/v1/notification", webhook);
+        var plex = schema.Single(s => (string)s!["implementation"]! == "PlexServer")!;
+        var (metadataBody, createdBody) = (await metadata.Content.ReadAsStringAsync(), await created.Content.ReadAsStringAsync());
+        Assert.Multiple(() =>
+        {
+            Assert.That(metadata.StatusCode, Is.EqualTo(HttpStatusCode.Created), metadataBody);
+            Assert.That(created.StatusCode, Is.EqualTo(HttpStatusCode.Created), createdBody);
+            Assert.That((bool)plex["supportsOnGrab"]!, Is.False);
+            Assert.That((bool)plex["supportsOnDownload"]!, Is.True);
+            Assert.That(schema.Select(s => (string)s!["implementation"]!), Is.EquivalentTo(new[] { "Discord", "PlexServer", "Webhook" }));
+        });
     }
 
     private async Task<JsonObject> CreateClientAsync()
@@ -349,6 +389,22 @@ public class DownloadApiTests
     }
 
     private sealed record Request(string Path, string Body);
+
+    private sealed class FakeWebhook : HttpMessageHandler
+    {
+        public List<string> EventTypes { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var body = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!;
+            lock (EventTypes)
+            {
+                EventTypes.Add((string)body["eventType"]!);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
 
     private sealed class FakeTracker : HttpMessageHandler
     {

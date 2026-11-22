@@ -176,6 +176,79 @@ namespace Generral.Core.Datastore.Migrations
                     b.ToTable("DownloadClients");
                 });
 
+            modelBuilder.Entity("Generral.Core.Extras.Metadata.MetadataDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enable")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Implementation")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<string>("Settings")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Metadata", (string)null);
+                });
+
+            modelBuilder.Entity("Generral.Core.Extras.Metadata.MetadataFile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Added")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Consumer")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("EpisodeFileId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Hash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("SeasonNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SeriesId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeriesId");
+
+                    b.ToTable("MetadataFiles");
+                });
+
             modelBuilder.Entity("Generral.Core.History.EpisodeHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -417,6 +490,58 @@ namespace Generral.Core.Datastore.Migrations
                     b.HasIndex("SeriesId");
 
                     b.ToTable("EpisodeFiles");
+                });
+
+            modelBuilder.Entity("Generral.Core.Notifications.NotificationDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Implementation")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<bool>("OnDownload")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnEpisodeFileDelete")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnEpisodeFileDeleteForUpgrade")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnGrab")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnSeriesAdd")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnSeriesDelete")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("OnUpgrade")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Settings")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("Generral.Core.Profiles.QualityProfile", b =>
@@ -934,6 +1059,15 @@ namespace Generral.Core.Datastore.Migrations
                 });
 
             modelBuilder.Entity("Generral.Core.Blocklisting.Blocklist", b =>
+                {
+                    b.HasOne("Generral.Core.Tv.Series", null)
+                        .WithMany()
+                        .HasForeignKey("SeriesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Generral.Core.Extras.Metadata.MetadataFile", b =>
                 {
                     b.HasOne("Generral.Core.Tv.Series", null)
                         .WithMany()

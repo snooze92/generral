@@ -9,8 +9,10 @@ using System.Text.RegularExpressions;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.DecisionEngine;
+using Generral.Core.Extras.Metadata;
 using Generral.Core.History;
 using Generral.Core.Mappings;
+using Generral.Core.Notifications;
 using Generral.Core.Organizer;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
@@ -62,6 +64,8 @@ public sealed partial class EpisodeImportService(
     QualityDefinitionService qualityDefinitions,
     DiskTransferService transfer,
     RecycleBinProvider recycleBin,
+    MetadataService metadata,
+    NotificationService notifications,
     TimeProvider time,
     ILogger<EpisodeImportService> logger)
 {
@@ -179,7 +183,7 @@ public sealed partial class EpisodeImportService(
         {
             foreach (var old in existing)
             {
-                await DeleteAsync(old, series, config, "Upgrade", cancellationToken);
+                await DeleteAsync(old, series, config, UpgradeReason, cancellationToken);
             }
 
             var parent = System.IO.Path.GetDirectoryName(destination)!;
@@ -210,8 +214,24 @@ public sealed partial class EpisodeImportService(
 
         RecordImported(item, series, episodes, file);
         await db.SaveChangesAsync(cancellationToken);
+        await metadata.SyncSeriesAsync(series.Id, cancellationToken);
+        await notifications.NotifyAsync(existing.Count > 0 ? NotificationTrigger.Upgrade : NotificationTrigger.Download, new DownloadMessage
+        {
+            Series = series,
+            Episodes = episodes,
+            File = file,
+            OldFiles = existing,
+            SourcePath = item.Path,
+            DownloadClientName = item.DownloadClientName,
+            DownloadClientType = item.DownloadClient,
+            DownloadId = item.DownloadId,
+            Release = await GrabbedReleaseAsync(item.DownloadId, cancellationToken),
+        }, cancellationToken);
         return new ImportResult(item.Path, item.EpisodeIds, file, []);
     }
+
+    /// <summary>The <see cref="DeleteAsync"/> reason when a better file replaces this one.</summary>
+    public const string UpgradeReason = "Upgrade";
 
     /// <summary>Deletes (or recycles) the file on disk and its record; the episodes lose their file.</summary>
     /// <exception cref="IOException">The file couldn't be recycled.</exception>
@@ -241,6 +261,33 @@ public sealed partial class EpisodeImportService(
 
         db.EpisodeFiles.Remove(file);
         await db.SaveChangesAsync(cancellationToken);
+        var upgrade = reason == UpgradeReason;
+        if (!upgrade)
+        {
+            await metadata.SyncSeriesAsync(series.Id, cancellationToken);
+        }
+
+        await notifications.NotifyAsync(
+            upgrade ? NotificationTrigger.EpisodeFileDeleteForUpgrade : NotificationTrigger.EpisodeFileDelete,
+            new EpisodeFileDeleteMessage { Series = series, Episodes = episodes, File = file, Reason = reason },
+            cancellationToken);
+    }
+
+    private async Task<GrabbedRelease?> GrabbedReleaseAsync(string? downloadId, CancellationToken cancellationToken)
+    {
+        if (downloadId is null)
+        {
+            return null;
+        }
+
+        var grab = await db.History.AsNoTracking().Where(h => h.DownloadId == downloadId && h.EventType == EpisodeHistoryEventType.Grabbed)
+            .OrderByDescending(h => h.Id).FirstOrDefaultAsync(cancellationToken);
+        return grab is null
+            ? null
+            : new GrabbedRelease(
+                grab.SourceTitle,
+                grab.Data.GetValueOrDefault(EpisodeHistory.Indexer),
+                long.TryParse(grab.Data.GetValueOrDefault(EpisodeHistory.Size), System.Globalization.CultureInfo.InvariantCulture, out var size) ? size : null);
     }
 
     public async Task<NamingInput> NamingInputAsync(Series series, IReadOnlyList<Episode> episodes, EpisodeFile file, CancellationToken cancellationToken = default)

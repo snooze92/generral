@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using Generral.Core.Datastore;
+using Generral.Core.Extras.Metadata;
+using Generral.Core.Notifications;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,7 +49,9 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
             var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
             var mapping = await db.Mappings.Include(m => m.Series).Include(m => m.Source).SingleOrDefaultAsync(m => m.Id == mappingId, cancellationToken)
                           ?? throw new KeyNotFoundException($"Mapping {mappingId} not found");
-            return (await ApplyLockedAsync(db, mapping, false, cancellationToken)).Result;
+            var result = (await ApplyLockedAsync(db, mapping, false, cancellationToken)).Result;
+            await SyncMetadataAsync(scope.ServiceProvider, seriesId, cancellationToken);
+            return result;
         });
     }
 
@@ -94,10 +98,21 @@ public sealed class ApplyMappingsService(IServiceScopeFactory scopes, MappingEng
             else
             {
                 await transaction.CommitAsync(cancellationToken);
+                await SyncMetadataAsync(scope.ServiceProvider, seriesId, cancellationToken);
             }
 
             return new RenumberResult(moves.OrderBy(m => m.NewSeasonNumber).ThenBy(m => m.NewEpisodeNumber).ToList(), results);
         });
+
+    /// <summary>Rewrites the NFO files whose episodes changed (spec 08 § NFO files) and has media servers rescan the series.</summary>
+    private static async Task SyncMetadataAsync(IServiceProvider services, int seriesId, CancellationToken cancellationToken)
+    {
+        if (await services.GetRequiredService<MetadataService>().SyncSeriesAsync(seriesId, cancellationToken) > 0 &&
+            await services.GetRequiredService<GenerralDbContext>().Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seriesId, cancellationToken) is { } series)
+        {
+            await services.GetRequiredService<NotificationService>().UpdateMediaServersAsync(series, cancellationToken);
+        }
+    }
 
     private async Task<T> WithSeriesLockAsync<T>(int seriesId, Func<Task<T>> action)
     {
