@@ -4,6 +4,8 @@ using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Instrumentation;
 using Generral.Core.Lifecycle;
+using Generral.Core.Profiles;
+using Generral.Core.Qualities;
 using Generral.Http;
 using Serilog;
 
@@ -88,6 +90,8 @@ public static class Program
         using (var scope = app.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<InitialUserService>().EnsureInitialUser();
+            scope.ServiceProvider.GetRequiredService<QualityDefinitionService>().EnsureDefaultsAsync().GetAwaiter().GetResult();
+            scope.ServiceProvider.GetRequiredService<QualityProfileService>().EnsureDefaultsAsync().GetAwaiter().GetResult();
         }
 
         app.UseGenerralHttp();

@@ -180,6 +180,7 @@ public static partial class SeriesEndpoints
 
     private static async Task<IResult> Create(SeriesResource resource, GenerralDbContext db, TagService tags, TimeProvider time)
     {
+        resource = await WithDefaultQualityProfileAsync(resource, db);
         var failures = await ValidateAsync(resource, null, db, tags);
         if (failures.Count > 0)
         {
@@ -352,8 +353,20 @@ public static partial class SeriesEndpoints
             failures.Add(tagFailure);
         }
 
+        if ((id is null || resource.QualityProfileId != 0) && !await db.QualityProfiles.AnyAsync(p => p.Id == resource.QualityProfileId))
+        {
+            failures.Add(new ValidationFailure("qualityProfileId", "Quality Profile does not exist"));
+        }
+
         return failures;
     }
+
+    /// <summary>A new series without <c>qualityProfileId</c> (0) gets the profile with the lowest id.</summary>
+    internal static async Task<SeriesResource> WithDefaultQualityProfileAsync(SeriesResource resource, GenerralDbContext db) =>
+        resource.QualityProfileId != 0 ? resource : resource with
+        {
+            QualityProfileId = await db.QualityProfiles.OrderBy(p => p.Id).Select(p => p.Id).FirstOrDefaultAsync(),
+        };
 
     private static void Apply(Series series, SeriesResource resource)
     {
@@ -363,7 +376,11 @@ public static partial class SeriesEndpoints
         series.Genres = (resource.Genres ?? []).Where(g => !Blank(g)).Select(g => g.Trim()).Distinct().ToList();
         series.Status = resource.Status;
         series.SeriesType = resource.SeriesType;
-        series.QualityProfileId = resource.QualityProfileId;
+        if (resource.QualityProfileId != 0)
+        {
+            series.QualityProfileId = resource.QualityProfileId;
+        }
+
         series.Monitored = resource.Monitored;
         series.MonitorNewItems = resource.MonitorNewItems;
         series.SeasonFolder = resource.SeasonFolder;

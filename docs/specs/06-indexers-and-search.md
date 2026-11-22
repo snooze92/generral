@@ -160,9 +160,13 @@ WEBRip-2160p, WEBDL-2160p, Bluray-2160p, Bluray-2160p Remux, Raw-HD`.
 Default quality profiles: *Any*, *SD*, *HD-720p*, *HD-1080p*, *Ultra-HD*, *HD - 720p/1080p* (Sonarr
 defaults). Default quality definitions (size limits) are tuned for sport: an event-length (3–5 h)
 1080p WEB release is commonly 5–12 GB, so the default max for WEBDL-1080p is raised compared to
-Sonarr's TV defaults.
+Sonarr's TV defaults: max MB/min 200 for 720p (HDTV/WEB/Bluray), 250 for HDTV-1080p and WEB 1080p,
+300 for Bluray-1080p (Sonarr: 125–155); everything else keeps Sonarr's values.
 
 Sport release titles often lack a source tag (`UFC 314 1080p h264-GRP`). The parser treats
 `1080p` with no source as `WEBDL-1080p` when the codec is h264/h265/x264/x265 and there is no HDTV
 marker, and as `HDTV-1080p` when it sees a broadcaster/TV marker (`HDTV`, `PDTV`, `DSR`, `SKY`,
-`ESPN+`…).
+`ESPN+`…). Implemented markers: `SKY`, `ESPN`/`ESPN+`, `BT Sport(s)`, `TNT Sports`, `Fox Sports`,
+`Eurosport`, `BBC`, `ITV`, `Canal+`, `beIN` (whole words: `SkyF1` stays WEB). Sonarr's own
+source tags (`HDTV`, `PDTV`, `DSR`, `WEB`…) are handled before the heuristic. `1080p` with neither a
+codec nor a source stays HDTV-1080p (Sonarr).

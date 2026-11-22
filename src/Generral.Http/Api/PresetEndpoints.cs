@@ -45,6 +45,8 @@ public sealed record PresetInstantiateRequest
 
     public bool? SeasonFolder { get; init; }
 
+    public int QualityProfileId { get; init; }
+
     public List<int> Tags { get; init; } = [];
 
     public Dictionary<string, string?> Parameters { get; init; } = [];
@@ -169,7 +171,7 @@ public static class PresetEndpoints
             failures.AddRange(type.Validate(source.Settings).Select(f => new ValidationFailure($"source.settings.{f.PropertyName}", f.ErrorMessage)));
         }
 
-        var series = SeriesResource(preset.Series, request);
+        var series = await SeriesEndpoints.WithDefaultQualityProfileAsync(SeriesResource(preset.Series, request), db);
         failures.AddRange(await SeriesEndpoints.ValidateAsync(series, null, db, tags));
         if (failures.Count > 0)
         {
@@ -298,6 +300,7 @@ public static class PresetEndpoints
         SeasonFolder = request.SeasonFolder ?? preset.SeasonFolder ?? true,
         Monitored = request.Monitored ?? preset.Monitored ?? true,
         MonitorNewItems = request.MonitorNewItems ?? preset.MonitorNewItems ?? NewItemMonitorType.All,
+        QualityProfileId = request.QualityProfileId,
         Tags = request.Tags ?? [],
         SearchSettings = preset.SearchSettings,
     };
