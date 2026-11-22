@@ -14,6 +14,7 @@ function Licence() {
         {' · '}
         <Link to="https://github.com/Sonarr/Sonarr">Sonarr</Link>
       </p>
+      <p>{translate('LegalUseNotice')}</p>
     </FieldSet>
   );
 }

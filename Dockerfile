@@ -29,8 +29,6 @@ COPY src/Generral.Http/Generral.Http.csproj src/Generral.Http/
 COPY src/Generral.Host/Generral.Host.csproj src/Generral.Host/
 RUN dotnet restore src/Generral.Host/Generral.Host.csproj
 COPY src/ src/
-# Shipped presets, published to /app/presets (GENERRAL__PRESETSDIR overrides the folder).
-COPY presets/ presets/
 # Framework-dependent and architecture-neutral (run with `dotnet`), so the same build output
 # works on amd64 and arm64 and on musl, and the SDK stage only runs once per multi-arch build.
 RUN dotnet publish src/Generral.Host/Generral.Host.csproj \

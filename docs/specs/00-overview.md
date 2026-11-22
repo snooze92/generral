@@ -86,13 +86,11 @@ renames, writes Plex metadata, and refreshes Plex.
   (`UFC 314: Volkanovski vs. Lopes`); search query `UFC {{ event.number }}`; release must match
   `\bUFC[ ._-]?{{ number }}\b` and must not match `prelim|fight[ ._-]?night`.
 - Monitoring: *future episodes* only.
-- Example: [`examples/ufc-numbered.yaml`](examples/ufc-numbered.yaml).
 
 ### UC2 – UFC with card parts
 
 Same as UC1, but each event is expanded into 3 episodes (*Early Prelims*, *Prelims*, *Main Card*).
-Each one has its own monitored flag and its own release-matching keywords. (The example file
-implements UC2. Removing its `parts:` block gives UC1.)
+Each one has its own monitored flag and its own release-matching keywords.
 
 ### UC3 – Rugby World Cup
 
@@ -102,7 +100,6 @@ implements UC2. Removing its `parts:` block gives UC1.)
 - Mapping: season = tournament year; episode = match number ordered by kick-off; title =
   `{{ stage }} - {{ home }} vs {{ away }}`; search query
   `Rugby World Cup {{ year }} {{ home }} {{ away }}`.
-- Example: [`examples/rugby-world-cup.yaml`](examples/rugby-world-cup.yaml).
 
 ### UC4 – World Rugby Sevens Series
 
@@ -110,7 +107,6 @@ implements UC2. Removing its `parts:` block gives UC1.)
 
 - Season = series season (`2024-25` mapped to season number `2025`); episode = sequence by date;
   part expansion per stage, with only `Cup Final` and `Cup Semi-Final` monitored by default.
-- Example: [`examples/rugby-sevens.yaml`](examples/rugby-sevens.yaml).
 
 ### UC5 – Non-sport
 

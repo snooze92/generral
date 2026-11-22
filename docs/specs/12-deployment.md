@@ -49,7 +49,7 @@ the UI.
 | `GENERRAL__DB__TYPE` / `__CONNECTIONSTRING` | `database.*` | `sqlite` / `/config/generral.db` |
 | `GENERRAL__ALLOWSCRIPTSOURCES` | `allowScriptSources` | `false` |
 | `GENERRAL__INSTANCENAME` | `instanceName` | `Generral` |
-| `GENERRAL__PRESETSDIR` | – | `<app>/presets` (shipped presets, read-only) |
+| `GENERRAL__PRESETSDIR` | – | `<app>/presets` (optional read-only presets; none ship, the folder may be missing) |
 | `GENERRAL__CONFIGDIR` | n/a | `/config` in Docker, `~/.config/Generral` otherwise |
 | `GENERRAL__UIDIR` | n/a | `<app>/UI` (the built SPA; for development, point it at `frontend/dist`) |
 | `GENERRAL__AUTH__USERNAME` / `__PASSWORD` | n/a (first start only) | `generral` / random, printed once to the log |
@@ -125,18 +125,16 @@ generral/
 │   ├── Generral.Core.Test/
 │   └── Generral.Integration.Test/   # Testcontainers: qBittorrent, Prowlarr, mock Torznab, mock sources
 ├── frontend/                 # React/TS (Vite); src/Components vendored from Sonarr
-├── presets/                  # shipped presets (YAML) + tests with recorded source fixtures
 ├── docker/                   # entrypoint.sh, s6/compose examples
 ├── Dockerfile
 ├── COPYRIGHT.md  LICENSE (GPL-3.0)  LICENSES/  REUSE.toml
-└── .github/workflows/        # ci.yml, docker.yml, presets.yml
+└── .github/workflows/        # ci.yml, docker.yml
 ```
 
 ## CI (GitHub Actions)
 
 | Workflow | Trigger | Steps |
 |----------|---------|-------|
-| `ci.yml` | PR, push to `main` | `dotnet build`, `dotnet format --verify-no-changes`, pending-migration check, `dotnet test` (unit + integration; Testcontainers from M2), `pnpm lint/typecheck/test`, preset fixture tests (M1), `reuse lint` |
+| `ci.yml` | PR, push to `main` | `dotnet build`, `dotnet format --verify-no-changes`, pending-migration check, `dotnet test` (unit + integration; Testcontainers from M2), `pnpm lint/typecheck/test`, `reuse lint` |
 | `ci.yml` → `docker` job | PR, push to `main` | amd64-only image build (GHA cache) and a `/ping` + non-root smoke test, so Dockerfile breakage shows up on the PR without paying for multi-arch builds |
 | `docker.yml` | push to `main` (→ `develop`, `sha-<short>`), tag `v*` (→ `X.Y.Z`, `X.Y`, `latest`), manual | `docker/setup-qemu` + `setup-buildx`, multi-arch `build-push-action` with GHA cache, push to GHCR, SBOM + provenance attestations, smoke test, Trivy scan (report only) |
-| `presets.yml` | nightly | Run every shipped preset against the **live** source (not fixtures) and open an issue when one breaks (layout change detection) |

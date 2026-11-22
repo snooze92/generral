@@ -1,8 +1,6 @@
 using System.Text.Json.Nodes;
 using Generral.Core.Extensions;
-using Generral.Core.Mappings;
 using Generral.Core.Presets;
-using Generral.Core.Templating;
 
 namespace Generral.Core.Test.Presets;
 
@@ -26,8 +24,6 @@ public class PresetDocumentTests
           season: { strategy: fixed, value: '{{ year }}' }
           title: '{{ event.title }} {{ secret.other }}'
         """;
-
-    private static string ShippedFolder => Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", "..", "..", "presets");
 
     [Test]
     public void Replaces_placeholders_and_leaves_other_templates()
@@ -65,26 +61,6 @@ public class PresetDocumentTests
         var e = Assert.Throws<PresetException>(() => PresetDocument.Parse(Preset).Resolve(new Dictionary<string, string?>()));
 
         Assert.That(e!.Message, Is.EqualTo("secrets.token: is required"));
-    }
-
-    [Test]
-    public void Shipped_presets_are_valid()
-    {
-        var engine = new MappingEngine(new TemplateRenderer());
-        var files = Directory.GetFiles(ShippedFolder, "*.yaml");
-
-        Assert.That(files.Select(Path.GetFileNameWithoutExtension), Is.EquivalentTo(new[] { "ufc-numbered", "ufc-numbered-parts", "rugby-world-cup" }));
-        foreach (var file in files)
-        {
-            var document = PresetDocument.Parse(File.ReadAllText(file));
-            var resolved = document.Resolve(new Dictionary<string, string?>());
-            Assert.That(document.Id, Is.EqualTo(Path.GetFileNameWithoutExtension(file)));
-            Assert.That(document.RequiredSecrets, Is.Empty, $"{file}: shipped presets work without a key");
-            foreach (var mapping in resolved.Mappings)
-            {
-                Assert.DoesNotThrow(() => engine.Validate(mapping.Parsed), file);
-            }
-        }
     }
 
     [Test]

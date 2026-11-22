@@ -12,7 +12,7 @@
 - Mapping engine: filter, vars, parts, season/episode strategies, numbering stability
   (`append`, `renumber-unlocked`), preview, versions.
 - Series/Season/Episode UI (index, details, monitoring), Calendar + iCal feed.
-- Presets: `ufc-numbered`, `ufc-numbered-parts`, `rugby-world-cup`. Import/export YAML.
+- Presets: format, gallery, import/export YAML. None ship (tests use fictional presets).
 - **Exit criteria:** UFC and Rugby World Cup series look right in the UI with correct numbering, and
   survive source refreshes.
 
@@ -32,8 +32,8 @@
 - **Exit criteria:** the MVP success criteria in [00](00-overview.md#success-criteria-for-mvp).
 
 ### M4 – Polish (v0.2–v0.x)
-- More presets (`svns`, `six-nations`, `ufc-fight-night`, `formula-1-sessions`, `pga-majors`,
-  non-sport example). Nightly live preset checks.
+- Community/fictional preset examples (fictional or licence-free content only; nothing ships by
+  default).
 - Renumber with on-disk rename, Library Import (adopt existing files).
 - `/api/v3/release/push` (autobrr), read-only Sonarr series/calendar/queue shim for dashboards.
 - More notification providers, Jellyfin/Emby refresh.

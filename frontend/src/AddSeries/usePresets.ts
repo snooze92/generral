@@ -47,6 +47,28 @@ export const usePresets = () => {
   return { ...result, data: result.data ?? NO_PRESETS };
 };
 
+/** POST /preset/import from a URL or a YAML document; resolves to the stored preset. */
+export const useImportPreset = () => {
+  const queryClient = useQueryClient();
+
+  const { mutate, isPending, error, reset } = useMutation<
+    Preset,
+    ApiError,
+    { url?: string; yaml?: string }
+  >({
+    mutationFn: (body) =>
+      fetchJson<Preset, { url?: string; yaml?: string }>({
+        path: getQueryPath('/preset/import'),
+        method: 'POST',
+        headers,
+        body,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/preset'] }),
+  });
+
+  return { importPreset: mutate, isImporting: isPending, importError: error, reset };
+};
+
 /** POST /preset/{id}/instantiate: creates the source(s), series and mapping(s), and queues a refresh. */
 export const useInstantiatePreset = () => {
   const queryClient = useQueryClient();

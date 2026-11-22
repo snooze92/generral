@@ -189,7 +189,7 @@ rolled-back transaction. File renames are not part of it yet (no files exist in 
 
 Sport is spoiler-sensitive. Defaults:
 
-- `overview` templates in shipped presets never include results/winners.
+- `overview` templates in presets never include results/winners.
 - Source fields that are known to carry results (`intHomeScore`, `strResult`, `strDescriptionEN`
   for completed events in TheSportsDB) are listed in the UI with a ⚠ badge in the field picker.
 - A per-series setting `spoilerFree: true` (default) also strips the `event.fields.*` values tagged
@@ -218,8 +218,10 @@ Saving a mapping triggers `ApplyMappings` for that mapping only.
 A **preset** is a YAML file bundling `source`, `series` defaults (title, overview, images, monitor
 mode, quality profile name, tags), and `mapping`. Presets:
 
-- ship in the image under `/app/presets/` (read-only, e.g. `ufc-numbered`, `ufc-numbered-parts`,
-  `ufc-fight-night`, `rugby-world-cup`, `six-nations`, `svns`, `formula-1-sessions`);
+- are **not shipped**: Generral comes with no presets, sources or other content. Users import
+  their own; an admin can also provide a read-only folder (`GENERRAL__PRESETSDIR`, empty or
+  missing by default). Any example added to the repository must be fictional or for licence-free
+  content;
 - can be imported from a file or URL and exported from any existing series ("*Export as preset*");
 - carry a `schema: generral/preset@1` header and `requires: { generral: ">=0.3" }`;
 - never include secrets (API keys are replaced by `{{ secret.NAME }}` placeholders, and the user is
@@ -231,13 +233,13 @@ Format (M1):
 
 ```yaml
 schema: generral/preset@1          # required
-id: ufc-numbered                   # a-z, 0-9, '-'; the file name of shipped presets
-name: UFC – Numbered events
+id: example-fight-league           # a-z, 0-9, '-'; the file name in the presets folder
+name: Example Fight League – Numbered events
 description: …
 requires: { generral: ">=0.1" }    # informational, not checked yet
 tags: [sport, mma]                 # gallery labels, not series tags
 parameters:                        # prompted on instantiate
-  - { name: tsdbKey, label: TheSportsDB API key, default: "123", secret: true }
+  - { name: apiKey, label: API key, secret: true }
   - { name: seasons, label: Seasons, default: current }
 source: { name, type, settings, refreshInterval: 12h }   # or sources: [ … ]
 series: { title, overview, network, genres, year, seriesType, seasonFolder, monitored, monitorNewItems, searchSettings }
@@ -251,13 +253,11 @@ mapping: { name, priority, source, …definition }          # or mappings: [ …
 - With several sources, a mapping names its `source` (default: the first); `priority` defaults to
   the list index. The rest of a mapping is the stored mapping definition.
 - `series` keys are those of the series resource; quality profile, images and `monitor` modes wait
-  for M2 (unknown keys are errors, so the spec examples' `images`/`monitor`/`qualityProfile` are
-  not in the shipped presets yet).
-- Shipped presets live in `presets/` (copied to `<app>/presets`, `GENERRAL__PRESETSDIR` overrides),
-  imported ones in `<config>/presets/`. Shipped M1 presets: `ufc-numbered`, `ufc-numbered-parts`
-  (TheSportsDB, free key `123` by default) and `rugby-world-cup` (fixturedownload.com JSON feed,
-  no key: the spec example's Wikipedia `http-html` source type doesn't exist yet). Their live
-  checks (`presets.yml`) are not set up yet; `PresetApiTests` runs them against synthetic responses.
+  for M2 (unknown keys are errors).
+- Imported presets live in `<config>/presets/`; the optional read-only folder is
+  `GENERRAL__PRESETSDIR` (default `<app>/presets`, which the image doesn't create). Its presets are
+  listed first and their ids can't be imported over. `PresetApiTests` covers the format with
+  fictional presets ("Example Fight League", "Example Cup") and synthetic responses.
 
 ## Import/export
 
@@ -265,8 +265,3 @@ Every Source, Series and Mapping has *Export YAML* / *Import YAML* actions. The 
 same document the "Advanced" editor tab shows, so there is a single declarative format and the UI is
 a view over it.
 
-## Worked examples
-
-- [`examples/ufc-numbered.yaml`](examples/ufc-numbered.yaml): UC1/UC2
-- [`examples/rugby-world-cup.yaml`](examples/rugby-world-cup.yaml): UC3
-- [`examples/rugby-sevens.yaml`](examples/rugby-sevens.yaml): UC4
