@@ -85,12 +85,14 @@ fields:
 # http-html example: Wikipedia "List of UFC events" scheduled-events table
 type: http-html
 requests:
-  - url: "https://en.wikipedia.org/wiki/List_of_UFC_events"
-items: "table#Scheduled_events tbody tr:has(td)"
+  # The MediaWiki parse API returns just the article HTML (no skin), wrapped in JSON
+  - url: "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_UFC_events&prop=text&format=json&formatversion=2"
+htmlPath: "$.parse.text"
+items: "table#Scheduled_events tr:has(td)"
 fields:
-  title:  { selector: "td:nth-child(1)" }
+  title:  { selector: "td:nth-child(1)", remove: sup }
   date:   { selector: "td:nth-child(2)" }
-  venue:  { selector: "td:nth-child(3)" }
+  venue:  { selector: "td:nth-child(3)", optional: true }
   key:    { text: "{{ title | string.slugify }}" }        # no natural id: derive one
   start:  { text: "{{ date }}", filters: [ { name: dateparse, args: "MMM d, yyyy" } ] }
   number: { text: "{{ title }}", filters: [ { name: regexp, args: "^UFC (\\d+)" } ], optional: true }
@@ -121,7 +123,30 @@ Engine details (decided in M1):
   item error (or null for `optional` fields).
 - Unparseable documents, invalid URLs and the request cap fail the whole fetch. Item problems
   (missing key/title, bad date, duplicate key) are collected per item and do not fail the fetch.
-- Every event keeps the item JSON under `fields._raw` (truncated to 16 KB).
+- Every event keeps the item JSON under `fields._raw` (truncated to 16 KB). For HTML, it is the item's
+  text (whitespace-collapsed, `sup` removed), not its markup, so that markup churn and footnote
+  renumbering don't change the event hash.
+
+`http-html` (M1):
+
+- `items` is a CSS selector over the whole document (AngleSharp: CSS3 plus `:has()`, including
+  relative forms such as `td:has(+ td > span)`; `:scope` is the item in field selectors). A field
+  `selector` is matched against the item and its descendants; with comma-separated alternatives the
+  first alternative that matches wins (so one source can read two tables with different columns:
+  `table#Past_events td:nth-child(2), table#Scheduled_events td:nth-child(1)`).
+- A field's text is the text content, `script`/`style` and `remove` matches left out, `br` as a
+  space, whitespace collapsed and trimmed. `attribute` reads the raw attribute value instead
+  (relative URLs are not resolved, except for the image fields). `path` is rejected in HTML sources,
+  `selector` in JSON ones.
+- `htmlPath` (optional): JSONPath to the HTML string when the response is JSON, e.g.
+  `$.parse.text` for the MediaWiki `action=parse` API. This is the recommended way to read
+  Wikipedia: no page chrome, and `prop=text&section=N` narrows it to one section. Without it the
+  response is parsed as HTML (any content type).
+- `pagination.next` is a CSS selector of the link to follow (its `href`); `page_param` works as for
+  JSON.
+- `xpath:` selectors are not implemented yet.
+- Requests carry the default User-Agent `Generral/<version> (+https://github.com/snooze92/generral)`
+  (Wikimedia requires a descriptive one with a contact); a `User-Agent` header overrides it.
 
 ### Filters
 

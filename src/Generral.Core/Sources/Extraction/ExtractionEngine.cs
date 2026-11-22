@@ -313,8 +313,8 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
     {
         if (item is IElement element)
         {
-            var html = element.OuterHtml;
-            return JsonValue.Create(html.Length <= limit ? html : html[..limit]);
+            var text = HtmlExtraction.RawText(element);
+            return JsonValue.Create(text.Length <= limit ? text : text[..limit]);
         }
 
         if (item is not JsonNode node)

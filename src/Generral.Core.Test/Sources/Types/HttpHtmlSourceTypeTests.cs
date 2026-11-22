@@ -39,7 +39,7 @@ public class HttpHtmlSourceTypeTests
             Assert.That((long?)events["xfl-12"].Fields["number"], Is.EqualTo(12));
             Assert.That(events["xfl-fight-night-doe-vs-roe"].Fields["venue"], Is.Null);
             Assert.That(events["xfl-fight-night-doe-vs-roe"].Fields["number"], Is.Null);
-            Assert.That((string?)events["xfl-12"].Fields["_raw"], Does.StartWith("<tr>"));
+            Assert.That((string?)events["xfl-12"].Fields["_raw"], Is.EqualTo("XFL 12 Mar 6, 2027 Harbour Arena Port Elsewhere, Nowhere"));
         });
     }
 

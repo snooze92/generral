@@ -14,6 +14,8 @@ internal static partial class HtmlExtraction
     /// <summary>Never part of a field's text.</summary>
     private static readonly ISelector Hidden = SelectorParser.ParseSelector("style, script")!;
 
+    private static readonly ISelector Footnotes = SelectorParser.ParseSelector("sup")!;
+
     public static IDocument Parse(string html) => new HtmlParser().ParseDocument(html);
 
     public static ISelector CompileSelector(string selector, string location) =>
@@ -33,6 +35,12 @@ internal static partial class HtmlExtraction
 
         return field.Definition.Attribute is { } attribute ? element.GetAttribute(attribute) : Text(element, field.Remove);
     }
+
+    /// <summary>
+    /// The item's text without <c>sup</c> footnote markers, not its markup: markup churn and footnote renumbering
+    /// (e.g. on Wikipedia) would otherwise change every event's hash.
+    /// </summary>
+    public static string RawText(IElement item) => Text(item, Footnotes);
 
     /// <summary>The <c>href</c> of the first match (its text without one).</summary>
     public static string? NextUrl(ISelector selector, IDocument document)
