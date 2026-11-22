@@ -200,7 +200,6 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
             episode.HasOne(e => e.Series).WithMany().HasForeignKey(e => e.SeriesId).OnDelete(DeleteBehavior.Cascade);
             episode.Property(e => e.Images).HasJsonConversion();
             episode.Property(e => e.SearchTerms).HasJsonConversion();
-            episode.HasOne<EpisodeFile>().WithMany().HasForeignKey(e => e.EpisodeFileId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<EpisodeFile>(file =>

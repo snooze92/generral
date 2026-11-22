@@ -115,7 +115,8 @@ public class DownloadApiTests
             Assert.That((string)item["trackedDownloadState"]!, Is.EqualTo("downloading"));
             Assert.That((int)item["episodeId"]!, Is.EqualTo(episodeId));
             Assert.That((string)item["downloadClient"]!, Is.EqualTo("qBittorrent"));
-            Assert.That((string)completed["trackedDownloadState"]!, Is.EqualTo("importPending"));
+            Assert.That((string)completed["trackedDownloadState"]!, Is.EqualTo("importBlocked"));
+            Assert.That((string)completed["statusMessages"]![0]!["messages"]![0]!, Does.Contain("reports files in /downloads/UFC 314 but this path doesn't exist"));
 
             Assert.That(remove.StatusCode, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(_qbit.Requests.Single(r => r.Path == "/api/v2/torrents/delete").Body, Does.Contain("deleteFiles=true"));
@@ -251,6 +252,8 @@ public class DownloadApiTests
 
         public string? Hash { get; private set; }
 
+        public string SavePath { get; set; } = "/downloads/";
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
@@ -279,7 +282,7 @@ public class DownloadApiTests
 
             var torrents = Hash is null
                 ? "[]"
-                : $$"""[{"hash":"{{new FakeTracker().TorrentHash.ToLowerInvariant()}}","name":"UFC 314","size":1000,"progress":{{(State == "stoppedUP" ? 1 : 0.5)}},"eta":60,"state":"{{State}}","category":"generral","save_path":"/downloads/","content_path":"/downloads/UFC 314","ratio":0}]""";
+                : $$"""[{"hash":"{{new FakeTracker().TorrentHash.ToLowerInvariant()}}","name":"UFC 314","size":1000,"progress":{{(State == "stoppedUP" ? 1 : 0.5)}},"eta":60,"state":"{{State}}","category":"generral","save_path":"{{SavePath}}","content_path":"{{SavePath}}UFC 314","ratio":0}]""";
             return path switch
             {
                 "/api/v2/app/webapiVersion" => Text("2.11.2"),

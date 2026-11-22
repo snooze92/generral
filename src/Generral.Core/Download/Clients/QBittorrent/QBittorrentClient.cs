@@ -181,6 +181,16 @@ public sealed class QBittorrentClient(IHttpClientFactory clients, TimeProvider t
         await PostFormAsync(settings, "/api/v2/torrents/delete", new() { ["hashes"] = downloadId.ToLowerInvariant(), ["deleteFiles"] = deleteData ? "true" : "false" }, cancellationToken);
     }
 
+    /// <summary>Sets the post-import category when it differs from the TV category.</summary>
+    public async Task MarkItemAsImportedAsync(DownloadClient client, DownloadClientItem item, CancellationToken cancellationToken = default)
+    {
+        var settings = QBittorrentSettings.From(client.Settings);
+        if (settings.TvImportedCategory is { } category && category != settings.TvCategory)
+        {
+            await PostFormAsync(settings, "/api/v2/torrents/setCategory", new() { ["hashes"] = item.DownloadId.ToLowerInvariant(), ["category"] = category }, cancellationToken);
+        }
+    }
+
     /// <summary>Sonarr's qBittorrent test: connection and authentication, categories, priority support and listing torrents.</summary>
     public async Task<IReadOnlyList<IndexerValidationFailure>> TestAsync(DownloadClient client, CancellationToken cancellationToken = default)
     {

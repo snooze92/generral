@@ -2,6 +2,7 @@ using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Download.TrackedDownloads;
 using Generral.Core.IndexerSearch;
+using Generral.Core.MediaFiles;
 using Generral.Core.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +22,10 @@ public sealed class ScheduledTaskService(
 {
     public const string EnabledKey = "GENERRAL:SCHEDULER:ENABLED";
     public static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(1);
+
+    public static readonly TimeSpan HousekeepingInterval = TimeSpan.FromHours(24);
+
+    private DateTime? _lastHousekeeping;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -69,6 +74,12 @@ public sealed class ScheduledTaskService(
         if (!onAirRunning && (await OnAirSchedule.DueEpisodesAsync(db, queued, now, cancellationToken)).Count > 0)
         {
             queue.Enqueue(OnAirSearchHandler.CommandName, trigger: CommandTrigger.Scheduled);
+        }
+
+        if (_lastHousekeeping is null || _lastHousekeeping + HousekeepingInterval <= now)
+        {
+            _lastHousekeeping = now;
+            queue.Enqueue(CleanUpRecycleBinHandler.CommandName, trigger: CommandTrigger.Scheduled);
         }
 
         if (await db.DownloadClients.AnyAsync(c => c.Enable, cancellationToken))

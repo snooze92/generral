@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Generral.Core.Datastore.Migrations
 {
     [DbContext(typeof(GenerralDbContext))]
-    [Migration("20261122143704_AddMediaFiles")]
+    [Migration("20261122150913_AddMediaFiles")]
     partial class AddMediaFiles
     {
         /// <inheritdoc />
@@ -806,8 +806,6 @@ namespace Generral.Core.Datastore.Migrations
 
                     b.HasIndex("AirDateUtc");
 
-                    b.HasIndex("EpisodeFileId");
-
                     b.HasIndex("SeriesId", "SeasonNumber", "EpisodeNumber")
                         .IsUnique();
 
@@ -1046,11 +1044,6 @@ namespace Generral.Core.Datastore.Migrations
 
             modelBuilder.Entity("Generral.Core.Tv.Episode", b =>
                 {
-                    b.HasOne("Generral.Core.MediaFiles.EpisodeFile", null)
-                        .WithMany()
-                        .HasForeignKey("EpisodeFileId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("Generral.Core.Tv.Series", "Series")
                         .WithMany()
                         .HasForeignKey("SeriesId")

@@ -74,6 +74,11 @@ public static class CoreServiceCollectionExtensions
         services.AddScoped<HistoryService>();
         services.AddScoped<BlocklistService>();
         services.AddSingleton<TrackedDownloadService>();
+        services.AddScoped<CompletedDownloadService>();
+        services.AddScoped<EpisodeImportService>();
+        services.AddSingleton<DiskTransferService>();
+        services.AddSingleton<RecycleBinProvider>();
+        services.AddSingleton<ICommandHandler, CleanUpRecycleBinHandler>();
         services.TryAddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<ReleaseSearchService>();
 

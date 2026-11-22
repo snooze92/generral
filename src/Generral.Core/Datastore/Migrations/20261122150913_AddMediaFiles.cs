@@ -69,11 +69,6 @@ namespace Generral.Core.Datastore.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Episodes_EpisodeFileId",
-                table: "Episodes",
-                column: "EpisodeFileId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_EpisodeFiles_SeriesId",
                 table: "EpisodeFiles",
                 column: "SeriesId");
@@ -89,23 +84,11 @@ namespace Generral.Core.Datastore.Migrations
                 table: "RootFolders",
                 column: "Path",
                 unique: true);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_Episodes_EpisodeFiles_EpisodeFileId",
-                table: "Episodes",
-                column: "EpisodeFileId",
-                principalTable: "EpisodeFiles",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_Episodes_EpisodeFiles_EpisodeFileId",
-                table: "Episodes");
-
             migrationBuilder.DropTable(
                 name: "EpisodeFiles");
 
@@ -114,10 +97,6 @@ namespace Generral.Core.Datastore.Migrations
 
             migrationBuilder.DropTable(
                 name: "RootFolders");
-
-            migrationBuilder.DropIndex(
-                name: "IX_Episodes_EpisodeFileId",
-                table: "Episodes");
         }
     }
 }

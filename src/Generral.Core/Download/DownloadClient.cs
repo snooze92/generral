@@ -97,6 +97,10 @@ public interface IDownloadClient
     /// <exception cref="DownloadClientException">The client failed.</exception>
     Task RemoveItemAsync(DownloadClient client, string downloadId, bool deleteData, CancellationToken cancellationToken = default);
 
+    /// <summary>After a successful import, e.g. qBittorrent's post-import category.</summary>
+    /// <exception cref="DownloadClientException">The client failed.</exception>
+    Task MarkItemAsImportedAsync(DownloadClient client, DownloadClientItem item, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<IndexerValidationFailure>> TestAsync(DownloadClient client, CancellationToken cancellationToken = default);
 
     /// <returns>Validation errors of the settings alone.</returns>
