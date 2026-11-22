@@ -10,6 +10,7 @@ import { InputType } from 'Helpers/Props/inputTypes';
 import { InputChanged } from 'typings/inputs';
 import { Failure } from 'typings/pending';
 import { ProviderSelectOption } from './Provider';
+import { toTextAreaValue } from './textAreaValue';
 
 interface ProviderFieldFormGroupProps {
   advancedSettings: boolean;
@@ -82,7 +83,7 @@ function ProviderFieldFormGroup({
         name={name}
         placeholder={placeholder}
         unit={unit}
-        value={value ?? undefined}
+        value={(type === 'textArea' ? toTextAreaValue(value) : value) ?? undefined}
         // @ts-expect-error - only select inputs take values
         values={selectValues}
         errors={errors}

@@ -3,5 +3,15 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.checkContainer {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.toggleLabel {
+  margin-bottom: 0;
+  font-weight: normal;
   cursor: pointer;
 }
