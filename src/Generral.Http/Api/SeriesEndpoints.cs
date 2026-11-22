@@ -2,7 +2,9 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Generral.Core.Datastore;
 using Generral.Core.Extensions;
+using Generral.Core.Extras.Metadata;
 using Generral.Core.Mappings;
+using Generral.Core.Notifications;
 using Generral.Core.Tags;
 using Generral.Core.Tv;
 using Microsoft.AspNetCore.Routing;
@@ -178,7 +180,7 @@ public static partial class SeriesEndpoints
         return series is null ? Results.NotFound() : Results.Ok(await ToResourceAsync(db, series, time));
     }
 
-    private static async Task<IResult> Create(SeriesResource resource, GenerralDbContext db, TagService tags, TimeProvider time)
+    private static async Task<IResult> Create(SeriesResource resource, GenerralDbContext db, TagService tags, NotificationService notifications, TimeProvider time)
     {
         resource = await WithDefaultQualityProfileAsync(resource, db);
         var failures = await ValidateAsync(resource, null, db, tags);
@@ -188,6 +190,7 @@ public static partial class SeriesEndpoints
         }
 
         var series = await AddAsync(resource, db, time);
+        await notifications.NotifyAsync(NotificationTrigger.SeriesAdd, new SeriesAddMessage { Series = series });
         return Results.Created($"series/{series.Id}", await ToResourceAsync(db, series, time));
     }
 
@@ -229,7 +232,7 @@ public static partial class SeriesEndpoints
     }
 
     /// <summary>Like Sonarr, changing a season's <c>monitored</c> sets it on all of the season's episodes. Seasons are not added or removed here.</summary>
-    private static async Task<IResult> Update(int id, SeriesResource resource, GenerralDbContext db, TagService tags, TimeProvider time)
+    private static async Task<IResult> Update(int id, SeriesResource resource, GenerralDbContext db, TagService tags, MetadataService metadata, TimeProvider time)
     {
         var series = await db.Series.SingleOrDefaultAsync(s => s.Id == id);
         if (series is null)
@@ -275,13 +278,23 @@ public static partial class SeriesEndpoints
 
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
+        await metadata.SyncSeriesAsync(series.Id);
 
         return Results.Accepted($"series/{series.Id}", await ToResourceAsync(db, series, time));
     }
 
     /// <summary>Seasons, episodes, mappings (with their versions) and episode links cascade in the database.</summary>
-    private static async Task<IResult> Delete(int id, GenerralDbContext db) =>
-        await db.Series.Where(s => s.Id == id).ExecuteDeleteAsync() > 0 ? Results.NoContent() : Results.NotFound();
+    private static async Task<IResult> Delete(int id, GenerralDbContext db, NotificationService notifications)
+    {
+        var series = await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+        if (series is null || await db.Series.Where(s => s.Id == id).ExecuteDeleteAsync() == 0)
+        {
+            return Results.NotFound();
+        }
+
+        await notifications.NotifyAsync(NotificationTrigger.SeriesDelete, new SeriesDeleteMessage { Series = series });
+        return Results.NoContent();
+    }
 
     internal static async Task<List<ValidationFailure>> ValidateAsync(SeriesResource resource, int? id, GenerralDbContext db, TagService tags)
     {

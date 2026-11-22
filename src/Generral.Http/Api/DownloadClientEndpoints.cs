@@ -195,34 +195,12 @@ public static class DownloadClientEndpoints
         return null;
     }
 
-    /// <summary>The stored settings with the posted fields applied; the masked placeholder keeps the stored value.</summary>
-    private static JsonObject Settings(DownloadClientResource resource, JsonObject? stored)
-    {
-        var settings = stored?.DeepClone().AsObject() ?? [];
-        foreach (var field in (resource.Fields ?? []).Where(f => f?.Name is { Length: > 0 }))
-        {
-            if (field.Value is JsonValue v && v.GetValueKind() == JsonValueKind.String && v.GetValue<string>() == SourceEndpoints.PrivateValue)
-            {
-                continue;
-            }
-
-            if (field.Value is null)
-            {
-                settings.Remove(field.Name);
-            }
-            else
-            {
-                settings[field.Name] = field.Value.DeepClone();
-            }
-        }
-
-        return settings;
-    }
+    private static JsonObject Settings(DownloadClientResource resource, JsonObject? stored) => ProviderFields.Merge(resource.Fields, stored);
 
     private static DownloadClientResource Schema(Implementation implementation) => new()
     {
         Name = "",
-        Fields = implementation.Fields.Select(f => f with { Value = f.Value?.DeepClone() }).ToList(),
+        Fields = ProviderFields.Schema(implementation.Fields),
         ImplementationName = "qBittorrent",
         Implementation = implementation.Name,
         ConfigContract = implementation.ConfigContract,
@@ -244,7 +222,7 @@ public static class DownloadClientEndpoints
         {
             Id = client.Id,
             Name = client.Name,
-            Fields = schema.Select(f => f with { Value = Mask(f, client.Settings.TryGetPropertyValue(f.Name, out var value) ? value?.DeepClone() : f.Value?.DeepClone()) }).ToList(),
+            Fields = ProviderFields.Read(schema, client.Settings),
             ImplementationName = "qBittorrent",
             Implementation = client.Implementation,
             ConfigContract = implementation?.ConfigContract,
@@ -258,14 +236,9 @@ public static class DownloadClientEndpoints
         };
     }
 
-    private static JsonNode? Mask(IndexerField field, JsonNode? value) =>
-        field.Privacy is "password" or "apiKey" && value is JsonValue v && v.GetValueKind() == JsonValueKind.String && v.GetValue<string>().Length > 0
-            ? SourceEndpoints.PrivateValue
-            : value;
-
     private static string InfoLink(string implementation) => $"https://wiki.servarr.com/sonarr/supported#{implementation.ToLowerInvariant()}";
 
-    private static ValidationFailure ToFailure(IndexerValidationFailure f) => new(f.PropertyName, f.ErrorMessage);
+    private static ValidationFailure ToFailure(IndexerValidationFailure f) => ProviderFields.ToFailure(f);
 
     private static ValidationFailure UnknownImplementation(string? implementation) =>
         new("implementation", $"Unknown download client implementation '{implementation}'");

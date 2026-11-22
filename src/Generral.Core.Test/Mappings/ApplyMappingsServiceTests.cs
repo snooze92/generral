@@ -1,8 +1,11 @@
 using System.Text.Json.Nodes;
+using Generral.Core.Configuration;
 using Generral.Core.Datastore;
 using Generral.Core.Extensions;
+using Generral.Core.Extras.Metadata;
 using Generral.Core.Mappings;
 using Generral.Core.Messaging;
+using Generral.Core.Notifications;
 using Generral.Core.Sources;
 using Generral.Core.Sources.Types;
 using Generral.Core.Templating;
@@ -48,6 +51,10 @@ public class ApplyMappingsServiceTests
         services.AddSingleton<ICommandHandler, RefreshSourceHandler>();
         services.AddSingleton<ICommandHandler, ApplyMappingsHandler>();
         services.AddSingleton(new MappingEngine(new TemplateRenderer()));
+        services.AddScoped<IUiSettingsService, UiSettingsService>();
+        services.AddScoped<MetadataService>();
+        services.AddSingleton<NotificationProvider>();
+        services.AddScoped<NotificationService>();
         services.AddSingleton(sp => new ApplyMappingsService(
             sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<MappingEngine>(), _time, NullLogger<ApplyMappingsService>.Instance)
         {

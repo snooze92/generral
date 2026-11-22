@@ -6,6 +6,8 @@ using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
 using Generral.Core.Download.Clients.QBittorrent;
 using Generral.Core.Download.TrackedDownloads;
+using Generral.Core.Extras.Metadata;
+using Generral.Core.Extras.Metadata.Consumers.PlexNfo;
 using Generral.Core.History;
 using Generral.Core.Indexers.Torznab;
 using Generral.Core.IndexerSearch;
@@ -13,6 +15,10 @@ using Generral.Core.Lifecycle;
 using Generral.Core.Mappings;
 using Generral.Core.MediaFiles;
 using Generral.Core.Messaging;
+using Generral.Core.Notifications;
+using Generral.Core.Notifications.Discord;
+using Generral.Core.Notifications.Plex;
+using Generral.Core.Notifications.Webhook;
 using Generral.Core.Organizer;
 using Generral.Core.Presets;
 using Generral.Core.Profiles;
@@ -82,6 +88,15 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<ICommandHandler, ManualImportHandler>();
         services.TryAddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<ReleaseSearchService>();
+        services.AddSingleton<IMetadataConsumer, PlexNfoMetadata>();
+        services.AddScoped<MetadataService>();
+        services.AddHttpClient(NotificationService.ClientName, NotificationService.ConfigureClient)
+            .ConfigurePrimaryHttpMessageHandler(SourceFetcherFactory.CreateHandler);
+        services.AddSingleton<INotification, PlexServerNotification>();
+        services.AddSingleton<INotification, WebhookNotification>();
+        services.AddSingleton<INotification, DiscordNotification>();
+        services.AddSingleton<NotificationProvider>();
+        services.AddScoped<NotificationService>();
 
         services.AddSingleton<CommandQueue>();
         services.AddSingleton<ICommandHandler, RefreshSourcesHandler>();

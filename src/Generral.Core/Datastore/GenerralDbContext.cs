@@ -1,10 +1,12 @@
 using Generral.Core.Blocklisting;
 using Generral.Core.Download;
+using Generral.Core.Extras.Metadata;
 using Generral.Core.History;
 using Generral.Core.Indexers;
 using Generral.Core.Languages;
 using Generral.Core.Mappings;
 using Generral.Core.MediaFiles;
+using Generral.Core.Notifications;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
 using Generral.Core.RemotePathMappings;
@@ -61,6 +63,12 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
     public DbSet<RootFolder> RootFolders => Set<RootFolder>();
 
     public DbSet<RemotePathMapping> RemotePathMappings => Set<RemotePathMapping>();
+
+    public DbSet<MetadataDefinition> Metadata => Set<MetadataDefinition>();
+
+    public DbSet<MetadataFile> MetadataFiles => Set<MetadataFile>();
+
+    public DbSet<NotificationDefinition> Notifications => Set<NotificationDefinition>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -211,6 +219,29 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
         });
 
         modelBuilder.Entity<RootFolder>(folder => folder.HasIndex(f => f.Path).IsUnique());
+
+        modelBuilder.Entity<MetadataDefinition>(metadata =>
+        {
+            metadata.ToTable("Metadata");
+            metadata.HasIndex(m => m.Name).IsUnique();
+            metadata.Property(m => m.Name).UseCollation("NOCASE");
+            metadata.Property(m => m.Settings).HasJsonConversion();
+        });
+
+        modelBuilder.Entity<MetadataFile>(file =>
+        {
+            file.HasIndex(f => f.SeriesId);
+            file.HasOne<Series>().WithMany().HasForeignKey(f => f.SeriesId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NotificationDefinition>(notification =>
+        {
+            notification.ToTable("Notifications");
+            notification.HasIndex(n => n.Name).IsUnique();
+            notification.Property(n => n.Name).UseCollation("NOCASE");
+            notification.Property(n => n.Settings).HasJsonConversion();
+            notification.Property(n => n.Tags).HasJsonConversion();
+        });
 
         modelBuilder.Entity<RemotePathMapping>(mapping => mapping.HasIndex(m => new { m.Host, m.RemotePath }).IsUnique());
 
