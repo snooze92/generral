@@ -71,6 +71,11 @@ public sealed class TagService(GenerralDbContext db)
             series.Tags = series.Tags.Where(t => t != id).ToList();
         }
 
+        foreach (var indexer in (await db.Indexers.ToListAsync()).Where(i => i.Tags.Contains(id)))
+        {
+            indexer.Tags = indexer.Tags.Where(t => t != id).ToList();
+        }
+
         db.Tags.Remove(tag);
         await db.SaveChangesAsync();
         await transaction.CommitAsync();

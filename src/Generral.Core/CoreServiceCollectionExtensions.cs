@@ -1,6 +1,7 @@
 using Generral.Core.Authentication;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
+using Generral.Core.Indexers.Torznab;
 using Generral.Core.Lifecycle;
 using Generral.Core.Mappings;
 using Generral.Core.Messaging;
@@ -38,6 +39,10 @@ public static class CoreServiceCollectionExtensions
 
         services.AddSourceTypes();
         services.AddSingleton<SourceRefreshService>();
+
+        services.AddHttpClient(TorznabClient.ClientName, TorznabClient.ConfigureClient)
+            .ConfigurePrimaryHttpMessageHandler(SourceFetcherFactory.CreateHandler);
+        services.AddSingleton<TorznabClient>();
 
         services.AddSingleton<CommandQueue>();
         services.AddSingleton<ICommandHandler, RefreshSourcesHandler>();

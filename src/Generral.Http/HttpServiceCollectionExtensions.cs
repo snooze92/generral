@@ -100,7 +100,10 @@ public static partial class HttpServiceCollectionExtensions
 
         app.Use(async (context, next) =>
         {
-            context.Response.Headers["X-Application-Version"] = BuildInfo.Version;
+            // Prowlarr checks the header of /api/v3 responses against Sonarr versions.
+            context.Response.Headers["X-Application-Version"] = context.Request.Path.StartsWithSegments(SonarrShimEndpoints.Prefix)
+                ? SonarrShimEndpoints.Version
+                : BuildInfo.Version;
             await next();
         });
 
@@ -123,6 +126,7 @@ public static partial class HttpServiceCollectionExtensions
         api.MapSettingsEndpoints();
         api.MapSourceEndpoints();
         api.MapTagEndpoints();
+        api.MapIndexerEndpoints();
         api.MapSeriesEndpoints();
         api.MapEpisodeEndpoints();
         api.MapMappingEndpoints();
@@ -130,6 +134,8 @@ public static partial class HttpServiceCollectionExtensions
         api.MapCalendarEndpoints();
         api.MapCommandEndpoints();
         api.MapOpenApi("/openapi.json");
+
+        app.MapGroup(SonarrShimEndpoints.Prefix).RequireAuthorization(AuthSchemes.ApiKeyPolicy).MapSonarrShimEndpoints();
 
         app.MapGroup("/feed/v1").RequireAuthorization(AuthSchemes.UiPolicy).MapCalendarFeedEndpoints();
 

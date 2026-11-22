@@ -42,9 +42,22 @@ For this to work, Generral MUST implement the subset of the Sonarr v3 API that P
 | `DELETE /api/v3/indexer/{id}` | Delete. |
 | Auth | `X-Api-Key` header (and `?apikey=` query, or `Authorization: Bearer`). |
 
-Newznab-implementation indexers that Prowlarr pushes (Usenet) are stored but disabled, with a
-health warning ("Usenet not supported yet"), until Usenet support lands. This keeps Prowlarr sync
-idempotent.
+Newznab-implementation indexers that Prowlarr pushes (Usenet) are stored as sent but never searched
+(`supportsRss`/`supportsSearch: false`, provider `message` "Usenet is not supported yet"), until
+Usenet support lands. Their `enable*` flags are kept as sent, because Prowlarr compares them and
+would otherwise push an update on every sync.
+
+Implementation notes (M2a):
+- The schema also carries Sonarr's other Torznab fields (`multiLanguages`, `failDownloads`,
+  `seedCriteria.seasonPackSeedGoal`/`seasonPackSeedRatio`,
+  `rejectTorrentFilesWithBlockedExtensionsWhileGrabbing`). Settings are stored by field name, and
+  fields nobody knows about are kept and returned, so a Prowlarr update never loses user values.
+  A posted `null` clears a field; `********` keeps the stored secret.
+- Validation (skipped by `forceSave`): name required and unique, `priority` 1–50, `baseUrl`
+  http(s), `apiPath` a path, `additionalParameters` like `&a=b`, seed criteria > 0, known tags, and,
+  for enabled indexers, the `t=caps` test (must support `q` in `search` or `tv-search`).
+- Requests use the `Indexer` HTTP client: same SSRF guard as sources (only link-local blocked, so
+  a LAN Prowlarr works), 100 s timeout, and at most one request per 2 s per indexer host.
 
 A **native Prowlarr app type** (like the one Sportarr has open as Prowlarr PR #2758) is a `Later`
 upstream contribution. The Sonarr shim stays.

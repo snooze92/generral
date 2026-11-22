@@ -76,6 +76,55 @@ namespace Generral.Core.Datastore.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
+            modelBuilder.Entity("Generral.Core.Indexers.Indexer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DownloadClientId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("EnableAutomaticSearch")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("EnableInteractiveSearch")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("EnableRss")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Implementation")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SeasonSearchMaximumSingleEpisodeAge")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Settings")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Indexers");
+                });
+
             modelBuilder.Entity("Generral.Core.Mappings.EpisodeLink", b =>
                 {
                     b.Property<int>("Id")
