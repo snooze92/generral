@@ -17,6 +17,7 @@ import DeleteSeriesModal from 'Series/Delete/DeleteSeriesModal';
 import Series from 'Series/Series';
 import { getSeriesStatusDetails } from 'Series/SeriesStatus';
 import { useToggleSeriesMonitored } from 'Series/useSeries';
+import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
 import SeriesDetailsPath from './SeriesDetailsPath';
 import SeriesDetailsSeason from './SeriesDetailsSeason';
@@ -180,6 +181,17 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
                   >
                     <span className={styles.statusName}>
                       {statusDetails.title}
+                    </span>
+                  </Label>
+
+                  <Label
+                    className={styles.detailsLabel}
+                    title={translate('SizeOnDisk')}
+                    size={sizes.LARGE}
+                    icon={icons.DRIVE}
+                  >
+                    <span>
+                      {formatBytes(series.statistics?.sizeOnDisk ?? 0)}
                     </span>
                   </Label>
 

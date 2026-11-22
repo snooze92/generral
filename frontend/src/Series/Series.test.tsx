@@ -423,6 +423,46 @@ describe('Series details', () => {
     expect(requests(fetchMock, 'DELETE', '/api/v1/series/1')).toHaveLength(1);
   });
 
+  it('shows the file quality and size, and deletes a file after confirmation', async () => {
+    const fetchMock = renderAt('/series/formula-1', {
+      'GET /api/v1/series': [
+        { ...formula1, statistics: { ...formula1.statistics, sizeOnDisk: 3 * 1024 ** 3 } },
+      ],
+      'GET /api/v1/episodefile': [
+        {
+          id: 5,
+          seriesId: 1,
+          seasonNumber: 2026,
+          relativePath: 'Season 2026/Formula 1 - S2026E01.mkv',
+          path: '/tv/Formula 1/Season 2026/Formula 1 - S2026E01.mkv',
+          size: 1.5 * 1024 ** 3,
+          dateAdded: '2026-03-02T00:00:00Z',
+          quality: {
+            quality: { id: 3, name: 'WEBDL-1080p', source: 'web', resolution: 1080 },
+            revision: { version: 1, real: 0, isRepack: false },
+          },
+          qualityCutoffNotMet: false,
+        },
+      ],
+      'DELETE /api/v1/episodefile/5': {},
+    });
+
+    await screen.findByText('Grand Prix 1');
+    expect(await within(row('Grand Prix 1')).findByText('WEBDL-1080p')).toBeTruthy();
+    expect(within(row('Grand Prix 1')).getByText('1.5 GiB')).toBeTruthy();
+    expect(screen.getByText('3 GiB')).toBeTruthy();
+    expect(within(row('Grand Prix 2')).queryByLabelText('Delete Episode File')).toBeNull();
+
+    fireEvent.click(within(row('Grand Prix 1')).getByLabelText('Delete Episode File'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Formula 1 - S2026E01\.mkv/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() =>
+      expect(requests(fetchMock, 'DELETE', '/api/v1/episodefile/5')).toHaveLength(1)
+    );
+  });
+
   it('shows not found for an unknown slug', async () => {
     renderAt('/series/nope');
 

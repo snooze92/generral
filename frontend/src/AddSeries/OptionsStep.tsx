@@ -1,14 +1,18 @@
 import React from 'react';
+import Alert from 'Components/Alert';
 import Form from 'Components/Form/Form';
 import FormInput from 'Components/Form/FormInput';
 import FormInputHelpText from 'Components/Form/FormInputHelpText';
 import FormLabel from 'Components/Form/FormLabel';
 import FormRow from 'Components/Form/FormRow';
-import { inputTypes } from 'Helpers/Props';
+import Link from 'Components/Link/Link';
+import { inputTypes, kinds } from 'Helpers/Props';
 import { SeriesType } from 'Series/Series';
+import { useRootFolders } from 'Settings/MediaManagement/MediaManagement';
 import useQualityProfiles from 'Settings/Profiles/Quality/useQualityProfiles';
 import { InputChanged } from 'typings/inputs';
 import { ValidationError } from 'typings/pending';
+import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
 import { NewSeries } from './useAddSeries';
 
@@ -48,6 +52,13 @@ function OptionsStep({
     value: profile.name,
   }));
 
+  const { data: rootFolders } = useRootFolders();
+  const rootFolderOptions = rootFolders.map((folder) => ({
+    key: folder.path,
+    value: folder.path,
+    hint: folder.freeSpace == null ? undefined : formatBytes(folder.freeSpace),
+  }));
+
   const errorsFor = (...names: string[]) =>
     validationErrors.filter((e) => names.includes(e.propertyName));
 
@@ -71,14 +82,23 @@ function OptionsStep({
       <FormRow>
         <FormLabel>{translate('RootFolder')}</FormLabel>
         <FormInputHelpText text={translate('AddSeriesRootFolderHelpText')} />
-        <FormInput
-          type={inputTypes.TEXT}
-          name="rootFolderPath"
-          placeholder="/tv"
-          value={series.rootFolderPath}
-          errors={errorsFor('rootFolderPath', 'path')}
-          onChange={onChange}
-        />
+        {rootFolders.length ? (
+          <FormInput
+            type={inputTypes.SELECT}
+            name="rootFolderPath"
+            values={rootFolderOptions}
+            value={series.rootFolderPath}
+            errors={errorsFor('rootFolderPath', 'path')}
+            onChange={onChange}
+          />
+        ) : (
+          <Alert kind={kinds.WARNING}>
+            {translate('AddSeriesNoRootFolders')}{' '}
+            <Link to="/settings/mediamanagement">
+              {translate('MediaManagement')}
+            </Link>
+          </Alert>
+        )}
       </FormRow>
 
       <FormRow>

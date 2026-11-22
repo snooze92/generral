@@ -1,0 +1,23 @@
+.actions {
+  width: 70px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.unavailable {
+  color: var(--dangerColor);
+}
+
+.addRootFolder {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  max-width: 600px;
+}
+
+.addMapping {
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 10px;
+}

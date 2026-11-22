@@ -21,6 +21,7 @@ import {
   useSeasonEpisodes,
   useToggleEpisodesMonitored,
 } from 'Episode/useEpisodes';
+import useEpisodeFiles from 'EpisodeFile/useEpisodeFiles';
 import { icons, kinds, sizes, tooltipPositions } from 'Helpers/Props';
 import { Season } from 'Series/Series';
 import { useToggleSeasonMonitored } from 'Series/useSeries';
@@ -88,6 +89,7 @@ function SeriesDetailsSeason({
     useToggleEpisodesMonitored();
   const lastToggledEpisode = useRef<number | null>(null);
   const { search, isSearching } = useSearchCommand();
+  const { byId: episodeFiles } = useEpisodeFiles(seriesId);
   const queue = useQueueDetails();
   const queueByEpisode = useMemo(
     () =>
@@ -286,6 +288,7 @@ function SeriesDetailsSeason({
                   <EpisodeRow
                     key={episode.id}
                     episode={episode}
+                    episodeFile={episodeFiles.get(episode.episodeFileId)}
                     queueItem={queueByEpisode.get(episode.id)}
                     seriesMonitored={seriesMonitored}
                     isSaving={togglingEpisodeIds.includes(episode.id)}

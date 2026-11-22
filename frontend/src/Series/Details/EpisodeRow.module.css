@@ -64,6 +64,18 @@
 .actions {
   composes: cell from 'Components/Table/Cells/TableRowCell.module.css';
 
-  width: 70px;
+  width: 100px;
+  white-space: nowrap;
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.size {
+  color: var(--inkMuted);
+  font-size: 0.9em;
   white-space: nowrap;
 }

@@ -8,20 +8,25 @@ import Icon from 'Components/Icon';
 import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
 import SpinnerIconButton from 'Components/Link/SpinnerIconButton';
+import ConfirmModal from 'Components/Modal/ConfirmModal';
 import MonitorToggleButton from 'Components/MonitorToggleButton';
 import RelativeDateCell from 'Components/Table/Cells/RelativeDateCell';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRow from 'Components/Table/TableRow';
 import Episode from 'Episode/Episode';
+import EpisodeQuality from 'Episode/EpisodeQuality';
 import { useToggleEpisodeLocked } from 'Episode/useEpisodes';
+import { EpisodeFile, useDeleteEpisodeFile } from 'EpisodeFile/useEpisodeFiles';
 import { icons, kinds } from 'Helpers/Props';
 import InteractiveSearchModal from 'InteractiveSearch/InteractiveSearchModal';
 import isBefore from 'Utilities/Date/isBefore';
+import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
 import styles from './EpisodeRow.module.css';
 
 interface EpisodeRowProps {
   episode: Episode;
+  episodeFile?: EpisodeFile;
   queueItem?: Queue;
   seriesMonitored: boolean;
   isSaving: boolean;
@@ -34,10 +39,11 @@ interface EpisodeRowProps {
 
 interface EpisodeStatusProps {
   episode: Episode;
+  episodeFile?: EpisodeFile;
   queueItem?: Queue;
 }
 
-function EpisodeStatus({ episode, queueItem }: EpisodeStatusProps) {
+function EpisodeStatus({ episode, episodeFile, queueItem }: EpisodeStatusProps) {
   if (queueItem) {
     const { iconName, iconKind, title } = getQueueStatus(queueItem);
     const progress = queueItem.size
@@ -60,7 +66,16 @@ function EpisodeStatus({ episode, queueItem }: EpisodeStatusProps) {
   }
 
   if (episode.hasFile) {
-    return null;
+    return episodeFile ? (
+      <span className={styles.file}>
+        <EpisodeQuality
+          quality={episodeFile.quality}
+          size={episodeFile.size}
+          isCutoffNotMet={episodeFile.qualityCutoffNotMet}
+        />
+        <span className={styles.size}>{formatBytes(episodeFile.size)}</span>
+      </span>
+    ) : null;
   }
 
   if (!episode.airDateUtc || !isBefore(episode.airDateUtc)) {
@@ -76,6 +91,7 @@ function EpisodeStatus({ episode, queueItem }: EpisodeStatusProps) {
 
 function EpisodeRow({
   episode,
+  episodeFile,
   queueItem,
   seriesMonitored,
   isSaving,
@@ -86,6 +102,10 @@ function EpisodeRow({
   const { toggleEpisodeLocked, isTogglingLocked } = useToggleEpisodeLocked(id);
   const { search, isSearching } = useSearchCommand();
   const [isInteractiveSearchOpen, setIsInteractiveSearchOpen] = useState(false);
+  const [isDeleteFileOpen, setIsDeleteFileOpen] = useState(false);
+  const { deleteEpisodeFile, isDeleting } = useDeleteEpisodeFile(
+    episodeFile?.id ?? 0
+  );
 
   const handleMonitorPress = useCallback(
     (value: boolean, options: { shiftKey: boolean }) =>
@@ -140,7 +160,11 @@ function EpisodeRow({
       />
 
       <TableRowCell className={styles.status}>
-        <EpisodeStatus episode={episode} queueItem={queueItem} />
+        <EpisodeStatus
+          episode={episode}
+          episodeFile={episodeFile}
+          queueItem={queueItem}
+        />
       </TableRowCell>
 
       <TableRowCell className={styles.actions}>
@@ -165,6 +189,34 @@ function EpisodeRow({
           title={`${episode.seasonNumber}x${episodeNumber} - ${title ?? ''}`}
           onModalClose={() => setIsInteractiveSearchOpen(false)}
         />
+
+        {episodeFile ? (
+          <>
+            <IconButton
+              name={icons.DELETE}
+              title={translate('DeleteEpisodeFile')}
+              aria-label={translate('DeleteEpisodeFile')}
+              onPress={() => setIsDeleteFileOpen(true)}
+            />
+
+            <ConfirmModal
+              isOpen={isDeleteFileOpen}
+              kind={kinds.DANGER}
+              title={translate('DeleteEpisodeFile')}
+              message={translate('DeleteEpisodeFileMessage', {
+                path: episodeFile.relativePath,
+              })}
+              confirmLabel={translate('Delete')}
+              isSpinning={isDeleting}
+              onConfirm={() =>
+                deleteEpisodeFile(undefined, {
+                  onSuccess: () => setIsDeleteFileOpen(false),
+                })
+              }
+              onCancel={() => setIsDeleteFileOpen(false)}
+            />
+          </>
+        ) : null}
       </TableRowCell>
     </TableRow>
   );
