@@ -7,6 +7,7 @@ using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
 using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
+using Generral.Core.IndexerSearch;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -125,6 +126,42 @@ public class ReleaseApiTests
     }
 
     [Test]
+    public async Task Indexers_are_searched_in_parallel_and_a_slow_one_times_out()
+    {
+        var (_, mainCardId) = await SeedAsync();
+        using (var scope = _host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
+            foreach (var name in new[] { "fast", "slow", "stuck" })
+            {
+                db.Indexers.Add(new Indexer
+                {
+                    Name = name,
+                    Implementation = IndexerImplementations.Torznab,
+                    Settings = new JsonObject { ["baseUrl"] = $"https://{name}.example", ["apiKey"] = "secret" },
+                });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        _handler.Delays["tracker.example"] = TimeSpan.FromSeconds(1);
+        _handler.Delays["slow.example"] = TimeSpan.FromSeconds(1);
+        _handler.Delays["stuck.example"] = TimeSpan.FromMinutes(5);
+        _host.Services.GetRequiredService<ReleaseSearchService>().IndexerTimeout = TimeSpan.FromSeconds(2);
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var releases = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/release?episodeId={mainCardId}"))!;
+        watch.Stop();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(watch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(3.5)), "1 s + 1 s + 2 s timeout in sequence would take 4 s or more");
+            Assert.That(releases.Select(r => (string)r!["indexer"]!).Distinct(), Is.EquivalentTo(new[] { "Tracker", "fast", "slow" }));
+        });
+    }
+
+    [Test]
     public async Task Rss_sync_grabs_releases_for_wanted_episodes()
     {
         var (_, mainCardId) = await SeedAsync();
@@ -207,8 +244,16 @@ public class ReleaseApiTests
 
         public List<string> Categories { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        /// <summary>Response delay by host.</summary>
+        public Dictionary<string, TimeSpan> Delays { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (Delays.TryGetValue(request.RequestUri!.Host, out var delay))
+            {
+                await Task.Delay(delay, cancellationToken);
+            }
+
             var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri!.Query);
             lock (Queries)
             {
@@ -228,7 +273,7 @@ public class ReleaseApiTests
                 <?xml version="1.0" encoding="UTF-8"?>
                 <rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>{items}</channel></rss>
                 """;
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(xml, Encoding.UTF8, "application/xml") });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(xml, Encoding.UTF8, "application/xml") };
         }
 
         private string Item(string title, int gigabytes, int seeders) => $"""

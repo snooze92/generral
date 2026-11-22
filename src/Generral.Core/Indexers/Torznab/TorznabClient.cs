@@ -31,10 +31,13 @@ public sealed class TorznabClient(IHttpClientFactory clients, TimeProvider time,
 {
     public const string ClientName = "Indexer";
 
-    /// <summary>Minimum gap between two requests to the same indexer host.</summary>
+    /// <summary>
+    /// Minimum gap between two requests to the same indexer, i.e. the same URL path: Prowlarr proxies every indexer
+    /// on one host (<c>/1/api</c>, <c>/2/api</c>…), so limiting per host would serialise them all.
+    /// </summary>
     public static readonly TimeSpan RateLimit = TimeSpan.FromSeconds(2);
 
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _hostLocks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _indexerLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastRequest = new(StringComparer.OrdinalIgnoreCase);
 
     public static void ConfigureClient(HttpClient client)
@@ -109,17 +112,17 @@ public sealed class TorznabClient(IHttpClientFactory clients, TimeProvider time,
     private async Task<string> GetAsync(Uri url, CancellationToken cancellationToken)
     {
         SsrfGuard.EnsureAllowed(url);
-        var host = url.Authority;
-        var gate = _hostLocks.GetOrAdd(host, _ => new SemaphoreSlim(1, 1));
+        var key = url.GetLeftPart(UriPartial.Path);
+        var gate = _indexerLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken);
         try
         {
-            if (_lastRequest.TryGetValue(host, out var last) && last + RateLimit - time.GetUtcNow() is { } wait && wait > TimeSpan.Zero)
+            if (_lastRequest.TryGetValue(key, out var last) && last + RateLimit - time.GetUtcNow() is { } wait && wait > TimeSpan.Zero)
             {
                 await Task.Delay(wait, time, cancellationToken);
             }
 
-            _lastRequest[host] = time.GetUtcNow();
+            _lastRequest[key] = time.GetUtcNow();
             using var response = await clients.CreateClient(ClientName).GetAsync(url, cancellationToken);
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogDebug("GET {Url}: {Status}", url, (int)response.StatusCode);

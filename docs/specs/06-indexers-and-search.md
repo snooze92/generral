@@ -57,7 +57,11 @@ Implementation notes (M2a):
   http(s), `apiPath` a path, `additionalParameters` like `&a=b`, seed criteria > 0, known tags, and,
   for enabled indexers, the `t=caps` test (must support `q` in `search` or `tv-search`).
 - Requests use the `Indexer` HTTP client: same SSRF guard as sources (only link-local blocked, so
-  a LAN Prowlarr works), 100 s timeout, and at most one request per 2 s per indexer host.
+  a LAN Prowlarr works), 100 s timeout, and at most one request per 2 s per indexer (keyed by URL
+  path, not host: all Prowlarr proxies share one host).
+- Searches and RSS syncs query up to 8 indexers in parallel; each indexer gets 30 s for all its
+  queries of that search. A failing or timed-out indexer is logged and only loses its own results,
+  so an interactive search takes about as long as the slowest indexer (capped at 30 s).
 
 A **native Prowlarr app type** (like the one Sportarr has open as Prowlarr PR #2758) is a `Later`
 upstream contribution. The Sonarr shim stays.
