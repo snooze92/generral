@@ -118,11 +118,27 @@ public static partial class ReleaseTitleMatcher
         return null;
     }
 
-    private static (bool Ok, string? Error) Match(string rule, string raw, string normalized)
+    /// <summary>The normalised title without the parts matched by <c>must</c>/<c>any</c> rules (e.g. the team code <c>FRA</c>), or null when none matched.</summary>
+    public static string? RemoveMatches(SearchTerms terms, string title)
     {
-        var isRaw = rule.StartsWith(RawPrefix, StringComparison.Ordinal);
-        var pattern = isRaw ? rule[RawPrefix.Length..] : rule;
-        var regex = Cache.GetOrAdd(pattern, static p =>
+        var normalized = Normalize(title);
+        var removed = normalized;
+        foreach (var rule in terms.Must.Concat(terms.Any).Where(r => !r.StartsWith(RawPrefix, StringComparison.Ordinal)))
+        {
+            try
+            {
+                removed = Regex(rule)?.Replace(removed, " ") ?? removed;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+            }
+        }
+
+        return removed == normalized ? null : removed;
+    }
+
+    private static Regex? Regex(string pattern) =>
+        Cache.GetOrAdd(pattern, static p =>
         {
             try
             {
@@ -133,6 +149,12 @@ public static partial class ReleaseTitleMatcher
                 return null;
             }
         });
+
+    private static (bool Ok, string? Error) Match(string rule, string raw, string normalized)
+    {
+        var isRaw = rule.StartsWith(RawPrefix, StringComparison.Ordinal);
+        var pattern = isRaw ? rule[RawPrefix.Length..] : rule;
+        var regex = Regex(pattern);
 
         if (regex is null)
         {

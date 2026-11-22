@@ -2,6 +2,7 @@ using Generral.Core.Blocklisting;
 using Generral.Core.Download;
 using Generral.Core.History;
 using Generral.Core.Indexers;
+using Generral.Core.Languages;
 using Generral.Core.Mappings;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
@@ -139,6 +140,7 @@ public class GenerralDbContext(DbContextOptions<GenerralDbContext> options) : Db
             profile.HasIndex(p => p.Name).IsUnique();
             profile.Property(p => p.Name).UseCollation("NOCASE");
             profile.Property(p => p.Items).HasJsonConversion();
+            profile.Property(p => p.Language).HasConversion(l => l.Id, id => Language.Find(id) ?? Language.English);
         });
 
         modelBuilder.Entity<ReleaseProfile>(profile =>

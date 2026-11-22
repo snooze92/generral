@@ -4,6 +4,7 @@
 //
 // Ported from Sonarr@51a2412af235 src/Sonarr.Api.V3/Profiles/Quality/QualityProfileController.cs, QualityProfileResource.cs,
 // QualityProfileSchemaController.cs, QualityCutoffValidator.cs, QualityItemsValidator.cs and QualityProfileResourceValidator.cs
+using Generral.Core.Languages;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
 using Microsoft.AspNetCore.Routing;
@@ -23,6 +24,9 @@ public sealed record QualityProfileResource
 
     public List<QualityProfileQualityItem>? Items { get; init; }
 
+    /// <summary>Radarr's profile language; defaults to English when omitted.</summary>
+    public Language? Language { get; init; }
+
     public int MinFormatScore { get; init; }
 
     public int CutoffFormatScore { get; init; }
@@ -38,6 +42,7 @@ public sealed record QualityProfileResource
         UpgradeAllowed = profile.UpgradeAllowed,
         Cutoff = profile.Cutoff,
         Items = profile.Items,
+        Language = profile.Language,
     };
 
     public QualityProfile ToModel(int id) => new()
@@ -47,6 +52,7 @@ public sealed record QualityProfileResource
         UpgradeAllowed = UpgradeAllowed,
         Cutoff = Cutoff,
         Items = Items!,
+        Language = Language ?? Language.English,
     };
 }
 

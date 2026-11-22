@@ -2,9 +2,10 @@
 // SPDX-FileCopyrightText: The Generral contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Ported from Sonarr@51a2412af235 src/NzbDrone.Core/Profiles/Qualities/QualityProfile.cs,
+// Ported from Sonarr@51a2412af235 src/NzbDrone.Core/Profiles/Qualities/QualityProfile.cs (Language: Radarr's),
 // src/NzbDrone.Core/Profiles/Qualities/QualityProfileQualityItem.cs and src/NzbDrone.Core/Profiles/Qualities/QualityIndex.cs
 using System.Text.Json.Serialization;
+using Generral.Core.Languages;
 using Generral.Core.Qualities;
 
 namespace Generral.Core.Profiles;
@@ -22,6 +23,9 @@ public class QualityProfile
 
     /// <summary>Lowest to highest preference; groups have an <c>Id</c>, a <c>Name</c> and <c>Items</c> instead of a <c>Quality</c>.</summary>
     public List<QualityProfileQualityItem> Items { get; set; } = [];
+
+    /// <summary>The wanted audio language (Radarr-style), or <see cref="Language.Any"/> / <see cref="Language.Original"/>.</summary>
+    public Language Language { get; set; } = Language.English;
 
     /// <summary>Index of the item holding <paramref name="qualityId"/> (or the group with that id), -1 when absent.</summary>
     public (int Index, int GroupIndex) GetIndex(int qualityId)

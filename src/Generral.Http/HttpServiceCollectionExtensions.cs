@@ -130,6 +130,7 @@ public static partial class HttpServiceCollectionExtensions
         api.MapIndexerEndpoints();
         api.MapDownloadClientEndpoints();
         api.MapActivityEndpoints();
+        api.MapLanguageEndpoints();
         api.MapQualityProfileEndpoints();
         api.MapQualityDefinitionEndpoints();
         api.MapReleaseProfileEndpoints();

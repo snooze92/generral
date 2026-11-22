@@ -97,6 +97,9 @@ Quality resources (M2b), Sonarr v3-shaped:
   cutoff = an allowed item, sizes 0–1000 and ordered). `formatItems`/`*FormatScore` are returned
   fixed (`[]`, `0`, `0`, `1`) and ignored until custom formats. `DELETE` of a profile used by a
   series → 400 `QualityProfile [name] is in use.`
+- `language`: `GET /language` (Sonarr's list plus `Any` -1 and `Original` -2, `{ id, name }`),
+  `GET /language/{id}`. Quality profiles carry `language: { id, name }` (Radarr-style; read by
+  `id`, defaults to English when omitted).
 - `qualitydefinition`: `GET`, `GET /{id}`, `PUT /{id}`, `PUT /update` (list), `GET /limits`. Only
   `title` and sizes are writable; size changes are copied into every profile item (Sonarr's
   `UpdateAllSizeLimits`). `quality` is `{ id, name, source, resolution }` and is read by `id`.
@@ -105,7 +108,7 @@ Quality resources (M2b), Sonarr v3-shaped:
   indexer, title, mappedSeriesId, mappedSeasonNumber, mappedEpisodeNumbers, mappedEpisodeInfo[],
   approved, rejected, rejections[], publishDate, downloadUrl, magnetUrl, infoHash, infoUrl,
   commentUrl, seeders, leechers, protocol, indexerFlags, episodeRequested, downloadAllowed,
-  releaseWeight`; no scene/TVDB/language/custom-format fields). Results are cached 30 min;
+  releaseWeight, languages[]`; no scene/TVDB/custom-format fields). Results are cached 30 min;
   `POST /release { guid, indexerId, episodeIds? }` grabs a cached one (rejected ones too),
   `episodeIds` (one series) overriding the match; unknown → 404, missing guid/indexerId → 400.
   `/release/push` is not implemented yet. `GET/PUT /settings/indexer { rssSyncInterval }`.

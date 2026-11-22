@@ -93,6 +93,8 @@ public class ReleaseApiTests
         var unknown = await _client.PostAsJsonAsync("/api/v1/release", new JsonObject { ["guid"] = "nope", ["indexerId"] = 1 });
         var invalid = await _client.PostAsJsonAsync("/api/v1/release", new JsonObject());
         var missing = await _client.GetAsync("/api/v1/release");
+        var languages = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/language"))!;
+        var profile = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/qualityprofile"))![0]!;
         var grabs = _grabs.Grabs;
 
         Assert.Multiple(() =>
@@ -106,6 +108,10 @@ public class ReleaseApiTests
             Assert.That((string)best["indexer"]!, Is.EqualTo("Tracker"));
             Assert.That((string)best["protocol"]!, Is.EqualTo("torrent"));
             Assert.That((int)best["mappedEpisodeInfo"]![0]!["id"]!, Is.EqualTo(mainCardId));
+            Assert.That((string)best["languages"]![0]!["name"]!, Is.EqualTo("Unknown"));
+            Assert.That(languages.Take(2).Select(l => (string)l!["name"]!), Is.EqualTo(new[] { "Any", "Original" }));
+            Assert.That(languages.Select(l => (int)l!["id"]!), Does.Contain(1).And.Contain(11));
+            Assert.That((string)profile["language"]!["name"]!, Is.EqualTo("English"));
             Assert.That(prelims["rejections"]!.AsArray().Select(r => (string)r!), Is.EqualTo(new[] { "Matches S2026E02, which wasn't requested" }));
             Assert.That((string)sd["rejections"]![0]!, Is.EqualTo("SDTV is not wanted in profile"));
             Assert.That(releases.Single(r => ((string)r["title"]!).Contains("Fight Night"))["rejections"]![0]!.GetValue<string>(), Does.StartWith("Does not match S2026E03: Does not match required rule"));

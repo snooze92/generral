@@ -135,6 +135,7 @@ rejection carries a human-readable reason shown in interactive search and logs.
 | Upgrade allowed / cutoff not met / is an upgrade | Against existing file. |
 | Size within quality definition limits | Uses the episode `runtime` (from mapping; default 120 min for sport events) × MB/min limits. |
 | Minimum seeders | Indexer field. |
+| Language | Profile `language` (see § Languages). |
 | Release profiles | *Must contain* / *Must not contain* / (Sonarr v3-style) *Preferred words* with scores, scoped by tags. Useful for broadcaster or commentary-language preferences (`Sky Sports`, `ESPN`, `French`, `English`). |
 | Custom formats | `Later`. Port Sonarr v4 custom formats (also covers e.g. `50fps` and broadcaster preferences). |
 | Blocklisted | By title+indexer or by infohash. |
@@ -183,6 +184,18 @@ seeders before size.
 - Grabs go through `IDownloadService`, which sends them to a download client (spec 07 § Implementation notes (M2d)).
   A failed grab is logged and the next best release for the same episodes is tried.
 - Interactive results are ordered accepted → rejected matches → unmatched, each best first.
+
+## Languages
+
+Sonarr's `LanguageParser` and language list (ids unchanged) are ported. Release languages are
+parsed from the title, ignoring the text matched by the episode's `must`/`any` rules (so `FRA` in
+`NZL v FRA` isn't French). Like Sonarr, an untagged title is `Unknown` and a `MULTi` title adds
+`Original`. Series have no original language: **Unknown and Original count as English**.
+
+The quality profile has one wanted `language` (Radarr-style; default English, seeded English for
+existing profiles), or the special values `Any` (-1, no check) and `Original` (-2, = English). The
+language specification rejects releases whose languages don't include it: "Language French is not
+wanted (profile: English)". The indexer `multiLanguages` setting is accepted but not used yet.
 
 ## Quality
 

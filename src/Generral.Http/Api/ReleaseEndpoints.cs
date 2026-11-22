@@ -9,6 +9,7 @@ using Generral.Core.DecisionEngine;
 using Generral.Core.Download;
 using Generral.Core.Indexers;
 using Generral.Core.IndexerSearch;
+using Generral.Core.Languages;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
 using Generral.Core.Tv;
@@ -18,12 +19,14 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Generral.Http.Api;
 
-/// <summary>Sonarr's <c>ReleaseResource</c> without scene parsing fields (TVDB/IMDb ids, languages, custom formats).</summary>
+/// <summary>Sonarr's <c>ReleaseResource</c> without scene parsing fields (TVDB/IMDb ids, custom formats).</summary>
 public sealed record ReleaseResource
 {
     public string Guid { get; init; } = "";
 
     public QualityModel Quality { get; init; } = new();
+
+    public List<Language> Languages { get; init; } = [];
 
     public int QualityWeight { get; init; }
 
@@ -102,6 +105,7 @@ public sealed record ReleaseResource
         {
             Guid = release.Guid,
             Quality = remote.Quality,
+            Languages = [.. remote.Languages],
             QualityWeight = (defaultProfile.GetIndex(remote.Quality.Quality.Id).Index * 100) + (remote.Quality.Revision.Real * 10) + remote.Quality.Revision.Version,
             Age = (int)age.TotalDays,
             AgeHours = age.TotalHours,
@@ -209,6 +213,7 @@ public static class ReleaseEndpoints
             {
                 Release = cached.Release,
                 Quality = cached.Quality,
+                Languages = cached.Languages,
                 Series = episodes[0].Series,
                 Episodes = episodes.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList(),
                 EpisodeRequested = true,
