@@ -125,7 +125,7 @@ function RootFolders() {
         <FormInput
           type={inputTypes.TEXT}
           name="rootFolderPath"
-          placeholder="/data/media/sports"
+          placeholder="/data/media/generral"
           value={path}
           onChange={({ value }: InputChanged<string>) => setPath(value)}
         />

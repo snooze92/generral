@@ -106,9 +106,9 @@ notes (M2c)) and `RefreshMonitoredDownloads` every minute when a download client
    **grab**. The download service sends it to qBittorrent with category `generral` and records a
    `TrackedDownload` + History *Grabbed*.
 5. `CheckForFinishedDownloads` sees the torrent complete → import: hardlink + rename into
-   `/data/media/sports/UFC/Season 2026/UFC - S2026E11 - UFC 322 - Main Card [WEBDL-1080p].mkv`,
+   `/data/media/generral/UFC/Season 2026/UFC - S2026E11 - UFC 322 - Main Card [WEBDL-1080p].mkv`,
    write `.nfo` and thumb, History *Imported*.
-6. Connect: Plex refresh of `/data/media/sports/UFC`. Discord notification (if configured).
+6. Connect: Plex refresh of `/data/media/generral/UFC`. Discord notification (if configured).
 7. When seeding goals are met, the torrent is removed from qBittorrent (if *Remove Completed* is on).
 
 ## Cross-cutting concerns

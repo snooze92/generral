@@ -87,7 +87,7 @@ describe('Media management settings', () => {
       { ...naming, standardEpisodeFormat: 'S{season:00}E{episode:00}' },
     ]);
 
-    fireEvent.change(screen.getByPlaceholderText('/data/media/sports'), {
+    fireEvent.change(screen.getByPlaceholderText('/data/media/generral'), {
       target: { value: '/tv' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Add Root Folder' }));

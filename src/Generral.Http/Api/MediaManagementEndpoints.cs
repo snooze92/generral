@@ -253,7 +253,7 @@ public static class MediaManagementEndpoints
             ColonReplacementFormat = Enum.TryParse<ColonReplacementFormat>(request.Query["colonReplacementFormat"], out var colon) ? colon : stored.ColonReplacementFormat,
         };
 
-        var series = new Series { Title = "UFC", SortTitle = "ufc", CleanTitle = "ufc", TitleSlug = "ufc", Path = "/data/media/sports/UFC", RootFolderPath = "/data/media/sports", Year = 1993 };
+        var series = new Series { Title = "UFC", SortTitle = "ufc", CleanTitle = "ufc", TitleSlug = "ufc", Path = "/data/media/generral/UFC", RootFolderPath = "/data/media/generral", Year = 1993 };
         var daily = new Series { Title = "Formula 1", SortTitle = "formula 1", CleanTitle = "formula1", TitleSlug = "f1", Path = "/f1", RootFolderPath = "/", SeriesType = SeriesType.Daily };
         Episode Episode(int number, string title) => new() { Id = number, SeasonNumber = 2025, EpisodeNumber = number, Title = title, AirDate = new DateOnly(2025, 4, 12) };
         var file = new EpisodeFile

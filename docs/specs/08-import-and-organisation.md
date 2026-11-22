@@ -89,7 +89,7 @@ and `{Event:<field>}` for any mapped event field (e.g. `{Event:venue}`).
 ### Resulting layout (UC1/UC2/UC3)
 
 ```
-/data/media/sports/
+/data/media/generral/
 ├── UFC/
 │   ├── tvshow.nfo
 │   ├── poster.jpg  fanart.jpg  banner.jpg  clearlogo.png

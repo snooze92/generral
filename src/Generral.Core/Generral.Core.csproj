@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="Ical.Net" />
     <PackageReference Include="JsonPath.Net" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />

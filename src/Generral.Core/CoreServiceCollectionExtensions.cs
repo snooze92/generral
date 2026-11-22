@@ -151,6 +151,7 @@ public static class CoreServiceCollectionExtensions
 
         services.AddSingleton<ISourceType, TheSportsDbSourceType>();
         services.AddSingleton<ISourceType, HttpJsonSourceType>();
+        services.AddSingleton<ISourceType, HttpHtmlSourceType>();
         services.AddSingleton<ISourceType, IcalSourceType>();
         services.AddSingleton<ISourceType, StaticSourceType>();
         services.AddSingleton<SourceTypeRegistry>();

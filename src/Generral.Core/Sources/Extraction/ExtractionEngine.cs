@@ -3,8 +3,10 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using AngleSharp.Dom;
 using Generral.Core.Templating;
 using Json.Path;
+using CssSelector = AngleSharp.Css.Dom.ISelector;
 
 namespace Generral.Core.Sources.Extraction;
 
@@ -23,7 +25,7 @@ public sealed record ExtractionOptions
 }
 
 /// <summary>
-/// Runs an <see cref="ExtractionDefinition"/> over JSON documents: renders request URLs, follows pagination,
+/// Runs an <see cref="ExtractionDefinition"/> over JSON or HTML documents: renders request URLs, follows pagination,
 /// selects items and extracts fields. Template models: URLs see the <c>foreach</c> variables; field
 /// <c>text</c> templates see the previous fields, plus <c>vars</c> (the <c>foreach</c> variables) and <c>request.url</c>.
 /// </summary>
@@ -48,10 +50,19 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             throw new ExtractionDefinitionException($"fields.{ReservedFields.Raw}: is reserved");
         }
 
+        var html = definition.Format == DocumentFormat.Html;
+        if (!html && definition.HtmlPath is not null)
+        {
+            throw new ExtractionDefinitionException("htmlPath: only applies to HTML sources");
+        }
+
         return new CompiledExtraction(
-            definition.Requests.Select((r, i) => CompileRequest(r, $"requests[{i}]")).ToList(),
-            CompilePath(definition.Items, "items"),
-            definition.Fields.Select(CompileField).ToList());
+            definition.Format,
+            definition.Requests.Select((r, i) => CompileRequest(r, $"requests[{i}]", html)).ToList(),
+            html ? null : CompilePath(definition.Items, "items"),
+            html ? HtmlExtraction.CompileSelector(definition.Items, "items") : null,
+            definition.HtmlPath is { } htmlPath ? CompilePath(htmlPath, "htmlPath") : null,
+            definition.Fields.Select(f => CompileField(f, html)).ToList());
     }
 
     public Task<ExtractionResult> ExtractAsync(ExtractionDefinition definition, IDocumentFetcher fetcher, ExtractionOptions? options = null, CancellationToken cancellationToken = default)
@@ -79,7 +90,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
     public ExtractionResult Extract(CompiledExtraction extraction, JsonNode? document, Uri? url = null, ExtractionOptions? options = null, CancellationToken cancellationToken = default)
     {
         var run = new Run(options ?? new ExtractionOptions());
-        AddItems(extraction, SelectItems(extraction.Items, document), url, new Dictionary<string, object?>(), run, cancellationToken);
+        AddItems(extraction, SelectItems(extraction.Items!, document), url, new Dictionary<string, object?>(), run, cancellationToken);
         return new ExtractionResult(run.Items, run.Urls, run.Warnings);
     }
 
@@ -105,8 +116,8 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             seen.Add(url);
             run.Urls.Add(url);
             var document = await fetcher.FetchAsync(url, cancellationToken);
-            var root = ParseDocument(document);
-            var items = SelectItems(extraction.Items, root);
+            var root = ParseDocument(extraction, document);
+            var items = root is IDocument html ? HtmlExtraction.SelectItems(extraction.ItemSelector!, html) : SelectItems(extraction.Items!, (JsonNode?)root);
             if (!AddItems(extraction, items, document.Url, vars, run, cancellationToken) || pagination is null)
             {
                 return;
@@ -120,7 +131,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             }
             else
             {
-                next = NextUrl(request.Next!, root, document.Url);
+                next = NextUrl(request, root, document.Url);
                 if (next is not null && seen.Contains(next))
                 {
                     next = null;
@@ -141,7 +152,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         }
     }
 
-    private bool AddItems(CompiledExtraction extraction, List<JsonNode?> items, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
+    private bool AddItems(CompiledExtraction extraction, List<object?> items, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
     {
         foreach (var item in items)
         {
@@ -157,7 +168,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         return true;
     }
 
-    private ExtractedItem ExtractItem(CompiledExtraction extraction, JsonNode? item, int index, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
+    private ExtractedItem ExtractItem(CompiledExtraction extraction, object? item, int index, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
     {
         var values = new Dictionary<string, object?>();
         var fields = new JsonObject();
@@ -171,7 +182,11 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             {
                 if (field.Path is not null)
                 {
-                    value = Select(field.Path, item);
+                    value = Select(field.Path, (JsonNode?)item);
+                }
+                else if (field.Selector is not null)
+                {
+                    value = HtmlExtraction.Select(field, (IElement)item!);
                 }
                 else if (field.Text is not null)
                 {
@@ -243,7 +258,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         };
     }
 
-    private static List<JsonNode?> SelectItems(JsonPath path, JsonNode? root)
+    private static List<object?> SelectItems(JsonPath path, JsonNode? root)
     {
         var matches = path.Evaluate(root).Matches;
         if (matches.Count == 1 && matches[0].Value is JsonArray array)
@@ -251,12 +266,12 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             return [.. array];
         }
 
-        return matches.Where(m => m.Value is not null).Select(m => m.Value).ToList();
+        return matches.Where(m => m.Value is not null).Select(m => (object?)m.Value).ToList();
     }
 
-    private static Uri? NextUrl(JsonPath path, JsonNode? root, Uri current)
+    private static Uri? NextUrl(CompiledRequest request, object? root, Uri current)
     {
-        var text = FieldValues.ToText(Select(path, root))?.Trim();
+        var text = (root is IDocument html ? HtmlExtraction.NextUrl(request.NextSelector!, html) : FieldValues.ToText(Select(request.Next!, (JsonNode?)root)))?.Trim();
         if (string.IsNullOrEmpty(text))
         {
             return null;
@@ -267,27 +282,48 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             : throw new ExtractionException($"Invalid next page URL '{text}'");
     }
 
-    private static JsonNode? ParseDocument(FetchedDocument document)
+    private static object? ParseDocument(CompiledExtraction extraction, FetchedDocument document)
     {
+        if (extraction.Format == DocumentFormat.Html && extraction.HtmlPath is null)
+        {
+            return HtmlExtraction.Parse(document.Content);
+        }
+
+        JsonNode? root;
         try
         {
-            return JsonNode.Parse(document.Content);
+            root = JsonNode.Parse(document.Content);
         }
         catch (JsonException e)
         {
             throw new ExtractionException($"{document.Url}: invalid JSON ({e.Message})", e);
         }
+
+        if (extraction.HtmlPath is null)
+        {
+            return root;
+        }
+
+        return Select(extraction.HtmlPath, root) is string text
+            ? HtmlExtraction.Parse(text)
+            : throw new ExtractionException($"{document.Url}: htmlPath matched no string");
     }
 
-    private static JsonNode? Raw(JsonNode? item, int limit)
+    private static JsonNode? Raw(object? item, int limit)
     {
-        if (item is null)
+        if (item is IElement element)
+        {
+            var text = HtmlExtraction.RawText(element);
+            return JsonValue.Create(text.Length <= limit ? text : text[..limit]);
+        }
+
+        if (item is not JsonNode node)
         {
             return null;
         }
 
-        var json = item.ToJsonString();
-        return json.Length <= limit ? item.DeepClone() : JsonValue.Create(json[..limit]);
+        var json = node.ToJsonString();
+        return json.Length <= limit ? node.DeepClone() : JsonValue.Create(json[..limit]);
     }
 
     private static IEnumerable<IReadOnlyDictionary<string, object?>> ExpandForeach(CompiledRequest request, CancellationToken cancellationToken)
@@ -338,19 +374,25 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         return new UriBuilder(url) { Query = string.Join('&', pairs) }.Uri;
     }
 
-    private CompiledRequest CompileRequest(RequestDefinition request, string location)
+    private CompiledRequest CompileRequest(RequestDefinition request, string location, bool html)
     {
-        var pagination = request.Pagination;
+        var next = request.Pagination?.Next;
         return new CompiledRequest(
             request,
             CompileTemplate(request.Url, $"{location}.url"),
             request.Foreach.Select(v => KeyValuePair.Create(v.Key, CompileTemplate(v.Value, $"{location}.foreach.{v.Key}"))).ToList(),
-            pagination?.Next is { } next ? CompilePath(next, $"{location}.pagination.next") : null);
+            next is not null && !html ? CompilePath(next, $"{location}.pagination.next") : null,
+            next is not null && html ? HtmlExtraction.CompileSelector(next, $"{location}.pagination.next") : null);
     }
 
-    private CompiledField CompileField(FieldDefinition field)
+    private CompiledField CompileField(FieldDefinition field, bool html)
     {
         var location = $"fields.{field.Name}";
+        if (html ? field.Path is not null : field.Selector is not null)
+        {
+            throw new ExtractionDefinitionException(html ? $"{location}.path: HTML sources use 'selector'" : $"{location}.selector: JSON sources use 'path'");
+        }
+
         var filters = field.Filters.Select((f, i) =>
         {
             try
@@ -366,6 +408,8 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         return new CompiledField(
             field,
             field.Path is not null ? CompilePath(field.Path, $"{location}.path") : null,
+            field.Selector is not null ? HtmlExtraction.CompileSelector(field.Selector, $"{location}.selector") : null,
+            field.Remove is not null ? HtmlExtraction.CompileSelector(field.Remove, $"{location}.remove") : null,
             field.Text is not null ? CompileTemplate(field.Text, $"{location}.text") : null,
             filters);
     }
@@ -401,20 +445,31 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
 
 public sealed class CompiledExtraction
 {
-    internal CompiledExtraction(IReadOnlyList<CompiledRequest> requests, JsonPath items, IReadOnlyList<CompiledField> fields)
+    internal CompiledExtraction(DocumentFormat format, IReadOnlyList<CompiledRequest> requests, JsonPath? items, CssSelector? itemSelector, JsonPath? htmlPath, IReadOnlyList<CompiledField> fields)
     {
+        Format = format;
         Requests = requests;
         Items = items;
+        ItemSelector = itemSelector;
+        HtmlPath = htmlPath;
         Fields = fields;
     }
 
+    internal DocumentFormat Format { get; }
+
     internal IReadOnlyList<CompiledRequest> Requests { get; }
 
-    internal JsonPath Items { get; }
+    /// <summary>JSON items.</summary>
+    internal JsonPath? Items { get; }
+
+    /// <summary>HTML items.</summary>
+    internal CssSelector? ItemSelector { get; }
+
+    internal JsonPath? HtmlPath { get; }
 
     internal IReadOnlyList<CompiledField> Fields { get; }
 }
 
-internal sealed record CompiledRequest(RequestDefinition Definition, CompiledTemplate Url, IReadOnlyList<KeyValuePair<string, CompiledTemplate>> Foreach, JsonPath? Next);
+internal sealed record CompiledRequest(RequestDefinition Definition, CompiledTemplate Url, IReadOnlyList<KeyValuePair<string, CompiledTemplate>> Foreach, JsonPath? Next, CssSelector? NextSelector);
 
-internal sealed record CompiledField(FieldDefinition Definition, JsonPath? Path, CompiledTemplate? Text, IReadOnlyList<FieldFilter> Filters);
+internal sealed record CompiledField(FieldDefinition Definition, JsonPath? Path, CssSelector? Selector, CssSelector? Remove, CompiledTemplate? Text, IReadOnlyList<FieldFilter> Filters);

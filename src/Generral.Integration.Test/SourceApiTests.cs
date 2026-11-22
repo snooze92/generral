@@ -46,7 +46,7 @@ public class SourceApiTests
         var apiKey = thesportsdb["fields"]!.AsArray().Single(f => (string)f!["name"]! == "apiKey")!;
         Assert.Multiple(() =>
         {
-            Assert.That(schema.Select(s => (string)s!["type"]!), Is.EquivalentTo(new[] { "thesportsdb", "http-json", "ical", "static" }));
+            Assert.That(schema.Select(s => (string)s!["type"]!), Is.EquivalentTo(new[] { "thesportsdb", "http-json", "http-html", "ical", "static" }));
             Assert.That((string)apiKey["value"]!, Is.EqualTo("123"));
             Assert.That((string)apiKey["type"]!, Is.EqualTo("password"));
             Assert.That((int)thesportsdb["refreshInterval"]!, Is.EqualTo(720));
