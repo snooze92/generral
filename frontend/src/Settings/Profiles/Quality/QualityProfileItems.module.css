@@ -1,0 +1,41 @@
+.items {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--hairline);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.check {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.name {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.groupItems {
+  color: var(--inkMuted);
+  font-size: 12px;
+}

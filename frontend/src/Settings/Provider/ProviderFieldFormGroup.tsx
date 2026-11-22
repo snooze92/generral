@@ -1,16 +1,17 @@
 // Adapted from Sonarr (GPL-3.0-or-later): frontend/src/Components/Form/ProviderFieldFormGroup.tsx
-// Maps Generral's source field types (including multi-line textArea) to inputs.
+// Maps the field types of sources (including multi-line textArea), indexers and download clients
+// to inputs.
 import React, { useMemo } from 'react';
 import FormInput from 'Components/Form/FormInput';
 import FormInputHelpText from 'Components/Form/FormInputHelpText';
 import FormLabel from 'Components/Form/FormLabel';
 import FormRow from 'Components/Form/FormRow';
 import { InputType } from 'Helpers/Props/inputTypes';
-import { SourceSelectOption } from 'Sources/Source';
 import { InputChanged } from 'typings/inputs';
 import { Failure } from 'typings/pending';
+import { ProviderSelectOption } from './Provider';
 
-interface SourceFieldFormGroupProps {
+interface ProviderFieldFormGroupProps {
   advancedSettings: boolean;
   name: string;
   label: string;
@@ -19,22 +20,23 @@ interface SourceFieldFormGroupProps {
   unit?: string;
   value?: unknown;
   type: string;
+  isFloat?: boolean;
   advanced: boolean;
   pending: boolean;
   errors: Failure[];
   warnings: Failure[];
-  selectOptions?: SourceSelectOption[];
+  selectOptions?: ProviderSelectOption[];
   onChange: (change: InputChanged<unknown>) => void;
 }
 
-function getInputType(type: string): InputType {
+function getInputType(type: string, isFloat?: boolean): InputType {
   switch (type) {
     case 'checkbox':
       return 'check';
     case 'keyValueList':
       return 'keyValueList';
     case 'number':
-      return 'number';
+      return isFloat ? 'float' : 'number';
     case 'password':
       return 'password';
     case 'select':
@@ -46,7 +48,7 @@ function getInputType(type: string): InputType {
   }
 }
 
-function SourceFieldFormGroup({
+function ProviderFieldFormGroup({
   advancedSettings,
   name,
   label,
@@ -55,13 +57,14 @@ function SourceFieldFormGroup({
   unit,
   value,
   type,
+  isFloat,
   advanced,
   pending,
   errors,
   warnings,
   selectOptions,
   onChange,
-}: SourceFieldFormGroupProps) {
+}: ProviderFieldFormGroupProps) {
   const selectValues = useMemo(() => {
     return selectOptions?.map((option) => ({
       key: option.value,
@@ -75,7 +78,7 @@ function SourceFieldFormGroup({
       <FormLabel>{label}</FormLabel>
       <FormInputHelpText text={helpText} />
       <FormInput
-        type={getInputType(type)}
+        type={getInputType(type, isFloat)}
         name={name}
         placeholder={placeholder}
         unit={unit}
@@ -91,4 +94,4 @@ function SourceFieldFormGroup({
   );
 }
 
-export default SourceFieldFormGroup;
+export default ProviderFieldFormGroup;

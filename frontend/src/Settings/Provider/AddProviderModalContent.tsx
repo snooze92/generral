@@ -9,41 +9,55 @@ import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import { kinds } from 'Helpers/Props';
-import { useSourceSchema } from 'Sources/useSources';
 import translate from 'Utilities/String/translate';
-import styles from './AddSourceModalContent.module.css';
+import styles from './AddProviderModalContent.module.css';
 
-interface AddSourceModalContentProps {
+export interface ProviderType {
+  key: string;
+  name: string;
+  hint?: string;
+}
+
+interface AddProviderModalContentProps {
+  title: string;
+  types: ProviderType[];
+  isLoading: boolean;
+  errorMessage?: string;
   onTypeSelect: (type: string) => void;
   onModalClose: () => void;
 }
 
-function AddSourceModalContent({
+/** Lists the implementations from a provider schema to pick the one to add. */
+function AddProviderModalContent({
+  title,
+  types,
+  isLoading,
+  errorMessage,
   onTypeSelect,
   onModalClose,
-}: AddSourceModalContentProps) {
-  const { data: schema, isLoading, error } = useSourceSchema();
-
+}: AddProviderModalContentProps) {
   return (
     <ModalContent onModalClose={onModalClose}>
-      <ModalHeader>{translate('AddSource')}</ModalHeader>
+      <ModalHeader>{title}</ModalHeader>
 
       <ModalBody>
         {isLoading ? <LoadingIndicator /> : null}
 
-        {error ? (
-          <Alert kind={kinds.DANGER}>{translate('AddSourceError')}</Alert>
+        {errorMessage ? (
+          <Alert kind={kinds.DANGER}>{errorMessage}</Alert>
         ) : null}
 
         <div className={styles.types}>
-          {schema.map((type) => (
+          {types.map((type) => (
             <Link
-              key={type.type}
+              key={type.key}
               className={styles.type}
-              onPress={() => onTypeSelect(type.type)}
+              onPress={() => onTypeSelect(type.key)}
             >
-              <span className={styles.name}>{type.typeName ?? type.type}</span>
-              <span className={styles.id}>{type.type}</span>
+              <span className={styles.name}>{type.name}</span>
+              {type.hint ? (
+                <span className={styles.id}>{type.hint}</span>
+              ) : null}
             </Link>
           ))}
         </div>
@@ -56,4 +70,4 @@ function AddSourceModalContent({
   );
 }
 
-export default AddSourceModalContent;
+export default AddProviderModalContent;

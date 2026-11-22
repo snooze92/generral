@@ -7,7 +7,11 @@ import NotFound from 'Components/NotFound';
 import PlaceholderPage, { Milestone } from 'Components/Page/PlaceholderPage';
 import SeriesDetailsPage from 'Series/Details/SeriesDetailsPage';
 import SeriesIndex from 'Series/Index/SeriesIndex';
+import DownloadClientSettings from 'Settings/DownloadClients/DownloadClientSettings';
 import GeneralSettings from 'Settings/General/GeneralSettings';
+import IndexerSettings from 'Settings/Indexers/IndexerSettings';
+import Profiles from 'Settings/Profiles/Profiles';
+import QualitySettings from 'Settings/Quality/QualitySettings';
 import Settings from 'Settings/Settings';
 import TagSettings from 'Settings/Tags/TagSettings';
 import UISettings from 'Settings/UI/UISettings';
@@ -59,30 +63,6 @@ const PLACEHOLDERS: PlaceholderRoute[] = [
     scope: () => translate('Settings'),
     title: () => translate('MediaManagement'),
     milestone: 'M3',
-  },
-  {
-    path: '/settings/profiles',
-    scope: () => translate('Settings'),
-    title: () => translate('Profiles'),
-    milestone: 'M2',
-  },
-  {
-    path: '/settings/quality',
-    scope: () => translate('Settings'),
-    title: () => translate('Quality'),
-    milestone: 'M2',
-  },
-  {
-    path: '/settings/indexers',
-    scope: () => translate('Settings'),
-    title: () => translate('Indexers'),
-    milestone: 'M2',
-  },
-  {
-    path: '/settings/downloadclients',
-    scope: () => translate('Settings'),
-    title: () => translate('DownloadClients'),
-    milestone: 'M2',
   },
   {
     path: '/settings/connect',
@@ -154,6 +134,17 @@ export function appRouteElements() {
       <Route path="/settings/tags" element={<TagSettings />} />
 
       <Route path="/settings/ui" element={<UISettings />} />
+
+      <Route path="/settings/profiles" element={<Profiles />} />
+
+      <Route path="/settings/quality" element={<QualitySettings />} />
+
+      <Route path="/settings/indexers" element={<IndexerSettings />} />
+
+      <Route
+        path="/settings/downloadclients"
+        element={<DownloadClientSettings />}
+      />
 
       <Route path="/system/status" element={<Status />} />
 
