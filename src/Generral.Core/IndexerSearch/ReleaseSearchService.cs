@@ -278,9 +278,10 @@ public sealed class ReleaseSearchService(
             return TimeSpan.Zero;
         }
 
+        // A disabled-till time already past (e.g. Prowlarr in another time zone) falls back to the normal escalation.
         var untilDisabledTill = limit.DisabledTill - time.GetUtcNow().UtcDateTime;
         return limit.RetryAfter is { } retryAfter && retryAfter > TimeSpan.Zero ? retryAfter
-            : untilDisabledTill is { } until && until > TimeSpan.Zero ? until
+            : untilDisabledTill is { } until ? (until > TimeSpan.Zero ? until : TimeSpan.Zero)
             : RequestLimitBackOff;
     }
 

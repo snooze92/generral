@@ -69,7 +69,8 @@ Implementation notes (M2a):
   the indexer resets it. Connection errors don't escalate; in the first 15 min after a start the
   back-off doesn't escalate and is capped at 5 min. A request limit (HTTP 429, `Request limit
   reached`, or Prowlarr's `Indexer is disabled till {time} due to recent failures.`, read as local
-  time) disables it at least until `Retry-After`/that time, else for 1 h. Disabled indexers are
+  time; a time already past only escalates normally) disables it at least until `Retry-After`/that
+  time, else for 1 h. Disabled indexers are
   skipped by RSS sync, automatic and interactive search (also for their remaining queries), and
   listed by the *Indexer Status* health check (with their re-enable time) while their first failure
   is less than 6 h old. A per-indexer search timeout is not a failure.
