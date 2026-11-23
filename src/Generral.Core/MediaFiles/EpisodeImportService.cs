@@ -47,6 +47,9 @@ public sealed record ImportItem
     public string? DownloadClient { get; init; }
 
     public string? DownloadClientName { get; init; }
+
+    /// <summary>Other video files of the release that were not imported (recorded in the history).</summary>
+    public IReadOnlyList<string> IgnoredFiles { get; init; } = [];
 }
 
 public sealed record ImportResult(string Path, IReadOnlyList<int> EpisodeIds, EpisodeFile? File, IReadOnlyList<string> Errors)
@@ -55,7 +58,11 @@ public sealed record ImportResult(string Path, IReadOnlyList<int> EpisodeIds, Ep
 }
 
 /// <summary>A video file found in a download folder, with the episodes it was assigned to (empty when none could be).</summary>
-public sealed record LocalEpisodeFile(string Path, long Size, IReadOnlyList<int> EpisodeIds, string? Rejection);
+public sealed record LocalEpisodeFile(string Path, long Size, IReadOnlyList<int> EpisodeIds, string? Rejection)
+{
+    /// <summary>Another file of the release was picked for its single episode; this one is left alone.</summary>
+    public bool Ignored { get; init; }
+}
 
 public sealed partial class EpisodeImportService(
     GenerralDbContext db,
@@ -116,12 +123,19 @@ public sealed partial class EpisodeImportService(
             return [new LocalEpisodeFile(files[0].FullName, files[0].Length, episodeIds, null)];
         }
 
+        var candidates = await ReleaseSearchCandidatesAsync(episodeIds, cancellationToken);
         if (episodeIds.Count == 1)
         {
+            if (candidates.Count == 1 && PickFile(files, candidates[0]) is { } picked)
+            {
+                return files.Select(f => f == picked
+                    ? new LocalEpisodeFile(f.FullName, f.Length, episodeIds, null)
+                    : new LocalEpisodeFile(f.FullName, f.Length, [], $"Ignored: {picked.Name} was imported for {candidates[0].Label}") { Ignored = true }).ToList();
+            }
+
             return files.Select(f => new LocalEpisodeFile(f.FullName, f.Length, [], "Several video files for a single episode: manual import required")).ToList();
         }
 
-        var candidates = await ReleaseSearchCandidatesAsync(episodeIds, cancellationToken);
         var matches = files.Select(f => (File: f, Episodes: candidates.Where(c => c.HasRules && ReleaseTitleMatcher.Check(c.Terms, f.Name) is null).ToList())).ToList();
         var claimed = matches.Where(m => m.Episodes.Count == 1).GroupBy(m => m.Episodes[0].Episode.Id).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
         return matches.Select(m => m.Episodes switch
@@ -133,9 +147,53 @@ public sealed partial class EpisodeImportService(
         }).ToList();
     }
 
+    /// <summary>
+    /// The file of a multi-file release (e.g. <c>Main Card.mkv</c> + <c>Prelims.mkv</c>) for its single episode: the only one matching the episode's
+    /// rules, else the only one not excluded by its <c>mustNot</c> rules, else the only one named like the episode title, else the only "main card", else the
+    /// largest when at least twice the size of the next. Null when still ambiguous.
+    /// </summary>
+    internal static FileInfo? PickFile(IReadOnlyList<FileInfo> files, SearchCandidate candidate)
+    {
+        static FileInfo? Single(IEnumerable<FileInfo> matches) => matches.Take(2).ToList() is [var one] ? one : null;
+
+        if (candidate.HasRules && Single(files.Where(f => ReleaseTitleMatcher.Check(candidate.Terms, f.Name) is null)) is { } matching)
+        {
+            return matching;
+        }
+
+        var allowed = files.Where(f => ReleaseTitleMatcher.Check(candidate.Terms with { Must = [], Any = [] }, f.Name) is null).ToList();
+        if (allowed.Count == 1)
+        {
+            return allowed[0];
+        }
+
+        static string Words(string text) => $" {string.Join(' ', WordsRegex().Matches(text.ToLowerInvariant()).Select(m => m.Value))} ";
+        var title = Words(candidate.Episode.Title);
+        foreach (var named in new Func<string, bool>[]
+                 {
+                     stem => stem.Trim().Length > 0 && (title.Contains(stem, StringComparison.Ordinal) || stem.Contains(title, StringComparison.Ordinal)),
+                     stem => stem.Contains(" main card ", StringComparison.Ordinal),
+                 })
+        {
+            if (Single(allowed.Where(f => named(Words(System.IO.Path.GetFileNameWithoutExtension(f.Name))))) is { } picked)
+            {
+                return picked;
+            }
+        }
+
+        var bySize = allowed.OrderByDescending(f => f.Length).ToList();
+        return bySize.Count >= 2 && bySize[0].Length >= 2 * bySize[1].Length ? bySize[0] : null;
+    }
+
     /// <summary>Checks the specifications, then transfers, renames and records the file (spec 08 steps 5–10).</summary>
     public async Task<ImportResult> ImportAsync(ImportItem item, TransferMode mode, CancellationToken cancellationToken = default)
     {
+        if (item.Quality.Quality == Quality.Unknown)
+        {
+            // A bare release title ("UFC 334") has no quality; the file name may.
+            item = item with { Quality = QualityParser.ParseQuality(System.IO.Path.GetFileName(item.Path)) };
+        }
+
         var series = await db.Series.SingleOrDefaultAsync(s => s.Id == item.SeriesId, cancellationToken);
         var episodes = await db.Episodes.Where(e => item.EpisodeIds.Contains(e.Id) && e.SeriesId == item.SeriesId)
             .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToListAsync(cancellationToken);
@@ -384,6 +442,7 @@ public sealed partial class EpisodeImportService(
                     [EpisodeHistory.DownloadClientName] = item.DownloadClientName,
                     ["releaseGroup"] = file.ReleaseGroup,
                     [EpisodeHistory.Size] = file.Size.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["ignoredFiles"] = item.IgnoredFiles.Count > 0 ? string.Join(", ", item.IgnoredFiles) : null,
                 },
             });
         }
@@ -453,6 +512,9 @@ public sealed partial class EpisodeImportService(
     }
 
     private static ImportResult Reject(ImportItem item, string reason) => new(item.Path, item.EpisodeIds, null, [reason]);
+
+    [GeneratedRegex(@"[\p{L}\p{N}]+")]
+    private static partial Regex WordsRegex();
 
     [GeneratedRegex(@"(?:\\|\/|^)(?:extras|extrafanart|behind the scenes|deleted scenes|featurettes|interviews|other|scenes|samples|shorts|trailers|theme[-_. ]music|backdrops)(?:\\|\/)", RegexOptions.IgnoreCase)]
     private static partial Regex ExcludedExtrasSubFolderRegex();

@@ -45,7 +45,14 @@ public sealed class CompletedDownloadService(
         var mode = item.CanMoveFiles ? TransferMode.Move : config.CopyUsingHardlinks ? TransferMode.HardLinkOrCopy : TransferMode.Copy;
         var sourceFolder = Directory.Exists(outputPath) ? outputPath : Path.GetDirectoryName(outputPath);
         var results = new List<ImportResult>();
-        foreach (var file in await importer.AssignAsync(outputPath, tracked.EpisodeIds, cancellationToken))
+        var files = await importer.AssignAsync(outputPath, tracked.EpisodeIds, cancellationToken);
+        var ignored = files.Where(f => f.Ignored).Select(f => Path.GetFileName(f.Path)).ToList();
+        if (ignored.Count > 0)
+        {
+            logger.LogInformation("{Title}: ignoring {Files}, another file was picked for the episode", tracked.Title, string.Join(", ", ignored));
+        }
+
+        foreach (var file in files.Where(f => !f.Ignored))
         {
             if (file.EpisodeIds.Count == 0)
             {
@@ -64,6 +71,7 @@ public sealed class CompletedDownloadService(
                 SourceFolder = sourceFolder,
                 DownloadClient = client.Implementation,
                 DownloadClientName = client.Name,
+                IgnoredFiles = ignored,
             }, mode, cancellationToken));
         }
 
