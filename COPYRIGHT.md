@@ -28,7 +28,8 @@ General Public License requires. Machine-readable, per-file information is in
 
 Bundled fonts (`frontend/public/Content/Fonts`) are Inter, JetBrains Mono and Fraunces from
 [Fontsource](https://fontsource.org), under the SIL Open Font License 1.1
-([`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt)). The licences of the npm packages bundled into the
+([`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt)). Noto Sans Bold (© 2022 The Noto Project Authors,
+OFL-1.1) is embedded in the backend to draw generated posters, with SkiaSharp (MIT). The licences of the npm packages bundled into the
 web UI are listed in `.vite/license.md` inside the build output.
 
 Vendored frontend files are byte-identical to upstream apart from the mechanical transforms listed

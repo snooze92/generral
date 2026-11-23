@@ -125,6 +125,28 @@ public class ApplyMappingsServiceTests
     }
 
     [Test]
+    public async Task Season_posters_come_from_the_first_event_with_one()
+    {
+        using (var db = Db())
+        {
+            db.Mappings.Single().Definition = Definition.Replace(
+                "title: 'Year {{ season }}' }",
+                "title: 'Year {{ season }}', images: { poster: '{{ if event.key != \"401\" }}https://img.example.org/{{ event.key }}.jpg{{ end }}' } }",
+                StringComparison.Ordinal);
+            db.SaveChanges();
+        }
+
+        await Apply.ApplyAsync(_mappingId);
+
+        using var check = Db();
+        Assert.That(check.Seasons.OrderBy(s => s.SeasonNumber).Select(s => $"{s.SeasonNumber} {s.Images.Poster}"), Is.EqualTo(new[]
+        {
+            "2025 https://img.example.org/399.jpg",
+            "2026 https://img.example.org/402.jpg",
+        }), "401 is earlier in 2026 but renders empty");
+    }
+
+    [Test]
     public async Task Successful_source_refresh_enqueues_apply_for_its_mappings()
     {
         var queue = _services.GetRequiredService<CommandQueue>();

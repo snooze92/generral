@@ -14,7 +14,8 @@ public static class MappingDefinitionParser
 {
     private static readonly string[] RootKeys =
         ["name", "series", "source", "priority", "filter", "vars", "dedupe", "parts", "season", "episode", "absolute", "title", "overview", "airDate", "runtime", "images", "search"];
-    private static readonly string[] SeasonKeys = ["strategy", "value", "group", "title"];
+    private static readonly string[] SeasonKeys = ["strategy", "value", "group", "title", "images"];
+    private static readonly string[] SeasonImageKeys = ["poster"];
     private static readonly string[] EpisodeKeys = ["strategy", "order", "value", "onInsert"];
     private static readonly string[] ImageKeys = ["thumb"];
     private static readonly string[] SearchTemplateKeys = ["queries", "must", "mustNot", "any"];
@@ -197,6 +198,7 @@ public static class MappingDefinitionParser
             Value = Template(obj["value"], "season.value"),
             Group = Template(obj["group"], "season.group"),
             Title = Template(obj["title"], "season.title"),
+            Poster = obj["images"] is { } images ? Template(Strict(images, "season.images", SeasonImageKeys)["poster"], "season.images.poster") : null,
         };
 
         switch (season.Strategy)

@@ -188,7 +188,26 @@ Plex local-asset file names:
 Images are cached in `/config/MediaCover/<seriesId>/` (Sonarr parity, served to the UI at
 `/MediaCover/...`) and copied to the library on import and when they change. *M3b: no cache yet.
 Images are downloaded straight into the library when their URL changes, and season posters are
-named `SeasonNN.jpg` (`Season2025.jpg`).*
+named `SeasonNN.jpg` (`Season2025.jpg`).* Every sync (after import, mapping apply, series edit)
+compares each file's URL with the tracked one, so a changed `images.thumb` rewrites the thumbs of
+existing files too. Season poster files are only written for seasons that have a file (the season
+folder must exist).
+
+Series images are set by URL in the UI (*Series → Edit Images*: poster, fanart, banner, logo).
+Season posters come from the mapping's `season.images.poster` template, rendered per event (like
+`season.title`, `season`/`episode` known): the season takes the first non-empty value in event
+order (earliest start first), and keeps its stored poster when the template renders empty for all
+of its events.
+
+**Generated posters** (Plex NFO setting *Generate missing series/season posters*, default on):
+without a series or season poster URL, a plain 1000×1500 JPEG is drawn instead (dark gradient,
+series title big with the year below; for seasons the season title, `Specials`, the year or
+`Season N` big with the series title below), with SkiaSharp and an embedded Noto Sans Bold.
+Episodes never get one (Plex's own screenshots are better). A generated file is tracked with the
+hash `generated:v<N>:…`, so it is redrawn when the title changes and replaced as soon as a real URL
+appears; it never overwrites a file that exists and wasn't generated (a downloaded image whose URL
+was later removed, or a hand-placed one). A failed download falls back to the generated poster only
+when no file exists yet, and is retried on the next sync.
 
 ## Rename & organise existing files
 

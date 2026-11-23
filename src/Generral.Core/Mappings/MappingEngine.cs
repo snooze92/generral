@@ -139,6 +139,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         AssignEpisodes(numbering, input);
 
         var seasons = new Dictionary<int, string?>();
+        var posters = new Dictionary<int, string>();
         foreach (var row in numbering)
         {
             Render(row, templates, input.Definition, cancellationToken);
@@ -146,6 +147,10 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             {
                 var number = row.Plan.SeasonNumber!.Value;
                 seasons[number] = seasons.GetValueOrDefault(number) ?? row.Plan.SeasonTitle;
+                if (row.Plan.SeasonPoster is { } poster)
+                {
+                    posters.TryAdd(number, poster);
+                }
             }
         }
 
@@ -155,7 +160,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         }
 
         var seriesType = input.Definition.Episode.Strategy == EpisodeStrategy.Date ? SeriesType.Daily : SeriesType.Standard;
-        return new MappingPlan(rows.Select(r => r.Plan).ToList(), seriesType, seasons);
+        return new MappingPlan(rows.Select(r => r.Plan).ToList(), seriesType, seasons) { SeasonPosters = posters };
     }
 
     /// <summary><c>part.*</c>: the part's properties as authored, plus <c>index</c>.</summary>
@@ -392,6 +397,11 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         if (Try(plan, "season.title", () => Optional(templates.SeasonTitle), out var seasonTitle))
         {
             plan.SeasonTitle = seasonTitle;
+        }
+
+        if (Try(plan, "season.images.poster", () => Optional(templates.SeasonPoster), out var seasonPoster))
+        {
+            plan.SeasonPoster = seasonPoster;
         }
 
         if (Try(plan, "overview", () => Optional(templates.Overview), out var overview))
@@ -648,6 +658,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             SeasonValue = definition.Season.Strategy == SeasonStrategy.Field ? Compile(definition.Season.Value!, "season.value") : null;
             SeasonGroup = Optional(definition.Season.Group, "season.group");
             SeasonTitle = Optional(definition.Season.Title, "season.title");
+            SeasonPoster = Optional(definition.Season.Poster, "season.images.poster");
             Order = Compile(definition.Episode.Order, "episode.order");
             EpisodeValue = Optional(definition.Episode.Value, "episode.value");
             Absolute = Optional(definition.Absolute, "absolute");
@@ -678,6 +689,8 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         public CompiledTemplate? SeasonGroup { get; }
 
         public CompiledTemplate? SeasonTitle { get; }
+
+        public CompiledTemplate? SeasonPoster { get; }
 
         public CompiledTemplate Order { get; }
 

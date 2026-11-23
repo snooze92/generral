@@ -71,7 +71,7 @@ public class MetadataAndNotificationTests
             Assert.That(seriesNfo.Contents, Does.Contain("<title>UFC</title>").And.Contain("<premiered>1993-11-12</premiered>").And.Contain("<genre>MMA</genre>")
                 .And.Contain("<uniqueid type=\"generral\" default=\"true\">series-8f1c</uniqueid>").And.Contain("<namedseason number=\"2025\">2025</namedseason>"));
             Assert.That(nfo.SeriesImages(series, []).Select(i => i.RelativePath), Is.EqualTo(new[] { "poster.jpg", "fanart.jpg" }));
-            Assert.That(nfo.SeasonImages(new Season { SeasonNumber = 2025, Images = new() { Poster = "https://img/s.jpg" } }, "Season 2025", []).Single().RelativePath,
+            Assert.That(nfo.SeasonImages(series, new Season { SeasonNumber = 2025, Images = new() { Poster = "https://img/s.jpg" } }, "Season 2025", []).Single().RelativePath,
                 Is.EqualTo(Path.Combine("Season 2025", "Season2025.jpg")));
             Assert.That(nfo.EpisodeMetadata(File(), [episode], new JsonObject { ["episodeMetadata"] = false }), Is.Null, "artwork only (approach B)");
         });

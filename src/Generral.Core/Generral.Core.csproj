@@ -18,7 +18,13 @@
     <PackageReference Include="Scriban" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Extras/Metadata/Fonts/NotoSans-Bold.ttf" LogicalName="Generral.Core.NotoSans-Bold.ttf" />
   </ItemGroup>
 
   <ItemGroup>

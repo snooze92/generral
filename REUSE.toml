@@ -600,3 +600,10 @@ path = ["src/**/*.cs", "src/Generral.Core.Test/Fixtures/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "The Generral contributors"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Noto Sans Bold, embedded for generated fallback posters (src/Generral.Core/Extras/Metadata/PosterGenerator.cs).
+[[annotations]]
+path = ["src/Generral.Core/Extras/Metadata/Fonts/*.ttf"]
+precedence = "override"
+SPDX-FileCopyrightText = "2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)"
+SPDX-License-Identifier = "OFL-1.1"

@@ -29,6 +29,8 @@ mapping:
 
   season:
     strategy: year                    # see "Numbering strategies"
+    images:                           # optional: first non-empty value in event order wins
+      poster: '{{ event.images.poster }}'
   episode:
     strategy: sequential              # by `order` within season
     order: '{{ event.start }}'
@@ -88,6 +90,13 @@ null), `date.add <duration>` (`-2h`, `3d`; null-safe), `date.year`, `date.tz(tz)
 
 `season.title` (optional template) sets a display name (`2024-25`, `France 2023`), written to
 `tvshow.nfo` `<namedseason>`.
+
+`season.images.poster` (optional template) is the season poster URL (`SeasonNN.jpg`). Like
+`season.title` it is rendered for every event of the season (with `season`/`episode` set); the
+first non-empty value in event order (earliest start first) wins, so `{{ event.images.poster }}`
+gives the season the poster of its first event that has one. When it renders empty for every
+event, the stored poster is kept (and a generated one is drawn if there is none, see
+[08](08-import-and-organisation.md#artwork)). The preview lists it per season (`seasons[].poster`).
 
 ### Episode
 
