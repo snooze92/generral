@@ -426,6 +426,11 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             plan.Thumb = thumb;
         }
 
+        if (Try(plan, "images.poster", () => Optional(templates.Poster), out var poster))
+        {
+            plan.Poster = poster;
+        }
+
         var terms = (JsonObject)definition.Search.Settings.DeepClone();
         foreach (var (key, eventList) in templates.Search)
         {
@@ -489,6 +494,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
                    && existing.AirDate == plan.AirDate
                    && existing.Runtime == plan.Runtime
                    && existing.Images.Thumb == plan.Thumb
+                   && existing.Images.Poster == plan.Poster
                    && existing.NumberLocked == plan.NumberLocked
                    && JsonNode.DeepEquals(existing.SearchTerms, plan.SearchTerms);
         return same ? MappingChange.Unchanged : MappingChange.Changed;
@@ -667,6 +673,7 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             AirDate = Compile(definition.AirDate, "airDate");
             Runtime = Optional(definition.Runtime, "runtime");
             Thumb = Optional(definition.Thumb, "images.thumb");
+            Poster = Optional(definition.Poster, "images.poster");
             Search =
             [
                 KeyValuePair.Create("queries", List(definition.Search.Queries, "search.queries")),
@@ -707,6 +714,8 @@ public sealed class MappingEngine(TemplateRenderer renderer)
         public CompiledTemplate? Runtime { get; }
 
         public CompiledTemplate? Thumb { get; }
+
+        public CompiledTemplate? Poster { get; }
 
         public List<KeyValuePair<string, List<CompiledTemplate>>> Search { get; }
     }

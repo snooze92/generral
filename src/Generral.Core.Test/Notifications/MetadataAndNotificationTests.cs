@@ -78,7 +78,7 @@ public class MetadataAndNotificationTests
     }
 
     [Test]
-    public void Spoiler_free_mode_drops_overview_and_thumb_once_aired()
+    public void Spoiler_free_mode_drops_overview_and_thumb_once_aired_but_keeps_the_poster()
     {
         var aired = SpoilerFilter.Apply(Episode(), spoilerFree: true, Now);
         var upcoming = SpoilerFilter.Apply(Episode(), spoilerFree: true, new DateTime(2025, 4, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -89,9 +89,12 @@ public class MetadataAndNotificationTests
         {
             Assert.That(aired.Overview, Is.Null);
             Assert.That(aired.Images.Thumb, Is.Null);
+            Assert.That(aired.Images.Poster, Is.EqualTo("https://img/poster.jpg"));
             Assert.That(aired.Title, Is.EqualTo("UFC 314: Volkanovski vs. Lopes - Main Card"));
             Assert.That(nfo.EpisodeMetadata(File(), [aired], [])!.Contents, Does.Not.Contain("<plot>"));
-            Assert.That(nfo.EpisodeImages(File(), [aired], []), Is.Empty);
+            Assert.That(nfo.EpisodeImages(File(), [aired], []).Single().Url, Is.EqualTo("https://img/poster.jpg"), "promo poster replaces the redacted thumb");
+            Assert.That(nfo.EpisodeImages(File(), [new Episode { Title = "No art" }], []), Is.Empty);
+            Assert.That(nfo.EpisodeImages(File(), [Episode()], []).Single().Url, Is.EqualTo("https://img/thumb.jpg"), "thumb wins over poster");
             Assert.That(upcoming.Overview, Is.Not.Null);
             Assert.That(off.Overview, Is.Not.Null);
         });
@@ -238,7 +241,7 @@ public class MetadataAndNotificationTests
         AirDate = new DateOnly(2025, 4, 12),
         AirDateUtc = new DateTime(2025, 4, 13, 2, 0, 0, DateTimeKind.Utc),
         Runtime = 180,
-        Images = new() { Thumb = "https://img/thumb.jpg" },
+        Images = new() { Thumb = "https://img/thumb.jpg", Poster = "https://img/poster.jpg" },
     };
 
     private static EpisodeFile File() => new()

@@ -131,6 +131,8 @@ public sealed class MappingPlanRow
 
     public string? Thumb { get; internal set; }
 
+    public string? Poster { get; internal set; }
+
     public JsonObject SearchTerms { get; internal set; } = [];
 
     public bool NumberLocked { get; internal set; }
@@ -164,7 +166,7 @@ public sealed class MappingPlanRow
         episode.AirDateUtc = AirDateUtc;
         episode.AirDate = AirDate;
         episode.Runtime = Runtime;
-        episode.Images = episode.Images with { Thumb = Thumb };
+        episode.Images = episode.Images with { Thumb = Thumb, Poster = Poster };
         episode.SearchTerms = (JsonObject)SearchTerms.DeepClone();
         episode.NumberLocked = NumberLocked;
         episode.Status = EpisodeStatus.Active;

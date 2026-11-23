@@ -91,6 +91,30 @@ public class MappingEngineTests
     }
 
     [Test]
+    public void Episode_poster_is_mapped_and_a_new_poster_is_a_change()
+    {
+        var yaml = Ufc + "\n" + """
+            images:
+              thumb:  '{{ event.images.thumb }}'
+              poster: '{{ event.images.poster }}'
+            """;
+        AddEvent("401", "UFC 401", Utc(2026, 5, 1)).Images = new() { Poster = "https://img/401.jpg" };
+        Run(yaml);
+        var first = Episode("401").Images;
+        _events.Single().Images = new() { Poster = "https://img/401-v2.jpg" };
+
+        var plan = Run(yaml, apply: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Poster, Is.EqualTo("https://img/401.jpg"));
+            Assert.That(first.Thumb, Is.Null);
+            Assert.That(Row(plan, "401").Poster, Is.EqualTo("https://img/401-v2.jpg"));
+            Assert.That(Row(plan, "401").Change, Is.EqualTo(MappingChange.Changed));
+        });
+    }
+
+    [Test]
     public void Inserted_event_is_appended()
     {
         AddEvent("401", "UFC 401", Utc(2026, 5, 1));

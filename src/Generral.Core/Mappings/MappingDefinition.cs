@@ -43,6 +43,9 @@ public sealed record MappingDefinition
     /// <summary>Episode thumbnail URL template.</summary>
     public string? Thumb { get; init; }
 
+    /// <summary>Episode poster URL template (promo art, kept in spoiler-free mode).</summary>
+    public string? Poster { get; init; }
+
     public SearchDefinition Search { get; init; } = new();
 }
 

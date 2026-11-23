@@ -52,6 +52,7 @@ export interface MappingPreviewRow {
   airDateUtc?: string;
   runtime?: number;
   thumb?: string;
+  poster?: string;
   numberLocked: boolean;
   renumbered: boolean;
   change: MappingChange;

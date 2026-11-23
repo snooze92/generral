@@ -174,8 +174,8 @@ Per-episode `<file base name>.nfo`:
   are rewritten, and a Plex partial refresh follows when something changed. The settings are global
   (not per root folder or series) for now.
 - **Spoiler-free mode** (UI setting, on by default): once an episode's air time has passed, the
-  episode NFO leaves out `<plot>` and no episode thumbnail is written. The same rule applies to
-  notifications. Titles are always kept (mapping templates keep them spoiler-free).
+  episode NFO leaves out `<plot>` and its thumb is hidden; the episode poster (promo art) is kept
+  and used as episode image instead. The same rule applies to notifications. Titles are always kept (mapping templates keep them spoiler-free).
 
 ### Artwork
 
@@ -188,7 +188,7 @@ Plex local-asset file names:
 | Series banner | `banner.jpg` | |
 | Clear logo | `clearlogo.png` | |
 | Season poster | `Season XX/SeasonNN.jpg` (`Season2025.jpg`; `season-specials-poster.jpg` for specials) | Mapping `season.images.poster` |
-| Episode thumb | `<episode base name>.jpg` | Mapping `images.thumb` |
+| Episode thumb | `<episode base name>.jpg` | Mapping `images.thumb`, else `images.poster` |
 
 Images are cached in `/config/MediaCover/<seriesId>/` (Sonarr parity, served to the UI at
 `/MediaCover/...`) and copied to the library on import and when they change. *M3b: no cache yet.
