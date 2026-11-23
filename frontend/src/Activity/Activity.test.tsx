@@ -97,23 +97,28 @@ describe('Activity', () => {
           id: 1,
           path: '/downloads/abc/f1.mkv',
           relativePath: 'f1.mkv',
+          folderName: 'abc',
           size: 1000,
           series: series[0],
           episodes,
           quality,
           downloadId: 'abc',
           rejections: [],
+          assignable: true,
         },
         {
           id: 2,
           path: '/downloads/abc/sample.mkv',
           relativePath: 'sample.mkv',
+          folderName: 'abc',
           size: 10,
           episodes: [],
           quality,
-          rejections: [{ reason: 'Sample' }],
+          rejections: [{ reason: 'Ignored: f1.mkv was imported for S2026E03' }],
+          assignable: false,
         },
       ],
+      'GET /api/v1/qualitydefinition': [{ id: 1, quality: quality.quality }],
       'POST /api/v1/command': { id: 2, name: 'ManualImport', status: 'completed' },
     });
 
@@ -123,7 +128,7 @@ describe('Activity', () => {
     );
     const dialog = within(await screen.findByRole('dialog'));
     expect(await dialog.findByText('sample.mkv')).toBeTruthy();
-    expect(dialog.getByText('Sample')).toBeTruthy();
+    expect(dialog.getByText('Ignored: f1.mkv was imported for S2026E03')).toBeTruthy();
     fireEvent.click(dialog.getByRole('button', { name: 'Import' }));
 
     await waitFor(() =>
@@ -134,6 +139,7 @@ describe('Activity', () => {
           files: [
             {
               path: '/downloads/abc/f1.mkv',
+              folderName: 'abc',
               seriesId: 1,
               episodeIds: [11],
               quality,

@@ -7,6 +7,7 @@ import Queue from 'Activity/Queue/Queue';
 import AddSeries from 'AddSeries/AddSeries';
 import CalendarPage from 'Calendar/CalendarPage';
 import NotFound from 'Components/NotFound';
+import ManualImportPage from 'ManualImport/ManualImportPage';
 import SeriesDetailsPage from 'Series/Details/SeriesDetailsPage';
 import SeriesIndex from 'Series/Index/SeriesIndex';
 import DownloadClientSettings from 'Settings/DownloadClients/DownloadClientSettings';
@@ -50,6 +51,8 @@ export function appRouteElements() {
         path="/wanted/cutoffunmet"
         element={<WantedPage kind="cutoffUnmet" />}
       />
+
+      <Route path="/wanted/manualimport" element={<ManualImportPage />} />
 
       <Route path="/activity/queue" element={<Queue />} />
 

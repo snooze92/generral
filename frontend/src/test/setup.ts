@@ -37,6 +37,11 @@ if (!window.ResizeObserver) {
   };
 }
 
+// Nor scrollIntoView, which select dropdowns call on the selected option when they open.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // Modals, menus and tooltips render into #portal-root (index.html), looked up when they're imported.
 const portalRoot = document.createElement('div');
 portalRoot.id = 'portal-root';

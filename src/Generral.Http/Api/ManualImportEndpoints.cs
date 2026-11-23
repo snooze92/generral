@@ -47,6 +47,12 @@ public sealed record ManualImportResource
     public string? DownloadId { get; init; }
 
     public List<ImportRejectionResource> Rejections { get; init; } = [];
+
+    /// <summary>
+    /// The rejections only explain why the file wasn't assigned automatically (unknown series, ambiguous match, …): they
+    /// go away once the user picks the series and episodes. Ignored files of a release (Sonarr parity) are not importable.
+    /// </summary>
+    public bool Assignable { get; init; }
 }
 
 public static class ManualImportEndpoints
@@ -56,7 +62,7 @@ public static class ManualImportEndpoints
 
     /// <summary>
     /// Lists the video files of <c>folder</c> (or of the tracked download <c>downloadId</c>), with the episodes Generral would assign them
-    /// (from the grab); import them with the <c>ManualImport</c> command.
+    /// (from the grab, or from <c>seriesId</c>'s episode rules when a folder is browsed); import them with the <c>ManualImport</c> command.
     /// </summary>
     private static async Task<IResult> GetMediaFiles(
         GenerralDbContext db,
@@ -81,8 +87,15 @@ public static class ManualImportEndpoints
             return ValidationFailure.BadRequest(new ValidationFailure("folder", "folder must be an absolute path, or downloadId a download in the queue"));
         }
 
+        if (!Directory.Exists(path) && !File.Exists(path))
+        {
+            return ValidationFailure.BadRequest(new ValidationFailure("folder", $"Folder '{path}' does not exist"));
+        }
+
         var series = seriesId ?? download?.SeriesId;
-        var files = await importer.AssignAsync(path, series is null ? [] : download?.EpisodeIds ?? [], cancellationToken);
+        var files = download is null && series is { } browsed
+            ? await importer.SuggestAsync(path, browsed, cancellationToken)
+            : await importer.AssignAsync(path, series is null ? [] : download?.EpisodeIds ?? [], cancellationToken);
         var root = Directory.Exists(path) ? path : System.IO.Path.GetDirectoryName(path)!;
         var seriesResource = series is null || await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == series, cancellationToken) is not { } s
             ? null
@@ -113,6 +126,7 @@ public static class ManualImportEndpoints
                 Languages = Core.DecisionEngine.DownloadDecisionMaker.ParseLanguages(download?.Title ?? name),
                 DownloadId = download?.DownloadId,
                 Rejections = rejections,
+                Assignable = !f.Ignored,
             };
         }).ToList());
     }
