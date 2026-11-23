@@ -20,6 +20,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Generral.Core.IndexerSearch;
 
+/// <summary>Interactive search results, best first, and the indexers that timed out (their late results are missing).</summary>
+public sealed record InteractiveSearchResult(List<DownloadDecision> Decisions, IReadOnlyList<string> TimedOut);
+
 public sealed record SearchResult(List<DownloadDecision> Decisions, int Searched, int Grabbed)
 {
     public string Summary => $"{Searched} episode(s) searched, {Decisions.Count} release(s) found, {Grabbed} grabbed";
@@ -32,32 +35,40 @@ public sealed class ReleaseSearchService(
     DownloadDecisionMaker decisionMaker,
     IDownloadService downloads,
     TrackedDownloadService trackedDownloads,
-    ProviderStatusTracker status,
+    IndexerStatusService status,
     TimeProvider time,
     ILogger<ReleaseSearchService> logger)
 {
     public const int MaxParallelIndexers = 8;
 
-    /// <summary>Budget of one indexer within one search or RSS sync (all its queries).</summary>
+    /// <summary>Budget of one indexer within one automatic search or RSS sync (all its queries).</summary>
     public TimeSpan IndexerTimeout { get; internal set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>Shorter budget for interactive search, where someone is waiting for the results.</summary>
+    public TimeSpan InteractiveIndexerTimeout { get; internal set; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>Back-off after a request limit that didn't say how long to wait (Sonarr's <c>minimumBackoff</c>).</summary>
+    public static readonly TimeSpan RequestLimitBackOff = TimeSpan.FromHours(1);
 
     /// <summary>In memory: after a restart RSS sync runs at the first scheduler check.</summary>
     public DateTime? LastRssSync { get; private set; }
 
     /// <summary>Interactive search: every decision, nothing grabbed. Accepted first, then rejected matches, then unmatched releases, each best first.</summary>
-    public async Task<List<DownloadDecision>> InteractiveSearchAsync(int episodeId, CancellationToken cancellationToken = default)
+    public async Task<InteractiveSearchResult> InteractiveSearchAsync(int episodeId, CancellationToken cancellationToken = default)
     {
-        var (decisions, _) = await SearchAsync(e => e.Id == episodeId, interactive: true, userInvoked: true, cancellationToken);
-        return decisions
-            .OrderBy(d => d.Approved ? 0 : d.RemoteEpisode.Episodes.Count > 0 ? 1 : 2)
-            .ThenByDescending(d => d, DownloadDecisionComparer.Instance)
-            .ToList();
+        var (decisions, _, timedOut) = await SearchAsync(e => e.Id == episodeId, interactive: true, userInvoked: true, cancellationToken);
+        return new InteractiveSearchResult(
+            decisions
+                .OrderBy(d => d.Approved ? 0 : d.RemoteEpisode.Episodes.Count > 0 ? 1 : 2)
+                .ThenByDescending(d => d, DownloadDecisionComparer.Instance)
+                .ToList(),
+            timedOut);
     }
 
     /// <summary>Automatic search (EpisodeSearch, SeasonSearch, SeriesSearch, MissingEpisodeSearch): grabs the best accepted releases.</summary>
     public async Task<SearchResult> AutomaticSearchAsync(Expression<Func<Episode, bool>> episodes, bool userInvoked, CancellationToken cancellationToken = default)
     {
-        var (decisions, searched) = await SearchAsync(episodes, interactive: false, userInvoked, cancellationToken);
+        var (decisions, searched, _) = await SearchAsync(episodes, interactive: false, userInvoked, cancellationToken);
         var grabbed = await GrabAsync(decisions, userInvoked ? ReleaseSourceType.UserInvokedSearch : ReleaseSourceType.Search, cancellationToken);
         return new SearchResult(decisions, searched, grabbed);
     }
@@ -72,7 +83,7 @@ public sealed class ReleaseSearchService(
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
         var indexers = await SearchableIndexersAsync(db, i => i.EnableRss, cancellationToken);
-        var releases = await QueryIndexersAsync(indexers, async (indexer, found, token) => found.AddRange(await FetchAsync(indexer, new TorznabSearch(), token)), cancellationToken);
+        var (releases, _) = await QueryIndexersAsync(indexers, IndexerTimeout, async (indexer, found, token) => found.AddRange(await FetchAsync(indexer, new TorznabSearch(), token)), cancellationToken);
 
         var now = time.GetUtcNow().UtcDateTime;
         var upgradable = await EpisodeCutoffService.CutoffUnmetEpisodeIdsAsync(db, cancellationToken);
@@ -86,7 +97,7 @@ public sealed class ReleaseSearchService(
         return new SearchResult(decisions, candidates.Count, grabbed);
     }
 
-    private async Task<(List<DownloadDecision> Decisions, int Searched)> SearchAsync(
+    private async Task<(List<DownloadDecision> Decisions, int Searched, IReadOnlyList<string> TimedOut)> SearchAsync(
         Expression<Func<Episode, bool>> filter,
         bool interactive,
         bool userInvoked,
@@ -97,7 +108,7 @@ public sealed class ReleaseSearchService(
         var requested = await db.Episodes.Where(e => e.Status == EpisodeStatus.Active).Where(filter).Select(e => e.Id).ToListAsync(cancellationToken);
         if (requested.Count == 0)
         {
-            return ([], 0);
+            return ([], 0, []);
         }
 
         var seriesIds = await db.Episodes.Where(e => requested.Contains(e.Id)).Select(e => e.SeriesId).Distinct().ToListAsync(cancellationToken);
@@ -110,13 +121,18 @@ public sealed class ReleaseSearchService(
             logger.LogInformation("{Series} {Episode} has no search queries", candidate.Episode.Series?.Title, candidate.Label);
         }
 
-        var releases = await QueryIndexersAsync(indexers, async (indexer, found, token) =>
+        var (releases, timedOut) = await QueryIndexersAsync(indexers, interactive ? InteractiveIndexerTimeout : IndexerTimeout, async (indexer, found, token) =>
         {
             var done = new HashSet<(string, string)>();
             foreach (var candidate in searched)
             {
                 foreach (var query in candidate.Terms.Queries)
                 {
+                    if (status.IsDisabled(indexer.Id))
+                    {
+                        return;
+                    }
+
                     var categories = candidate.Terms.Categories;
                     if (!done.Add((query, string.Join(',', categories ?? []))))
                     {
@@ -137,7 +153,7 @@ public sealed class ReleaseSearchService(
             .ExecuteUpdateAsync(e => e.SetProperty(x => x.LastSearchTime, time.GetUtcNow().UtcDateTime), cancellationToken);
 
         var context = await ContextAsync(db, scopeCandidates, requested.ToHashSet(), indexers, userInvoked, cancellationToken);
-        return (decisionMaker.GetDecisions(Distinct(releases), context), requested.Count);
+        return (decisionMaker.GetDecisions(Distinct(releases), context), requested.Count, timedOut);
     }
 
     /// <summary>Like Sonarr's <c>ProcessDecisions</c>: best first, never two releases for the same episode.</summary>
@@ -198,26 +214,37 @@ public sealed class ReleaseSearchService(
         .Select(e => new SearchCandidate(e, SearchTerms.From(e.SearchTerms, e.Series?.SearchSettings)))
         .ToList();
 
-    private static async Task<List<Indexer>> SearchableIndexersAsync(GenerralDbContext db, Func<Indexer, bool> enabled, CancellationToken cancellationToken) =>
-        (await db.Indexers.AsNoTracking().OrderBy(i => i.Priority).ThenBy(i => i.Id).ToListAsync(cancellationToken))
-        .Where(i => enabled(i) && i.Implementation == IndexerImplementations.Torznab)
-        .ToList();
+    /// <summary>Enabled Torznab indexers, without those in back-off (Sonarr's <c>filterBlockedIndexers</c>).</summary>
+    private async Task<List<Indexer>> SearchableIndexersAsync(GenerralDbContext db, Func<Indexer, bool> enabled, CancellationToken cancellationToken)
+    {
+        var indexers = (await db.Indexers.AsNoTracking().OrderBy(i => i.Priority).ThenBy(i => i.Id).ToListAsync(cancellationToken))
+            .Where(i => enabled(i) && i.Implementation == IndexerImplementations.Torznab)
+            .ToList();
+        foreach (var blocked in indexers.Where(i => status.IsDisabled(i.Id)))
+        {
+            logger.LogDebug("Indexer {Indexer} is temporarily disabled due to recent failures, skipped", blocked.Name);
+        }
+
+        return indexers.Where(i => !status.IsDisabled(i.Id)).ToList();
+    }
 
     /// <summary>
-    /// Runs <paramref name="query"/> for up to <see cref="MaxParallelIndexers"/> indexers at once, each within <see cref="IndexerTimeout"/>:
-    /// a slow or failing indexer only loses its own (remaining) results.
+    /// Runs <paramref name="query"/> for up to <see cref="MaxParallelIndexers"/> indexers at once, each within <paramref name="budget"/>:
+    /// a slow or failing indexer only loses its own (remaining) results. A timeout is not a failure (no back-off).
     /// </summary>
-    private async Task<List<ReleaseInfo>> QueryIndexersAsync(
+    private async Task<(List<ReleaseInfo> Releases, List<string> TimedOut)> QueryIndexersAsync(
         IReadOnlyList<Indexer> indexers,
+        TimeSpan budget,
         Func<Indexer, List<ReleaseInfo>, CancellationToken, Task> query,
         CancellationToken cancellationToken)
     {
         var perIndexer = new List<ReleaseInfo>[indexers.Count];
+        var timedOut = new bool[indexers.Count];
         var options = new ParallelOptions { MaxDegreeOfParallelism = MaxParallelIndexers, CancellationToken = cancellationToken };
         await Parallel.ForEachAsync(Enumerable.Range(0, indexers.Count), options, async (i, token) =>
         {
             var found = perIndexer[i] = [];
-            using var timeout = new CancellationTokenSource(IndexerTimeout, time);
+            using var timeout = new CancellationTokenSource(budget, time);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, timeout.Token);
             try
             {
@@ -225,11 +252,12 @@ public sealed class ReleaseSearchService(
             }
             catch (OperationCanceledException) when (timeout.IsCancellationRequested && !token.IsCancellationRequested)
             {
-                logger.LogWarning("Indexer {Indexer} timed out after {Seconds}s, {Count} release(s) kept", indexers[i].Name, IndexerTimeout.TotalSeconds, found.Count);
+                timedOut[i] = true;
+                logger.LogWarning("Indexer {Indexer} timed out after {Seconds}s, {Count} release(s) kept", indexers[i].Name, budget.TotalSeconds, found.Count);
             }
         });
 
-        return perIndexer.SelectMany(r => r).ToList();
+        return (perIndexer.SelectMany(r => r).ToList(), indexers.Where((_, i) => timedOut[i]).Select(i => i.Name).ToList());
     }
 
     private async Task<IReadOnlyList<ReleaseInfo>> FetchAsync(Indexer indexer, TorznabSearch search, CancellationToken cancellationToken)
@@ -237,16 +265,32 @@ public sealed class ReleaseSearchService(
         try
         {
             var releases = await torznab.SearchAsync(indexer, search, cancellationToken);
-            status.RecordSuccess(ProviderKind.Indexer, indexer.Id);
+            status.RecordSuccess(indexer);
             return releases;
         }
         catch (Exception e) when (e is TorznabException or HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
-            status.RecordFailure(ProviderKind.Indexer, indexer.Id, indexer.Name, CleanseLogMessage.Cleanse(e.Message));
-            logger.LogWarning("Indexer {Indexer} failed: {Message}", indexer.Name, e.Message);
+            var failure = status.RecordFailure(indexer, CleanseLogMessage.Cleanse(e.Message), MinimumBackOff(e), escalate: !IsConnectionFailure(e));
+            logger.LogWarning("Indexer {Indexer} failed, disabled till {DisabledTill:u}: {Message}", indexer.Name, failure.DisabledTill, e.Message);
             return [];
         }
     }
+
+    private TimeSpan MinimumBackOff(Exception e)
+    {
+        if (e is not TorznabException { RequestLimit: true } limit)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var untilDisabledTill = limit.DisabledTill - time.GetUtcNow().UtcDateTime;
+        return limit.RetryAfter is { } retryAfter && retryAfter > TimeSpan.Zero ? retryAfter
+            : untilDisabledTill is { } until && until > TimeSpan.Zero ? until
+            : RequestLimitBackOff;
+    }
+
+    private static bool IsConnectionFailure(Exception e) =>
+        e is HttpRequestException { HttpRequestError: HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError };
 
     private static IEnumerable<ReleaseInfo> Distinct(IEnumerable<ReleaseInfo> releases) =>
         releases.DistinctBy(r => r.InfoHash is { Length: > 0 } hash ? hash.ToUpperInvariant() : $"{r.IndexerId}:{r.Guid}");

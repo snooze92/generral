@@ -112,7 +112,7 @@ public static class IndexerEndpoints
         return Results.Accepted($"indexer/{indexer.Id}", ToResource(indexer));
     }
 
-    private static async Task<IResult> Delete(int id, GenerralDbContext db)
+    private static async Task<IResult> Delete(int id, GenerralDbContext db, IndexerStatusService status)
     {
         var indexer = await db.Indexers.SingleOrDefaultAsync(i => i.Id == id);
         if (indexer is null)
@@ -122,10 +122,11 @@ public static class IndexerEndpoints
 
         db.Indexers.Remove(indexer);
         await db.SaveChangesAsync();
+        status.Remove(id);
         return Results.Ok(new JsonObject());
     }
 
-    private static async Task<IResult> Test(IndexerResource resource, GenerralDbContext db, TorznabClient torznab, CancellationToken cancellationToken)
+    private static async Task<IResult> Test(IndexerResource resource, GenerralDbContext db, TorznabClient torznab, IndexerStatusService status, CancellationToken cancellationToken)
     {
         var stored = resource.Id > 0 ? await db.Indexers.AsNoTracking().SingleOrDefaultAsync(i => i.Id == resource.Id, cancellationToken) : null;
         if (IndexerImplementations.Find(resource.Implementation) is null)
@@ -140,7 +141,17 @@ public static class IndexerEndpoints
             failures.Add(ToFailure(failure));
         }
 
-        return failures.Count > 0 ? ValidationFailure.BadRequest([.. failures]) : Results.Ok(new JsonObject());
+        if (failures.Count > 0)
+        {
+            return ValidationFailure.BadRequest([.. failures]);
+        }
+
+        if (stored is not null)
+        {
+            status.RecordSuccess(stored);
+        }
+
+        return Results.Ok(new JsonObject());
     }
 
     /// <summary>

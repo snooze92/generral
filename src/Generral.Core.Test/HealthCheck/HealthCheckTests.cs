@@ -1,6 +1,7 @@
 using Generral.Core.Datastore;
 using Generral.Core.HealthCheck;
 using Generral.Core.Indexers;
+using Generral.Core.Lifecycle;
 using Generral.Core.Sources;
 using Generral.Core.Tv;
 using Microsoft.Data.Sqlite;
@@ -36,7 +37,8 @@ public class HealthCheckTests
     [Test]
     public async Task Indexer_rss_check_errors_without_rss_indexers_and_warns_when_all_fail()
     {
-        var check = new IndexerRssCheck(_db, _status);
+        var indexers = new IndexerStatusService(_status, new StartedAt(Now.AddDays(-1)), new FixedTime(Now));
+        var check = new IndexerRssCheck(_db, indexers);
         var none = await check.CheckAsync(CancellationToken.None);
 
         var indexer = new Indexer { Name = "Tracker", Implementation = IndexerImplementations.Torznab };
@@ -44,7 +46,7 @@ public class HealthCheckTests
         await _db.SaveChangesAsync();
         var ok = await check.CheckAsync(CancellationToken.None);
 
-        _status.RecordFailure(ProviderKind.Indexer, indexer.Id, indexer.Name, "HTTP 500");
+        indexers.RecordFailure(indexer, "HTTP 500");
         var failing = await check.CheckAsync(CancellationToken.None);
 
         Assert.Multiple(() =>
@@ -97,5 +99,12 @@ public class HealthCheckTests
     private sealed class FixedTime(DateTime now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class StartedAt(DateTime startTime) : IRuntimeInfo
+    {
+        public DateTime StartTime => startTime;
+
+        public bool IsContainerized => false;
     }
 }

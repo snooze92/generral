@@ -14,7 +14,7 @@ public sealed record ProviderFailure(ProviderKind Kind, int Id, string Name, str
 
 /// <summary>
 /// The last outcome of each indexer, download client, mapping and source, in memory (Generral's stand-in for Sonarr's provider
-/// status tables, without back-off). A change of outcome asks the scheduler for a health check.
+/// status tables; indexer back-off is in <see cref="Indexers.IndexerStatusService"/>). A change of outcome asks the scheduler for a health check.
 /// </summary>
 public sealed class ProviderStatusTracker(TimeProvider time)
 {

@@ -9,6 +9,7 @@ using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
 using Generral.Core.IndexerSearch;
 using Generral.Core.Tv;
+using Generral.Http.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
@@ -148,16 +149,52 @@ public class ReleaseApiTests
         _handler.Delays["tracker.example"] = TimeSpan.FromSeconds(1);
         _handler.Delays["slow.example"] = TimeSpan.FromSeconds(1);
         _handler.Delays["stuck.example"] = TimeSpan.FromMinutes(5);
-        _host.Services.GetRequiredService<ReleaseSearchService>().IndexerTimeout = TimeSpan.FromSeconds(2);
+        _host.Services.GetRequiredService<ReleaseSearchService>().InteractiveIndexerTimeout = TimeSpan.FromSeconds(2);
 
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        var releases = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/release?episodeId={mainCardId}"))!;
+        using var response = await _client.GetAsync($"/api/v1/release?episodeId={mainCardId}");
+        var releases = (await response.Content.ReadFromJsonAsync<JsonArray>())!;
         watch.Stop();
 
         Assert.Multiple(() =>
         {
             Assert.That(watch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(3.5)), "1 s + 1 s + 2 s timeout in sequence would take 4 s or more");
             Assert.That(releases.Select(r => (string)r!["indexer"]!).Distinct(), Is.EquivalentTo(new[] { "Tracker", "fast", "slow" }));
+            Assert.That(response.Headers.GetValues(ReleaseEndpoints.TimedOutHeader).Single(), Is.EqualTo("stuck"));
+        });
+    }
+
+    [Test]
+    public async Task An_indexer_prowlarr_disabled_is_skipped_until_the_given_time()
+    {
+        var (_, mainCardId) = await SeedAsync();
+        using (var scope = _host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
+            db.Indexers.Add(new Indexer
+            {
+                Name = "Blocked",
+                Implementation = IndexerImplementations.Torznab,
+                Settings = new JsonObject { ["baseUrl"] = "https://blocked.example", ["apiKey"] = "secret" },
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var till = DateTime.Now.AddHours(2);
+        _handler.Errors["blocked.example"] = $"""<error code="429" description="Indexer is disabled till {till.ToString(System.Globalization.CultureInfo.CurrentCulture)} due to recent failures." />""";
+
+        await _client.GetFromJsonAsync<JsonArray>($"/api/v1/release?episodeId={mainCardId}");
+        var firstRequests = _handler.Hosts.Count(h => h == "blocked.example");
+        var releases = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/release?episodeId={mainCardId}"))!;
+        var status = _host.Services.GetRequiredService<IndexerStatusService>().Blocked().Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstRequests, Is.EqualTo(1));
+            Assert.That(_handler.Hosts.Count(h => h == "blocked.example"), Is.EqualTo(1), "skipped by the second search");
+            Assert.That(releases, Has.Count.EqualTo(5));
+            Assert.That(status.Name, Is.EqualTo("Blocked"));
+            Assert.That(status.DisabledTill, Is.EqualTo(till.ToUniversalTime()).Within(TimeSpan.FromSeconds(1)));
         });
     }
 
@@ -269,11 +306,26 @@ public class ReleaseApiTests
         /// <summary>Response delay by host.</summary>
         public Dictionary<string, TimeSpan> Delays { get; } = [];
 
+        /// <summary>Torznab error body (HTTP 429) by host.</summary>
+        public Dictionary<string, string> Errors { get; } = [];
+
+        public List<string> Hosts { get; } = [];
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (Delays.TryGetValue(request.RequestUri!.Host, out var delay))
             {
                 await Task.Delay(delay, cancellationToken);
+            }
+
+            lock (Hosts)
+            {
+                Hosts.Add(request.RequestUri.Host);
+            }
+
+            if (Errors.TryGetValue(request.RequestUri.Host, out var error))
+            {
+                return new HttpResponseMessage(HttpStatusCode.TooManyRequests) { Content = new StringContent(error, Encoding.UTF8, "application/xml") };
             }
 
             var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri!.Query);
