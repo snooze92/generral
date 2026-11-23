@@ -53,7 +53,7 @@ Implementation notes (M2a):
   `rejectTorrentFilesWithBlockedExtensionsWhileGrabbing`). Settings are stored by field name, and
   fields nobody knows about are kept and returned, so a Prowlarr update never loses user values.
   A posted `null` clears a field; `********` keeps the stored secret.
-- Validation (skipped by `forceSave`): name required and unique, `priority` 1–50, `baseUrl`
+- Validation (with `forceSave`, only the structural checks remain: name required and unique; an out-of-range priority is clamped): name required and unique, `priority` 1–50, `baseUrl`
   http(s), `apiPath` a path, `additionalParameters` like `&a=b`, seed criteria > 0, known tags, and,
   for enabled indexers, the `t=caps` test (must support `q` in `search` or `tv-search`).
 - Requests use the `Indexer` HTTP client: same SSRF guard as sources (only link-local blocked, so
@@ -65,8 +65,8 @@ Implementation notes (M2a):
   indexers in the `X-Generral-Timed-Out-Indexers` response header (the UI shows a warning).
 - **Indexer back-off** (Sonarr's `IndexerStatus`, kept in memory: a restart clears it): each failed
   request escalates the indexer's level and disables it for 1 min, 5 min, 15 min, 30 min, 1 h, 3 h,
-  6 h, 12 h or 24 h; a success steps the level down and re-enables it; a successful *Test* or deleting
-  the indexer resets it. Connection errors don't escalate; in the first 15 min after a start the
+  6 h, 12 h or 24 h; a success steps the level down and re-enables it; a successful *Test* re-enables it
+  and steps the level down (Sonarr parity), deleting the indexer resets it. Connection errors don't escalate; in the first 15 min after a start the
   back-off doesn't escalate and is capped at 5 min. A request limit (HTTP 429, `Request limit
   reached`, or Prowlarr's `Indexer is disabled till {time} due to recent failures.`, read as local
   time; a time already past only escalates normally) disables it at least until `Retry-After`/that
@@ -106,9 +106,10 @@ search:
   diacritics removed. `\b` works as expected after normalisation. The raw title is also available
   (`raw:` prefix).
 - Torznab requests use `t=search&q=<query>&cat=<cats>`. `t=tvsearch` is **not** used by default
-  (season/ep params make no sense for virtual series). A per-indexer *Use TV search* toggle exists
-  for trackers that only index sport under tvsearch.
-- The rendered queries and rules for an episode are shown in *Episode details → Search*.
+  (season/ep params make no sense for virtual series). A per-indexer *Use TV search* toggle for
+  trackers that only index sport under tvsearch is `Later`.
+- The rendered queries and rules for an episode are shown in *Episode details → Search* (`Later`;
+  for now in the mapping preview API).
 
 ## Search triggers
 
@@ -194,8 +195,8 @@ seeders before size.
   needs a monitored series). Each grabs the best accepted release per episode set and never two
   for the same episode. `LastSearchTime` is set on searched episodes. Unmonitored episodes may be
   grabbed only when the command is manual.
-- RSS sync: indexers with *Enable RSS*; candidates are active episodes without a file whose date
-  window contains now. Interval: `PUT /settings/indexer { rssSyncInterval }` (minutes, 0 off, else
+- RSS sync: indexers with *Enable RSS*; candidates are active episodes without a file (or below
+  their profile's cutoff) whose date window contains now. Interval: `PUT /settings/indexer { rssSyncInterval }` (minutes, 0 off, else
   10–120, default 15); the last run is kept in memory, so it runs at the first scheduler check after
   a start.
 - Grabs go through `IDownloadService`, which sends them to a download client (spec 07 § Implementation notes (M2d)).
@@ -232,7 +233,7 @@ wanted (profile: English)". The indexer `multiLanguages` setting is accepted but
 ## Quality
 
 Port Sonarr's quality list unchanged so that profiles look identical:
-`Unknown, SDTV, DVD, WEBRip-480p, WEBDL-480p, Bluray-480p, HDTV-720p, WEBRip-720p, WEBDL-720p,
+`Unknown, SDTV, DVD, WEBRip-480p, WEBDL-480p, Bluray-480p, Bluray-576p, HDTV-720p, WEBRip-720p, WEBDL-720p,
 Bluray-720p, HDTV-1080p, WEBRip-1080p, WEBDL-1080p, Bluray-1080p, Bluray-1080p Remux, HDTV-2160p,
 WEBRip-2160p, WEBDL-2160p, Bluray-2160p, Bluray-2160p Remux, Raw-HD`.
 

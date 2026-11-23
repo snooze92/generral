@@ -13,11 +13,14 @@ Required`, `On Application Update` (not used in Docker).
 Generral additions: `On New Episode` (a mapping created a monitored episode, e.g. "UFC 323
 announced"), `On Source Failure`.
 
+In v0.1, `On Rename` (no rename command yet), `On Manual Interaction Required`, `On New Episode`
+and `On Source Failure` are `Later` (M4); the others are raised.
+
 ## Providers
 
 | Provider | MVP | Notes |
 |----------|-----|-------|
-| **Plex Media Server** | MVP | Port of Sonarr's. Plex.tv OAuth sign-in to obtain a token (or paste a token); host/port/SSL. *Update Library* on import/rename/delete: **partial scan** of the series folder via `GET /library/sections/{id}/refresh?path=<url-encoded folder>`. The section id is discovered by matching section `Location` paths against the series path (with a path mapping setting for when Plex sees different paths). Unlike Sonarr, no matching section means no refresh (logged at debug), not a scan of every TV section. |
+| **Plex Media Server** | MVP | Port of Sonarr's. Paste a token (Plex.tv OAuth sign-in is `Later`); host/port/SSL. *Update Library* on import/rename/delete: **partial scan** of the series folder via `GET /library/sections/{id}/refresh?path=<url-encoded folder>`. The section id is discovered by matching section `Location` paths against the series path (with a path mapping setting for when Plex sees different paths). Unlike Sonarr, no matching section means no refresh (logged at debug), not a scan of every TV section. |
 | Webhook | MVP | Sonarr-shaped JSON payloads (`eventType`, `series`, `episodes`, `episodeFile`, `release`, …) so that existing Sonarr webhook consumers mostly work. |
 | Discord | MVP | |
 | ntfy, Apprise, Gotify, Pushover, Telegram, Email | Later | Port from Sonarr as needed. |

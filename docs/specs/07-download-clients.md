@@ -3,13 +3,14 @@
 ## Abstraction
 
 `IDownloadClient` (Sonarr-derived): `Test()`, `Download(release, episodes) → downloadId`,
-`GetItems() → DownloadClientItem[]`, `RemoveItem(id, deleteData)`, `GetStatus()` (output root
-folders for remote-path-mapping hints), `MarkItemAsImported(item)` (optional post-import category).
+`GetItems() → DownloadClientItem[]`, `RemoveItem(id, deleteData)`, `MarkItemAsImported(item)`
+(optional post-import category). `GetStatus()` (output root folders for remote-path-mapping hints)
+is `Later`.
 
 `DownloadClientItem`: `downloadId` (infohash for torrents), `title`, `category`, `totalSize`,
 `remainingSize`, `remainingTime`, `status` (`queued`, `downloadingMetadata`, `paused`, `downloading`, `completed`,
 `failed`, `warning`), `message`, `outputPath`, `canMoveFiles`, `canBeRemoved`, `seedRatio`,
-`seedTime`.
+`isStalled` (`seedTime` is `Later`).
 
 | Client | MVP | Notes |
 |--------|-----|-------|
@@ -38,12 +39,11 @@ folders for remote-path-mapping hints), `MarkItemAsImported(item)` (optional pos
 
 | Purpose | Endpoint(s) |
 |---------|-------------|
-| Version check | `GET /api/v2/app/version`, `GET /api/v2/app/webapiVersion` |
+| Version check | `GET /api/v2/app/webapiVersion` |
 | Preferences (save path, ratio limits, queueing) | `GET /api/v2/app/preferences` |
 | Add | `POST /api/v2/torrents/add` (multipart: `urls` for magnet, or `torrents` file upload; `category`, `paused`/`stopped`, `sequentialDownload`, `firstLastPiecePrio`, `contentLayout`, `ratioLimit`, `seedingTimeLimit`, `tags`) |
-| Find added torrent | Infohash comes from the magnet/torrent (computed locally for `.torrent`). If a magnet has no hash in its URL, poll `torrents/info?category=` for a new item. |
+| Find added torrent | Infohash comes from the magnet/torrent (computed locally for `.torrent`). A magnet without an infohash is rejected. |
 | Poll | `GET /api/v2/torrents/info?category=<cat>` (and `/sync/maindata` incremental, `Later`) |
-| Files (for import) | `GET /api/v2/torrents/files?hash=` |
 | Set share limits | `POST /api/v2/torrents/setShareLimits` (from indexer seed criteria) |
 | Set category post-import | `POST /api/v2/torrents/setCategory` |
 | Remove | `POST /api/v2/torrents/delete` (`deleteFiles=true/false`) |
@@ -76,9 +76,10 @@ seeding requirements are respected.
 - **Queue** (*Activity → Queue*): series, episode(s), quality, progress, ETA, status, client,
   indexer, actions: *Remove* (options: remove from client, blocklist, skip redownload), *Manual
   import*, *Grab again*.
-- **Failed download handling:** client reports `failed`/`error`, or the import fails because no
-  video files are found → mark failed → blocklist the release → (if *Redownload failed* is on)
-  automatically search again.
+- **Failed download handling:** client reports `failed` (or the torrent stalls past the stalled
+  timeout) → mark failed → blocklist the release → (if *Redownload failed* is on) automatically
+  search again. As in Sonarr, qBittorrent `error` is only a warning, and a completed download
+  without eligible video files is *import blocked* (manual import), not failed.
 - **Stalled handling** (optional, off by default): torrent stalled with 0 % progress for > X hours →
   treat as failed.
 
@@ -98,7 +99,7 @@ seeding requirements are respected.
   written per episode (`downloadId` = upper-case infohash, Sonarr's `data` keys in camelCase).
 - Tracked downloads are in memory and rebuilt from the client listing (`torrents/info?category=`) and the grab history.
   `RefreshMonitoredDownloads` runs every minute (scheduler check interval is now 1 min) when an enabled client exists.
-  States: `downloading`; `importPending` for completed grabs (import is M3); `importBlocked` for completed unknown
+  States: `downloading`; `importPending` for completed grabs, then `importing`/`imported`; `importBlocked` for completed unknown
   items; `failed` after failed download handling; `ignored` after *Remove* without client removal or blocklist.
   qBittorrent `error`/`missingFiles` are warnings (Sonarr parity, not failures). `stalledDL` warns after 1 h.
 - Failed download handling: a client `failed` status, or (if `stalledDownloadTimeout` > 0 hours) a torrent stalled at
@@ -110,5 +111,6 @@ seeding requirements are respected.
   `episodeIds`), `DELETE /queue/{id}?removeFromClient=true&blocklist=false&skipRedownload=false`. History:
   `GET /history?page&pageSize&sortDirection&episodeId&seriesId&downloadId&eventType`. Blocklist: `GET /blocklist?page&pageSize&seriesId`,
   `DELETE /blocklist/{id}`.
-- Not yet: post-import category, share-limit updates after add, bulk queue/blocklist endpoints, *Grab again*,
-  *Manual import*, `/sync/maindata`, download client health checks.
+- Done in M3: post-import category, manual import from the queue, download client health checks.
+- Not yet: share-limit updates after add, bulk queue/blocklist endpoints, *Grab again*, `/sync/maindata`, unknown
+  (hand-added) items and the *skip redownload* option in the queue UI (the API supports both).

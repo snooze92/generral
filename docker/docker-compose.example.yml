@@ -1,7 +1,7 @@
 # Example stack from docs/specs/12-deployment.md. Copy, adjust paths/ids, then `docker compose up -d`.
 services:
   generral:
-    image: ghcr.io/snooze92/generral:develop
+    image: ghcr.io/snooze92/generral:latest
     container_name: generral
     environment:
       - PUID=1000

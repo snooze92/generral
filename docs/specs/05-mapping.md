@@ -153,7 +153,7 @@ episode or loses watch state. Rules:
    - `onInsert: renumber-unlocked`: renumber freely among episodes that have **no file and no
      grab history** (`numberLocked = false`); locked ones keep their numbers. This is the right default
      for fixtures lists that are published all at once and then refined.
-   - `onInsert: renumber-all`: always reflect `order`. Existing files are renamed on disk (and Plex
+   - `onInsert: renumber-all` (`Later`, M4): always reflect `order`. Existing files are renamed on disk (and Plex
      refreshed) as part of the same command. Never automatic: a preview + confirmation is required,
      or the mapping must explicitly opt in (`autoRenumber: true`).
 3. **Locking.** An episode's number becomes `numberLocked` when it gets a file, is grabbed, or

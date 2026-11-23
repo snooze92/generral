@@ -8,7 +8,7 @@ Plex agent or plugin**.
 
 Sonarr parity, with matching driven by the tracked download rather than by parsing:
 
-1. `CheckForFinishedDownloads` (every minute) polls clients. Items that are `completed` and tracked
+1. `RefreshMonitoredDownloads` (every minute) polls clients. Items that are `completed` and tracked
    become *ImportPending*.
 2. **Path translation** via *Remote Path Mappings* (host, remote path → local path), for when
    qBittorrent and Generral see different mount points. Health check: "Download client reports
@@ -86,7 +86,7 @@ Generral tokens.
 | Standard Episode Format | `{Series Title} - S{season:00}E{episode:00} - {Episode Title} [{Quality Full}]` |
 | Daily Episode Format | `{Series Title} - {Air-Date} - {Episode Title} [{Quality Full}]` |
 | Multi-Episode Style | `Prefixed Range` → `S2026E11-E13` |
-| Series Folder Format | `{Series Title}` (or `{Series Title} ({Series Year})` if the series has a year) |
+| Series Folder Format | `{Series TitleYear}` (the plain title when the series has no year) |
 | Season Folder Format | `Season {season}` (no zero-padding, so a year season becomes `Season 2025`) |
 | Specials Folder Format | `Specials` |
 

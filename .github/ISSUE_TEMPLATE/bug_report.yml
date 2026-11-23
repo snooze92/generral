@@ -1,0 +1,42 @@
+name: Bug report
+description: Something in Generral doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Security problems go through [private reporting](https://github.com/snooze92/generral/security/advisories/new) instead.
+  - type: input
+    id: version
+    attributes:
+      label: Generral version
+      description: System → Status, or the image tag.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: How you run it
+      description: Docker image tag, host OS / NAS, reverse proxy or URL base, Prowlarr / qBittorrent / Plex versions if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Source / mapping (if relevant)
+      description: The source settings and mapping YAML involved, with any API keys removed.
+      render: yaml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: From System → Log Files (set the log level to debug in Settings → General to reproduce, if you can). Remove anything private.
+      render: text

@@ -2,7 +2,7 @@
 
 ## Docker image
 
-- **Name:** `ghcr.io/<org>/generral` (also Docker Hub `<org>/generral`, optional).
+- **Name:** `ghcr.io/snooze92/generral` (Docker Hub is `Later`).
 - **Platforms:** `linux/amd64`, `linux/arm64`.
 - **Tags:** `latest` (stable), `develop` (main branch), `X.Y.Z`, `X.Y`, `sha-<short>`.
 - **Port:** `8990`.
@@ -71,7 +71,7 @@ Also in [`docker/docker-compose.example.yml`](../../docker/docker-compose.exampl
 ```yaml
 services:
   generral:
-    image: ghcr.io/<org>/generral:latest
+    image: ghcr.io/snooze92/generral:latest
     container_name: generral
     environment:
       - PUID=1000

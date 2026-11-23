@@ -7,7 +7,7 @@
 | Backend | **C# / .NET 10 (LTS)**, ASP.NET Core minimal APIs | Same stack as Sonarr/Prowlarr/Sportarr, so code can be ported (see [01](01-prior-art.md#what-we-reuse)). Single self-contained binary. |
 | Persistence | **EF Core** + **SQLite** (default), PostgreSQL (optional, `Later`) | Sonarr parity: single-file DB in `/config`, trivial backups. |
 | Frontend | **React + TypeScript**, Vite, CSS modules, TanStack Query | Sonarr's frontend is React/TS with CSS modules, so vendored components drop in. TanStack Query instead of Redux for new code. |
-| Real-time | **SignalR** hub at `/signalr/messages` | Pushes queue/progress/command/episode changes to the UI (Sonarr pattern). |
+| Real-time | **SignalR** hub at `/signalr/messages` (`Later`; until then the UI polls) | Pushes queue/progress/command/episode changes to the UI (Sonarr pattern). |
 | Templating | **Scriban** | Sandboxed expressions in mappings and naming. |
 | Packaging | **Docker** (multi-arch amd64/arm64) | See [12](12-deployment.md). |
 
@@ -62,7 +62,7 @@ Generral is one process (an ASP.NET Core host) that serves both the API and the 
 | `Generral.Core.Metadata` | NFO writers, artwork download, MediaCover cache. | [08](08-import-and-organisation.md) |
 | `Generral.Core.Notifications` | Connect providers (Plex, webhook, Discord, …). | [09](09-media-servers-and-notifications.md) |
 | `Generral.Core.Messaging` | Command queue, events bus, scheduled tasks. | below |
-| `Generral.Http` | API endpoints (native + Sonarr shim), auth, SignalR, static files. | [11](11-api.md) |
+| `Generral.Http` | API endpoints (native + Sonarr shim), auth, SignalR (`Later`), static files. | [11](11-api.md) |
 
 ### Command queue & scheduled tasks
 
@@ -105,7 +105,7 @@ notes (M2c)) and `RefreshMonitoredDownloads` every minute when a download client
 4. Release `UFC.322.Main.Card.1080p.WEB.h264-GRP` matches S2026E11 and passes quality/size/seeders →
    **grab**. The download service sends it to qBittorrent with category `generral` and records a
    `TrackedDownload` + History *Grabbed*.
-5. `CheckForFinishedDownloads` sees the torrent complete → import: hardlink + rename into
+5. `RefreshMonitoredDownloads` sees the torrent complete → import: hardlink + rename into
    `/data/media/generral/UFC/Season 2026/UFC - S2026E11 - UFC 322 - Main Card [WEBDL-1080p].mkv`,
    write `.nfo` and thumb, History *Imported*.
 6. Connect: Plex refresh of `/data/media/generral/UFC`. Discord notification (if configured).
@@ -118,7 +118,7 @@ notes (M2c)) and `RefreshMonitoredDownloads` every minute when a download client
   mapping normalises them to UTC (see [05](05-mapping.md#dates-and-timezones)).
 - **HTTP politeness:** a shared `HttpClientFactory` with named clients (`Source`, `Indexer`,
   `DownloadClient`, `MediaServer`) gives per-host rate limits, timeouts, retries with jitter, a
-  `User-Agent: Generral/<version> (+https://github.com/<org>/generral)`, and conditional GET
+  `User-Agent: Generral/<version> (+https://github.com/snooze92/generral)`, and conditional GET
   (ETag/Last-Modified) for sources.
 - **Logging:** Serilog to console + rolling files in `/config/logs`, levels Info/Debug/Trace
   switchable at runtime (Sonarr parity). Secrets (API keys, passwords, cookies) are redacted.

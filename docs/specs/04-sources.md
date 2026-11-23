@@ -31,7 +31,7 @@ All types share common settings:
 | `cookies` | none | Optional raw cookie string. |
 | `flaresolverr` | off | Optional: route requests via a FlareSolverr instance (Prowlarr-style proxy tag). |
 | `timezone` | `UTC` | Applied to date strings that lack an offset. |
-| `keepGoneEvents` | `true` | Events missing from a refresh are kept and marked `gone`, not deleted. |
+| `keepGoneEvents` | `true` | Events missing from a refresh are kept and marked `gone`, not deleted. Always on for now; making it a setting is `Later`. |
 
 Implementation notes (M1a):
 
@@ -249,7 +249,8 @@ implemented yet. The API key is part of the URL path and is redacted from logs.
   *UFC 322: Della Maddalena vs Makhachev*".
 - **Gone** events: not returned by N=3 consecutive successful refreshes → `status = gone` (kept).
   A failed fetch (non-2xx, parse error, zero items when there were items before) **never** marks
-  events gone. It records `lastError` and raises a health warning after 24 h.
+  events gone. It records `lastError` and raises a health warning at once, which becomes an error after 24 h
+  (see [02](02-architecture.md)).
 - **Zero-item guard:** if a refresh returns 0 items but the previous one returned > 0, treat it as a
   failure (protects against layout changes on scraped pages).
 - **Caching:** conditional GET, plus a raw-response cache (per URL, 1 h) so that editing a mapping

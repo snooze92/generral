@@ -29,8 +29,8 @@ Resource shapes reuse Sonarr's where the concept is the same, so that vendored U
 | `preset` | `GET /preset` (gallery), `POST /preset/import` (file or URL), `POST /preset/{id}/instantiate` |
 | `release` | `GET /release?episodeId=` (interactive search), `POST /release` (grab, optionally with episode override), `POST /release/push` |
 | `queue`, `history`, `blocklist`, `wanted/missing`, `wanted/cutoff`, `calendar`, `manualimport` | Sonarr-shaped |
-| `indexer`, `downloadclient`, `notification`, `metadata`, `qualityprofile`, `qualitydefinition`, `releaseprofile`, `tag`, `rootfolder`, `remotepathmapping`, `config/{naming,mediamanagement,host,ui,indexer,downloadclient}` | Sonarr-shaped, including `/schema` and `/test` for providers |
-| `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `RefreshMonitoredDownloads`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `OnAirSearch`, `RenameFiles`, `RenameSeries`, `Renumber`, `DownloadedEpisodesScan`, `Backup`, `CheckHealth`, `Housekeeping` |
+| `indexer`, `downloadclient`, `notification`, `metadata`, `qualityprofile`, `qualitydefinition`, `releaseprofile`, `tag`, `rootfolder`, `remotepathmapping`, `config/{naming,mediamanagement}`, `settings/{general,ui,indexer,downloadclient}` | Sonarr-shaped, including `/schema` and `/test` for providers |
+| `command` | `GET/POST /command`, `GET /command/{id}`. Names: `RefreshSources`, `RefreshSource`, `ApplyMappings`, `RssSync`, `RefreshMonitoredDownloads`, `EpisodeSearch`, `SeasonSearch`, `SeriesSearch`, `MissingEpisodeSearch`, `CutoffUnmetEpisodeSearch`, `OnAirSearch`, `ManualImport`, `Renumber`, `Backup`, `CheckHealth`, `CleanUpRecycleBin` (the *Housekeeping* task). `RenameFiles`, `RenameSeries` and `DownloadedEpisodesScan` are `Later` (M4). |
 | `system` | `/system/status`, `/system/task`, `/system/backup` (+ `/{id}/download`, `/restore/{id}`, `/restore/upload`), `/health`, `/diskspace`, `/log` (recent in-memory entries, paged, `level=warn\|error`), `/log/file`, `/log/file/{name}` |
 
 Source, event and command resources (M1a):
@@ -208,9 +208,9 @@ Calendar (M1):
   series-local `airDate`. `premieresOnly` keeps episode 1 of non-special seasons. Titles and overviews
   are already spoiler-free when rendered (spec 05 § Spoilers), so the feed adds no further rule.
 
-SignalR hub `/signalr/messages` broadcasts `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
+`Later`: a SignalR hub `/signalr/messages` broadcasting `{ name, body: { action: "updated"|"deleted"|"sync", resource } }`
 for `series`, `episode`, `episodefile`, `queue`, `command`, `health`, `source`, `event`,
-`mapping` (Sonarr's message format).
+`mapping` (Sonarr's message format). Until then the UI polls and refetches after its own changes.
 
 ## Sonarr compatibility shim
 
