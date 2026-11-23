@@ -108,7 +108,9 @@ Quality resources (M2b), Sonarr v3-shaped:
   indexer, title, mappedSeriesId, mappedSeasonNumber, mappedEpisodeNumbers, mappedEpisodeInfo[],
   approved, rejected, rejections[], publishDate, downloadUrl, magnetUrl, infoHash, infoUrl,
   commentUrl, seeders, leechers, protocol, indexerFlags, episodeRequested, downloadAllowed,
-  releaseWeight, languages[]`; no scene/TVDB/custom-format fields). Results are cached 30 min;
+  releaseWeight, languages[]`; no scene/TVDB/custom-format fields), in spec 06's interactive order
+  (`releaseWeight` = position). Indexers that hit the 15 s interactive timeout are named in the
+  `X-Generral-Timed-Out-Indexers` header (comma-separated). Results are cached 30 min;
   `POST /release { guid, indexerId, episodeIds? }` grabs a cached one (rejected ones too),
   `episodeIds` (one series) overriding the match; unknown → 404, missing guid/indexerId → 400.
   `/release/push` is not implemented yet. `GET/PUT /settings/indexer { rssSyncInterval }`.

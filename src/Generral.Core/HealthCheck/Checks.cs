@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Generral.Core.HealthCheck;
 
-public sealed class IndexerRssCheck(GenerralDbContext db, ProviderStatusTracker status) : IProvideHealthCheck
+public sealed class IndexerRssCheck(GenerralDbContext db, IndexerStatusService status) : IProvideHealthCheck
 {
     public async Task<HealthCheck> CheckAsync(CancellationToken cancellationToken)
     {
@@ -23,14 +23,14 @@ public sealed class IndexerRssCheck(GenerralDbContext db, ProviderStatusTracker 
             return HealthCheck.Error(this, $"No indexers available with RSS sync enabled, {BuildInfo.AppName} will not grab new releases automatically");
         }
 
-        var failing = status.Failures(ProviderKind.Indexer).Select(f => f.Id).ToHashSet();
+        var failing = status.Blocked().Select(f => f.IndexerId).ToHashSet();
         return enabled.All(i => failing.Contains(i.Id))
             ? HealthCheck.Warning(this, "All rss-capable indexers are temporarily unavailable due to recent indexer errors")
             : HealthCheck.Ok(this);
     }
 }
 
-public sealed class IndexerSearchCheck(GenerralDbContext db, ProviderStatusTracker status) : IProvideHealthCheck
+public sealed class IndexerSearchCheck(GenerralDbContext db, IndexerStatusService status) : IProvideHealthCheck
 {
     public async Task<HealthCheck> CheckAsync(CancellationToken cancellationToken)
     {
@@ -46,19 +46,23 @@ public sealed class IndexerSearchCheck(GenerralDbContext db, ProviderStatusTrack
             return HealthCheck.Warning(this, $"No indexers available with Interactive Search enabled, {BuildInfo.AppName} will not provide any interactive search results");
         }
 
-        var failing = status.Failures(ProviderKind.Indexer).Select(f => f.Id).ToHashSet();
+        var failing = status.Blocked().Select(f => f.IndexerId).ToHashSet();
         return automatic.All(i => failing.Contains(i.Id))
             ? HealthCheck.Warning(this, "All search-capable indexers are temporarily unavailable due to recent indexer errors")
             : HealthCheck.Ok(this);
     }
 }
 
-public sealed class IndexerStatusCheck(GenerralDbContext db, ProviderStatusTracker status) : IProvideHealthCheck
+/// <summary>Indexers in back-off whose first failure is recent (like Sonarr, an indexer failing for longer stops being reported).</summary>
+public sealed class IndexerStatusCheck(GenerralDbContext db, IndexerStatusService status, TimeProvider time) : IProvideHealthCheck
 {
+    public static readonly TimeSpan RecentFailure = TimeSpan.FromHours(6);
+
     public async Task<HealthCheck> CheckAsync(CancellationToken cancellationToken)
     {
         var enabled = (await db.Indexers.AsNoTracking().ToListAsync(cancellationToken)).Where(i => i.Enable).Select(i => i.Id).ToHashSet();
-        var failing = status.Failures(ProviderKind.Indexer).Where(f => enabled.Contains(f.Id)).ToList();
+        var since = time.GetUtcNow().UtcDateTime - RecentFailure;
+        var failing = status.Blocked().Where(s => enabled.Contains(s.IndexerId) && s.InitialFailure > since).ToList();
         if (failing.Count == 0)
         {
             return HealthCheck.Ok(this);
@@ -66,7 +70,7 @@ public sealed class IndexerStatusCheck(GenerralDbContext db, ProviderStatusTrack
 
         return failing.Count == enabled.Count
             ? HealthCheck.Error(this, "All indexers are unavailable due to failures")
-            : HealthCheck.Warning(this, $"Indexers unavailable due to failures: {string.Join(", ", failing.Select(f => f.Name))}");
+            : HealthCheck.Warning(this, $"Indexers unavailable due to failures: {string.Join(", ", failing.Select(f => $"{f.Name} (until {f.DisabledTill:u})"))}");
     }
 }
 

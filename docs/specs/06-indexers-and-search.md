@@ -59,9 +59,21 @@ Implementation notes (M2a):
 - Requests use the `Indexer` HTTP client: same SSRF guard as sources (only link-local blocked, so
   a LAN Prowlarr works), 100 s timeout, and at most one request per 2 s per indexer (keyed by URL
   path, not host: all Prowlarr proxies share one host).
-- Searches and RSS syncs query up to 8 indexers in parallel; each indexer gets 30 s for all its
-  queries of that search. A failing or timed-out indexer is logged and only loses its own results,
-  so an interactive search takes about as long as the slowest indexer (capped at 30 s).
+- Searches and RSS syncs query up to 8 indexers in parallel; each indexer gets 30 s (15 s for an
+  interactive search) for all its queries of that search. A failing or timed-out indexer is logged
+  and only loses its own results; interactive search returns what finished and names the timed-out
+  indexers in the `X-Generral-Timed-Out-Indexers` response header (the UI shows a warning).
+- **Indexer back-off** (Sonarr's `IndexerStatus`, kept in memory: a restart clears it): each failed
+  request escalates the indexer's level and disables it for 1 min, 5 min, 15 min, 30 min, 1 h, 3 h,
+  6 h, 12 h or 24 h; a success steps the level down and re-enables it; a successful *Test* or deleting
+  the indexer resets it. Connection errors don't escalate; in the first 15 min after a start the
+  back-off doesn't escalate and is capped at 5 min. A request limit (HTTP 429, `Request limit
+  reached`, or Prowlarr's `Indexer is disabled till {time} due to recent failures.`, read as local
+  time; a time already past only escalates normally) disables it at least until `Retry-After`/that
+  time, else for 1 h. Disabled indexers are
+  skipped by RSS sync, automatic and interactive search (also for their remaining queries), and
+  listed by the *Indexer Status* health check (with their re-enable time) while their first failure
+  is less than 6 h old. A per-indexer search timeout is not a failure.
 
 A **native Prowlarr app type** (like the one Sportarr has open as Prowlarr PR #2758) is a `Later`
 upstream contribution. The Sonarr shim stays.
@@ -188,7 +200,11 @@ seeders before size.
   a start.
 - Grabs go through `IDownloadService`, which sends them to a download client (spec 07 § Implementation notes (M2d)).
   A failed grab is logged and the next best release for the same episodes is tried.
-- Interactive results are ordered accepted → rejected matches → unmatched, each best first.
+- Interactive results are ordered accepted → rejected matches → unmatched, each best first. The UI
+  table sorts client-side by any column (Sonarr's predicates: age, title, indexer, size, peers,
+  languages, quality weight, rejections); its default order is approved first → quality (in the
+  series' profile order, best first) → seeders descending, i.e. by `releaseWeight` with the server
+  order as tie-breaker.
   Any matched release can be grabbed (`POST /release`), rejected ones included (date window, quality…);
   unmatched ones need `episodeIds`.
 - On-air search: the scheduler (every minute) queues `OnAirSearch` when a monitored episode of a

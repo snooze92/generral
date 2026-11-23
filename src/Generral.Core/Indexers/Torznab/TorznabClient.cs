@@ -6,6 +6,8 @@
 // and src/NzbDrone.Core/Indexers/Newznab/NewznabRequestGenerator.cs
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net;
+using System.Net.Http.Headers;
 using Generral.Core.Lifecycle;
 using Generral.Core.Sources.Http;
 using Microsoft.Extensions.Logging;
@@ -52,7 +54,7 @@ public sealed class TorznabClient(IHttpClientFactory clients, TimeProvider time,
     public async Task<TorznabCapabilities> GetCapabilitiesAsync(TorznabSettings settings, CancellationToken cancellationToken = default)
     {
         var url = settings.RequestUrl("t=caps");
-        return TorznabParser.ParseCapabilities(await GetAsync(url, cancellationToken));
+        return TorznabParser.ParseCapabilities((await GetAsync(url, cancellationToken)).Content);
     }
 
     /// <exception cref="TorznabException">The indexer reported an error, or the response isn't Torznab.</exception>
@@ -78,7 +80,16 @@ public sealed class TorznabClient(IHttpClientFactory clients, TimeProvider time,
         }
 
         var url = settings.RequestUrl(query);
-        return TorznabParser.ParseReleases(await GetAsync(url, cancellationToken), url, indexer);
+        var (content, retryAfter) = await GetAsync(url, cancellationToken);
+        try
+        {
+            return TorznabParser.ParseReleases(content, url, indexer);
+        }
+        catch (TorznabException e) when (retryAfter is not null)
+        {
+            e.RetryAfter = retryAfter;
+            throw;
+        }
     }
 
     /// <summary>Sonarr's indexer test: the caps must be readable and allow a text search.</summary>
@@ -109,7 +120,7 @@ public sealed class TorznabClient(IHttpClientFactory clients, TimeProvider time,
     public Task<IReadOnlyList<ReleaseInfo>> FetchRssAsync(Indexer indexer, CancellationToken cancellationToken = default) =>
         SearchAsync(indexer, new TorznabSearch(), cancellationToken);
 
-    private async Task<string> GetAsync(Uri url, CancellationToken cancellationToken)
+    private async Task<(string Content, TimeSpan? RetryAfter)> GetAsync(Uri url, CancellationToken cancellationToken)
     {
         SsrfGuard.EnsureAllowed(url);
         var key = url.GetLeftPart(UriPartial.Path);
@@ -127,17 +138,24 @@ public sealed class TorznabClient(IHttpClientFactory clients, TimeProvider time,
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogDebug("GET {Url}: {Status}", url, (int)response.StatusCode);
 
+            var retryAfter = response.StatusCode == HttpStatusCode.TooManyRequests ? RetryAfter(response.Headers.RetryAfter) : null;
             var isXml = response.Content.Headers.ContentType?.MediaType?.Contains("xml", StringComparison.OrdinalIgnoreCase) == true;
             if (!response.IsSuccessStatusCode && !isXml)
             {
-                throw new HttpRequestException($"{url.GetLeftPart(UriPartial.Path)} returned HTTP {(int)response.StatusCode}", null, response.StatusCode);
+                var message = $"{url.GetLeftPart(UriPartial.Path)} returned HTTP {(int)response.StatusCode}";
+                throw response.StatusCode == HttpStatusCode.TooManyRequests
+                    ? new TorznabException(message) { RequestLimit = true, RetryAfter = retryAfter }
+                    : new HttpRequestException(message, null, response.StatusCode);
             }
 
-            return content;
+            return (content, retryAfter);
         }
         finally
         {
             gate.Release();
         }
     }
+
+    private TimeSpan? RetryAfter(RetryConditionHeaderValue? header) =>
+        header?.Delta ?? (header?.Date is { } date ? date - time.GetUtcNow() : null);
 }

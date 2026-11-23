@@ -233,6 +233,31 @@ public class DownloadDecisionMakerTests
     }
 
     [Test]
+    public void Interactive_order_is_approved_then_quality_then_seeders()
+    {
+        var episode = UfcEpisodes()[2];
+        DownloadDecision D(string title, int seeders, params string[] rejections) => new(new RemoteEpisode
+        {
+            Release = Release(title, seeders: seeders),
+            Quality = QualityParser.ParseQuality(title),
+            Series = _ufc,
+            QualityProfile = _profile,
+            Episodes = rejections.Contains("unmatched") ? [] : [episode],
+        }, rejections);
+
+        var webFew = D("UFC 314 1080p WEB-DL h264 a", 12);
+        var webMany = D("UFC 314 1080p WEB-DL h264 b", 900);
+        var hdtvMost = D("UFC 314 720p HDTV x264", 5000);
+        var rejectedBest = D("UFC 314 2160p WEB-DL h265", 9000, "Too big");
+        var rejectedWorse = D("UFC 314 720p HDTV x264 c", 9000, "Too big");
+        var unmatched = D("UFC 314 1080p WEB-DL h264 d", 9999, "unmatched");
+
+        var sorted = DownloadDecisionComparer.InteractiveOrder([unmatched, rejectedWorse, hdtvMost, webFew, rejectedBest, webMany]);
+
+        Assert.That(sorted, Is.EqualTo(new[] { webMany, webFew, hdtvMost, rejectedBest, rejectedWorse, unmatched }));
+    }
+
+    [Test]
     public void Title_normalisation()
     {
         Assert.Multiple(() =>

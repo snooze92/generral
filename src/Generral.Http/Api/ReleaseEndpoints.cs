@@ -13,6 +13,7 @@ using Generral.Core.Languages;
 using Generral.Core.Profiles;
 using Generral.Core.Qualities;
 using Generral.Core.Tv;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -146,6 +147,9 @@ public static class ReleaseEndpoints
     /// <summary>Like Sonarr: an interactive search result can be grabbed for 30 minutes.</summary>
     public static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
 
+    /// <summary>Names of the indexers that timed out (comma-separated); the body stays Sonarr's plain array.</summary>
+    public const string TimedOutHeader = "X-Generral-Timed-Out-Indexers";
+
     public static void MapReleaseEndpoints(this IEndpointRouteBuilder api)
     {
         var releases = api.MapGroup("/release");
@@ -153,7 +157,8 @@ public static class ReleaseEndpoints
         releases.MapPost("/", Grab);
     }
 
-    private static async Task<IResult> Search(int? episodeId, ReleaseSearchService search, IMemoryCache cache, GenerralDbContext db, TimeProvider time, CancellationToken cancellationToken)
+    private static async Task<IResult> Search(
+        int? episodeId, ReleaseSearchService search, IMemoryCache cache, GenerralDbContext db, TimeProvider time, HttpResponse response, CancellationToken cancellationToken)
     {
         if (episodeId is not { } id)
         {
@@ -165,7 +170,12 @@ public static class ReleaseEndpoints
             return Results.NotFound();
         }
 
-        var decisions = await search.InteractiveSearchAsync(id, cancellationToken);
+        var (decisions, timedOut) = await search.InteractiveSearchAsync(id, cancellationToken);
+        if (timedOut.Count > 0)
+        {
+            response.Headers[TimedOutHeader] = string.Join(", ", timedOut);
+        }
+
         var definitions = await db.QualityDefinitions.AsNoTracking().ToListAsync(cancellationToken);
         var defaultProfile = QualityProfileService.GetDefaultProfile("", definitions);
         var now = time.GetUtcNow().UtcDateTime;

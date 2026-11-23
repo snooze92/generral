@@ -16,6 +16,15 @@ namespace Generral.Core.Indexers.Torznab;
 public sealed class TorznabException(string message, bool apiKeyError = false, Exception? innerException = null) : Exception(message, innerException)
 {
     public bool ApiKeyError { get; } = apiKeyError;
+
+    /// <summary>A request or grab limit, or Prowlarr's own back-off: the indexer shouldn't be queried for a while.</summary>
+    public bool RequestLimit { get; init; }
+
+    /// <summary>From the <c>Retry-After</c> header.</summary>
+    public TimeSpan? RetryAfter { get; internal set; }
+
+    /// <summary>Prowlarr's <c>Indexer is disabled till {time} due to recent failures.</c>, in UTC.</summary>
+    public DateTime? DisabledTill { get; init; }
 }
 
 public sealed record TorznabCapabilities
@@ -144,9 +153,16 @@ public static partial class TorznabParser
                 throw new TorznabException("Invalid API key", apiKeyError: true);
             }
 
-            throw description == "Request limit reached"
-                ? new TorznabException("API limit reached")
-                : new TorznabException($"Torznab error detected: {description}");
+            if (description == "Request limit reached")
+            {
+                throw new TorznabException("API limit reached") { RequestLimit = true };
+            }
+
+            throw new TorznabException($"Torznab error detected: {description}")
+            {
+                RequestLimit = code == 429,
+                DisabledTill = DisabledTillRegex().Match(description) is { Success: true } match ? ParseLocalTime(match.Groups[1].Value) : null,
+            };
         }
 
         return document;
@@ -243,6 +259,16 @@ public static partial class TorznabParser
     private static long? ParseLong(string? value) => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : null;
 
     private static double? ParseDouble(string? value) => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : null;
+
+    /// <summary>Prowlarr prints its local time in its own culture; read as this host's local time (same host or both in UTC).</summary>
+    private static DateTime? ParseLocalTime(string value) =>
+        DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out var result) ||
+        DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out result)
+            ? result.ToUniversalTime()
+            : null;
+
+    [GeneratedRegex(@"disabled till (.+?) due to", RegexOptions.IgnoreCase)]
+    private static partial Regex DisabledTillRegex();
 
     [GeneratedRegex(@"\s[A-Z]{2,4}$")]
     private static partial Regex TimeZoneSuffixRegex();

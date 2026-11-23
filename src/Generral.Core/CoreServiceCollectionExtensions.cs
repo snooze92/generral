@@ -11,6 +11,7 @@ using Generral.Core.Extras.Metadata;
 using Generral.Core.Extras.Metadata.Consumers.PlexNfo;
 using Generral.Core.HealthCheck;
 using Generral.Core.History;
+using Generral.Core.Indexers;
 using Generral.Core.Indexers.Torznab;
 using Generral.Core.IndexerSearch;
 using Generral.Core.Lifecycle;
@@ -91,6 +92,7 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<ICommandHandler, CleanUpRecycleBinHandler>();
         services.AddSingleton<ICommandHandler, ManualImportHandler>();
         services.TryAddSingleton<IDownloadService, DownloadService>();
+        services.AddSingleton<IndexerStatusService>();
         services.AddSingleton<ReleaseSearchService>();
         services.AddSingleton<IMetadataConsumer, PlexNfoMetadata>();
         services.AddScoped<MetadataService>();
