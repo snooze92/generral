@@ -61,6 +61,11 @@ public sealed class DownloadService(
         var downloadId = await implementation.AddTorrentAsync(client, torrent, remoteEpisode, indexer, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<HistoryService>().RecordGrabbedAsync(remoteEpisode, client, downloadId, cancellationToken);
         tracked.TrackGrab(client, downloadId, remoteEpisode);
+
+        // The release is named after these numbers now, so mappings must not move them (spec 05 § Numbering stability).
+        var episodeIds = remoteEpisode.Episodes.Select(e => e.Id).ToList();
+        await db.Episodes.Where(e => episodeIds.Contains(e.Id) && !e.NumberLocked)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.NumberLocked, true), cancellationToken);
         if ((remoteEpisode.Series ?? await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seriesId, cancellationToken)) is { } series)
         {
             await scope.ServiceProvider.GetRequiredService<NotificationService>().NotifyAsync(NotificationTrigger.Grab, new GrabMessage

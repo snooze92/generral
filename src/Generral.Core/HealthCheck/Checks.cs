@@ -60,7 +60,9 @@ public sealed class IndexerStatusCheck(GenerralDbContext db, IndexerStatusServic
 
     public async Task<HealthCheck> CheckAsync(CancellationToken cancellationToken)
     {
-        var enabled = (await db.Indexers.AsNoTracking().ToListAsync(cancellationToken)).Where(i => i.Enable).Select(i => i.Id).ToHashSet();
+        // Newznab indexers synced by Prowlarr are never queried, so they can't fail.
+        var enabled = (await db.Indexers.AsNoTracking().Where(i => i.Implementation == IndexerImplementations.Torznab).ToListAsync(cancellationToken))
+            .Where(i => i.Enable).Select(i => i.Id).ToHashSet();
         var since = time.GetUtcNow().UtcDateTime - RecentFailure;
         var failing = status.Blocked().Where(s => enabled.Contains(s.IndexerId) && s.InitialFailure > since).ToList();
         if (failing.Count == 0)

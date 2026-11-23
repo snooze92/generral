@@ -5,6 +5,7 @@
 // Ported from Sonarr@51a2412af235 src/NzbDrone.Core/Notifications/NotificationService.cs and NotificationFactory.cs
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
+using Generral.Core.Extras.Metadata;
 using Generral.Core.Lifecycle;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +59,16 @@ public sealed class NotificationService(
             }
 
             await RunAsync(definition, () => notification.SendHealthAsync(definition, check, restored, cancellationToken), cancellationToken);
+        }
+    }
+
+    /// <summary>Brings the series' metadata files up to date and, when any changed, has media servers rescan it (spec 08 § NFO files).</summary>
+    public async Task SyncMetadataAsync(MetadataService metadata, int seriesId, CancellationToken cancellationToken = default)
+    {
+        if (await metadata.SyncSeriesAsync(seriesId, cancellationToken) > 0 &&
+            await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seriesId, cancellationToken) is { } series)
+        {
+            await UpdateMediaServersAsync(series, cancellationToken);
         }
     }
 

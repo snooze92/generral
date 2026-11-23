@@ -37,7 +37,9 @@ Sonarr parity, with matching driven by the tracked download rather than by parsi
 8. Extras: subtitles (`.srt .ass .ssa .sub/.idx .vtt`) with the same base name get carried over as
    `<episode name>.<lang>.<ext>` (Sonarr parity).
 9. Write **metadata** (NFO/art, below) and set permissions (`chmod` folder/file, `chown` group from
-   settings; Sonarr parity, Linux only).
+   settings, a name or gid; Sonarr parity, Linux only). With *Delete Empty Folders*, deleting an
+   episode file (not an upgrade) also deletes the season folders it leaves empty; the series folder
+   stays.
 10. History *Imported*, `DownloadFolderImported` event → Connect (Plex refresh, notifications).
 11. Mark the item imported in the client (post-import category), and remove it once seeding goals
     are met if *Remove Completed* is on.

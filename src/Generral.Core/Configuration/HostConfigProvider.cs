@@ -156,6 +156,10 @@ public sealed class HostConfigProvider : IHostConfigProvider
 
         var portText = Env(HostConfigKey.Port);
         var port = portText is not null ? ParseInt(portText, HostConfigKey.Port) : file.Port ?? defaults.Port;
+        if (port is < 1 or > 65535)
+        {
+            throw new InvalidConfigurationException(HostConfigKey.Port, port.ToString(System.Globalization.CultureInfo.InvariantCulture), "a port between 1 and 65535");
+        }
 
         return new HostSettings
         {

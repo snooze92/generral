@@ -67,7 +67,7 @@ public class AuthModeTests
             Assert.That((await client.GetAsync("/api/v1/system/status")).StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
             Assert.That((await client.GetAsync("/ping")).StatusCode, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(redirect.Headers.Location?.ToString(), Is.EqualTo("/generral/login?returnUrl=%2Fgenerral%2Fseries"));
-            Assert.That(await client.GetStringAsync("/generral/series"), Does.Contain("href=\"/generral/assets/app.css\"").And.Contain("data-base=\"/generral\""));
+            Assert.That(await client.GetStringAsync("/generral/series"), Does.Contain("href=\"/generral/assets/app.css\"").And.Contain("href=\"/generral/favicon.svg\"").And.Contain("data-base=\"/generral\""));
         });
     }
 }

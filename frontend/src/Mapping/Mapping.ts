@@ -39,6 +39,8 @@ export interface MappingPreviewRow {
     status: EventStatus;
   };
   kept: boolean;
+  partKey?: string;
+  partTitle?: string;
   rejectedBy?: string;
   episodeId?: number;
   currentSeasonNumber?: number;

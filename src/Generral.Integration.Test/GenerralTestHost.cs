@@ -39,7 +39,7 @@ public sealed partial class GenerralTestHost : IAsyncDisposable
         var configFolder = Path.Combine(Path.GetTempPath(), "generral-it-" + Guid.NewGuid().ToString("N"));
         var uiFolder = Path.Combine(configFolder, "UI");
         Directory.CreateDirectory(uiFolder);
-        File.WriteAllText(Path.Combine(uiFolder, "index.html"), "<html><head><link href=\"/assets/app.css\"></head><body data-base=\"__URL_BASE__\">index</body></html>");
+        File.WriteAllText(Path.Combine(uiFolder, "index.html"), "<html><head><link rel=\"icon\" href=\"/favicon.svg\"><link href=\"/assets/app.css\"></head><body data-base=\"__URL_BASE__\">index</body></html>");
         File.WriteAllText(Path.Combine(uiFolder, "login.html"), "<html><body>login __INSTANCE_NAME__</body></html>");
         Directory.CreateDirectory(Path.Combine(uiFolder, "assets"));
         File.WriteAllText(Path.Combine(uiFolder, "assets", "app.css"), "body{}");

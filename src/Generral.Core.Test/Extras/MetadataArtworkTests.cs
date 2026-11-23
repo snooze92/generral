@@ -68,6 +68,7 @@ public class MetadataArtworkTests
             AirDateUtc = DateTime.UtcNow.AddDays(7),
             Images = new ImageSet { Thumb = "https://img.example.org/e1.jpg" },
         });
+        db.Metadata.RemoveRange(db.Metadata);
         db.Metadata.Add(new MetadataDefinition { Name = "Plex", Implementation = PlexNfoMetadata.Name, Enable = true, Settings = new JsonObject { ["seriesMetadata"] = false, ["episodeMetadata"] = false } });
         db.SaveChanges();
     }

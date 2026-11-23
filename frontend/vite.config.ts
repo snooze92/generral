@@ -19,8 +19,14 @@ const backend = process.env.GENERRAL_BACKEND ?? 'http://localhost:8990';
 export default defineConfig({
   plugins: [patchCssModules({ exportMode: 'default' }), react()],
 
-  // Assets are referenced absolutely; the backend prefixes them with the URL base when serving HTML.
+  // HTML references assets absolutely and the backend prefixes them with the URL base. URLs emitted
+  // into JS (e.g. preloaded CSS for lazy chunks) are resolved against import.meta.url instead, so
+  // they pick up the URL base too.
   base: '/',
+  experimental: {
+    renderBuiltUrl: (_filename, { hostType }) =>
+      hostType === 'js' ? { relative: true } : undefined,
+  },
   publicDir: 'public',
 
   define: {

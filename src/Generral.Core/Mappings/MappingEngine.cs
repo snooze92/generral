@@ -228,8 +228,9 @@ public sealed class MappingEngine(TemplateRenderer renderer)
             plan.Monitored = isMonitored;
         }
 
-        // File and grab locks are set elsewhere; the mapping locks numbers once the air date has passed.
-        plan.NumberLocked = row.Existing?.NumberLocked == true || row.Existing?.AirDateUtc <= input.Now || plan.AirDateUtc <= input.Now;
+        // Import and grab set the lock too; a file also counts on its own, for files imported before they did.
+        plan.NumberLocked = row.Existing?.NumberLocked == true || row.Existing?.HasFile == true ||
+                            row.Existing?.AirDateUtc <= input.Now || plan.AirDateUtc <= input.Now;
 
         var season = input.Definition.Season;
         switch (season.Strategy)

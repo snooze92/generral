@@ -138,6 +138,8 @@ public class HostConfigProviderTests
     }
 
     [TestCase("GENERRAL__PORT", "abc")]
+    [TestCase("GENERRAL__PORT", "99999")]
+    [TestCase("GENERRAL__PORT", "0")]
     [TestCase("GENERRAL__AUTHMETHOD", "basic")]
     [TestCase("GENERRAL__AUTHREQUIRED", "sometimes")]
     [TestCase("GENERRAL__LOGLEVEL", "verbose")]
