@@ -18,6 +18,11 @@ Sonarr parity, with matching driven by the tracked download rather than by parsi
    Archives (`.rar`) are not unpacked (use Unpackerr, as with Sonarr).
 4. **File → episode assignment:**
    - Single-episode grab + one video file → that episode.
+   - Single-episode grab + several files (e.g. `Main Card.mkv` + `Prelims.mkv`) → one file is picked:
+     the only one matching the episode's rules, else the only one not excluded by `mustNot`, else the
+     only one named like the episode title, else the only one named "main card", else the largest when
+     ≥ 2× the next. The others are ignored and listed in the import history (`ignoredFiles`). The
+     file quality is parsed from the file name when the release title has none.
    - Pack grab (several parts) + several files → each file's name is matched against each covered
      episode's *part* rules (`must`/`mustNot`). Unmatched files are left for manual import.
    - Pack grab + one file → **multi-episode file** covering all its episodes.

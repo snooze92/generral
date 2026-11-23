@@ -30,6 +30,11 @@ export function getQueueStatus({
     title = translate('Queued');
   }
 
+  if (status === 'downloadingMetadata') {
+    iconName = icons.QUEUED;
+    title = translate('DownloadingMetadata');
+  }
+
   if (status === 'completed') {
     iconName = icons.DOWNLOADED;
     title = translate('Downloaded');

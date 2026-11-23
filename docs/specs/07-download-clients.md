@@ -7,7 +7,7 @@
 folders for remote-path-mapping hints), `MarkItemAsImported(item)` (optional post-import category).
 
 `DownloadClientItem`: `downloadId` (infohash for torrents), `title`, `category`, `totalSize`,
-`remainingSize`, `remainingTime`, `status` (`queued`, `paused`, `downloading`, `completed`,
+`remainingSize`, `remainingTime`, `status` (`queued`, `downloadingMetadata`, `paused`, `downloading`, `completed`,
 `failed`, `warning`), `message`, `outputPath`, `canMoveFiles`, `canBeRemoved`, `seedRatio`,
 `seedTime`.
 
@@ -59,7 +59,7 @@ redirects to a `magnet:`, it passes the magnet instead (Sonarr behaviour).
 | `error`, `missingFiles` | `warning` (message: qBittorrent error) |
 | `pausedDL`/`stoppedDL` | `paused` |
 | `queuedDL`, `checkingDL`, `checkingUP`, `checkingResumeData`, `allocating`, `moving` | `queued` |
-| `metaDL`, `forcedMetaDL` | `queued` (message: "Downloading metadata") |
+| `metaDL`, `forcedMetaDL` | `downloadingMetadata` (Generral addition, shown as "Downloading metadata"; `warning` when DHT is disabled) |
 | `downloading`, `forcedDL`, `stalledDL` | `downloading` (`stalledDL` → `warning` with message after 1 h with no progress) |
 | `uploading`, `stalledUP`, `queuedUP`, `forcedUP`, `pausedUP`/`stoppedUP` | `completed` |
 

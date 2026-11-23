@@ -575,6 +575,7 @@
   "DownloadFailedEpisodeTooltip": "Episode download failed",
   "DownloadIgnoredEpisodeTooltip": "Episode Download Ignored",
   "Downloading": "Downloading",
+  "DownloadingMetadata": "Downloading metadata",
   "DownloadProgressForTitle": "Download progress for {title}",
   "DownloadWarning": "Download warning: {warningMessage}",
   "EpisodeFileDeletedTooltip": "Episode file deleted",

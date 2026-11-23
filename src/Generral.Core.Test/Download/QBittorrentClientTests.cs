@@ -98,14 +98,14 @@ public class QBittorrentClientTests
                 ("BBBB", DownloadItemStatus.Downloading, true),
                 ("CCCC", DownloadItemStatus.Completed, false),
                 ("DDDD", DownloadItemStatus.Warning, false),
-                ("EEEE", DownloadItemStatus.Queued, false),
+                ("EEEE", DownloadItemStatus.DownloadingMetadata, false),
                 ("FFFF", DownloadItemStatus.Paused, false),
             }));
             Assert.That(items[0].RemainingSize, Is.EqualTo(750));
             Assert.That(items[0].RemainingTime, Is.EqualTo(TimeSpan.FromSeconds(60)));
             Assert.That(items[2].OutputPath, Is.EqualTo("/downloads/UFC 314"));
             Assert.That(items[2].CanBeRemoved, Is.True, "stopped and ratio reached");
-            Assert.That(items[4].Message, Is.EqualTo("Downloading metadata"));
+            Assert.That(items[4].Message, Is.Null);
         });
     }
 

@@ -145,6 +145,21 @@ describe('Activity', () => {
     );
   });
 
+  it('shows a magnet without metadata as downloading metadata', async () => {
+    renderSettingsPage(<Queue />, {
+      ...commonRoutes,
+      'GET /api/v1/queue': paged([
+        { ...queueItem, status: 'downloadingMetadata', size: 0, sizeleft: 0, timeleft: undefined },
+      ]),
+    });
+
+    const row = within(
+      (await screen.findByText(queueItem.title)).closest('tr') as HTMLElement
+    );
+    expect(row.getByLabelText('Downloading metadata')).toBeTruthy();
+    expect(row.queryByText('0 B')).toBeNull();
+  });
+
   it('refreshes the queue with RefreshMonitoredDownloads', async () => {
     const fetchMock = renderSettingsPage(<Queue />, {
       ...commonRoutes,

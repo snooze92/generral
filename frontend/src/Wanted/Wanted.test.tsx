@@ -37,7 +37,10 @@ describe('Wanted', () => {
       'GET /api/v1/wanted/missing': ({ url }: MockRequest) =>
         url.searchParams.get('monitored') === 'false'
           ? paged([episode(13, 5, 'Chinese GP'), episode(14, 6, 'Miami GP')])
-          : paged([episode(11, 3, 'Australian GP'), episode(12, 4, 'Japanese GP')]),
+          : paged([
+              episode(11, 3, 'Australian GP'),
+              episode(12, 4, 'Japanese GP'),
+            ]),
       'POST /api/v1/command': command,
     });
 

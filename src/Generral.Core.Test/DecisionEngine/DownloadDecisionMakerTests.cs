@@ -20,7 +20,7 @@ public class DownloadDecisionMakerTests
 
     private readonly Series _ufc = new() { Id = 1, Title = "UFC", SortTitle = "ufc", CleanTitle = "ufc", TitleSlug = "ufc", Path = "/tv/UFC", RootFolderPath = "/tv", QualityProfileId = 1 };
 
-    /// <summary>The terms the ufc-numbered example renders for UFC 314's parts, and UFC 31 to check that 314 doesn't match it.</summary>
+    /// <summary>The terms the UFC numbered-parts mapping (spec 05 worked example) renders for UFC 314's parts, and UFC 31 to check that 314 doesn't match it.</summary>
     private List<Episode> UfcEpisodes()
     {
         Episode Part(int id, int number, string part, string[] must, string[] mustNot, int? ufc = 314, DateTime? air = null) => new()

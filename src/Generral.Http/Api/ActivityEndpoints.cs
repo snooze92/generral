@@ -32,6 +32,7 @@ public enum QueueStatus
 {
     Unknown,
     Queued,
+    DownloadingMetadata,
     Paused,
     Downloading,
     Completed,

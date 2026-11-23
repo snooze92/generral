@@ -39,6 +39,9 @@ public class DownloadClient
 public enum DownloadItemStatus
 {
     Queued,
+
+    /// <summary>A magnet whose metadata (name, size, files) is not known yet.</summary>
+    DownloadingMetadata,
     Paused,
     Downloading,
     Completed,
