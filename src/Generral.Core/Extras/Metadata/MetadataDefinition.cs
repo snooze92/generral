@@ -62,4 +62,5 @@ public sealed record MetadataFileResult(string RelativePath, string Contents);
 
 /// <param name="Url">The image to download; null to write <paramref name="Generated"/>.</param>
 /// <param name="Generated">Drawn when there is no URL, or when its download fails and the file doesn't exist yet.</param>
-public sealed record ImageFileResult(string RelativePath, string? Url, GeneratedPoster? Generated = null);
+/// <param name="FitWide">Fit the downloaded image into 16:9 (<see cref="WidePoster"/>).</param>
+public sealed record ImageFileResult(string RelativePath, string? Url, GeneratedPoster? Generated = null, bool FitWide = false);
