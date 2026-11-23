@@ -142,7 +142,8 @@ public static class CoreServiceCollectionExtensions
     {
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<TemplateRenderer>(_ => new TemplateRenderer());
-        services.TryAddSingleton(sp => new ExtractionEngine(sp.GetRequiredService<TemplateRenderer>(), sp.GetRequiredService<TimeProvider>()));
+        services.TryAddSingleton(sp => new DetailsCache(sp.GetRequiredService<TimeProvider>()));
+        services.TryAddSingleton(sp => new ExtractionEngine(sp.GetRequiredService<TemplateRenderer>(), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<DetailsCache>()));
 
         services.AddHttpClient(SourceFetcherFactory.ClientName, SourceFetcherFactory.ConfigureClient)
             .ConfigurePrimaryHttpMessageHandler(SourceFetcherFactory.CreateHandler);

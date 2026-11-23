@@ -45,5 +45,6 @@ public sealed class HttpHtmlSourceType(SourceFetcherFactory fetchers, Extraction
             },
             HelpText = "Field name → extractor (selector with optional attribute/remove, or text; filters). key and title are required",
         },
+        DetailsField,
     ];
 }

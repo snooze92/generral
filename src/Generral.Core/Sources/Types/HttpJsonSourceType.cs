@@ -38,5 +38,6 @@ public sealed class HttpJsonSourceType(SourceFetcherFactory fetchers, Extraction
             },
             HelpText = "Field name → extractor (path or text, filters). key and title are required",
         },
+        DetailsField,
     ];
 }

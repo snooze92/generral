@@ -7,7 +7,7 @@ namespace Generral.Core.Sources.Extraction;
 
 /// <summary>
 /// Reads an <see cref="ExtractionDefinition"/> from YAML or JSON. Top-level keys other than
-/// <c>requests</c>, <c>items</c> and <c>fields</c> belong to the source type and are ignored; nested objects are strict.
+/// <c>requests</c>, <c>items</c>, <c>fields</c> and <c>details</c> belong to the source type and are ignored; nested objects are strict.
 /// </summary>
 public static class ExtractionDefinitionParser
 {
@@ -15,6 +15,7 @@ public static class ExtractionDefinitionParser
     private static readonly string[] PaginationKeys = ["next", "page_param", "start", "until_empty", "max_pages"];
     private static readonly string[] FieldKeys = ["path", "selector", "attribute", "remove", "text", "filters", "optional", "default"];
     private static readonly string[] FilterKeys = ["name", "args"];
+    private static readonly string[] DetailsKeys = ["url", "format", "htmlPath", "fields", "optional", "cache"];
 
     /// <exception cref="ExtractionDefinitionException">Invalid YAML or definition.</exception>
     public static ExtractionDefinition FromYaml(string yaml)
@@ -63,21 +64,74 @@ public static class ExtractionDefinitionParser
             Requests = requests,
             Items = RequiredString(root, "items", "items"),
             Fields = FieldsFromJson(root["fields"] ?? throw Error("fields", "is required")),
+            Details = root["details"] is { } details ? ParseDetails(details) : null,
         };
     }
 
     /// <summary>Reads the <c>fields</c> mapping (field name → extractor) on its own.</summary>
-    public static IReadOnlyList<FieldDefinition> FieldsFromJson(JsonNode? node)
+    public static IReadOnlyList<FieldDefinition> FieldsFromJson(JsonNode? node) => ParseFields(node, "fields");
+
+    private static IReadOnlyList<FieldDefinition> ParseFields(JsonNode? node, string location)
     {
-        var fields = AsObject(node, "fields")
-            .Select(f => ParseField(f.Key, f.Value))
+        var fields = AsObject(node, location)
+            .Select(f => ParseField(f.Key, f.Value, location))
             .ToList();
         if (fields.Count == 0)
         {
-            throw Error("fields", "at least one field is required");
+            throw Error(location, "at least one field is required");
         }
 
         return fields;
+    }
+
+    private static DetailsDefinition ParseDetails(JsonNode node)
+    {
+        const string location = "details";
+        var obj = Strict(node, location, DetailsKeys);
+        var details = new DetailsDefinition
+        {
+            Url = RequiredString(obj, "url", location),
+            Format = String(obj["format"], $"{location}.format") switch
+            {
+                null => null,
+                "json" => DocumentFormat.Json,
+                "html" => DocumentFormat.Html,
+                _ => throw Error($"{location}.format", "must be 'json' or 'html'"),
+            },
+            HtmlPath = String(obj["htmlPath"], $"{location}.htmlPath"),
+            Fields = ParseFields(obj["fields"] ?? throw Error($"{location}.fields", "is required"), $"{location}.fields"),
+            Optional = Bool(obj["optional"], $"{location}.optional") ?? false,
+            Cache = obj["cache"] is { } cache ? Duration(cache, $"{location}.cache") : DetailsDefinition.DefaultCache,
+        };
+
+        if (details.Cache > DetailsDefinition.MaxCache)
+        {
+            throw Error($"{location}.cache", "must be at most 30d");
+        }
+
+        return details;
+    }
+
+    /// <summary><c>0</c>, or a number with a unit: <c>30m</c>, <c>12h</c>, <c>7d</c>.</summary>
+    private static TimeSpan Duration(JsonNode node, string location)
+    {
+        var text = Scalar(node, location).Trim();
+        if (text == "0")
+        {
+            return TimeSpan.Zero;
+        }
+
+        if (text.Length >= 2 && int.TryParse(text[..^1], NumberStyles.None, CultureInfo.InvariantCulture, out var amount))
+        {
+            switch (text[^1])
+            {
+                case 'm': return TimeSpan.FromMinutes(amount);
+                case 'h': return TimeSpan.FromHours(amount);
+                case 'd': return TimeSpan.FromDays(amount);
+            }
+        }
+
+        throw Error(location, "must be 0 or a duration such as 30m, 12h or 7d");
     }
 
     private static RequestDefinition ParseRequest(JsonNode? node, string location)
@@ -125,12 +179,12 @@ public static class ExtractionDefinitionParser
         return pagination;
     }
 
-    private static FieldDefinition ParseField(string name, JsonNode? node)
+    private static FieldDefinition ParseField(string name, JsonNode? node, string parent)
     {
-        var location = $"fields.{name}";
+        var location = $"{parent}.{name}";
         if (name.Length == 0)
         {
-            throw Error("fields", "field names must not be empty");
+            throw Error(parent, "field names must not be empty");
         }
 
         var obj = Strict(node, location, FieldKeys);

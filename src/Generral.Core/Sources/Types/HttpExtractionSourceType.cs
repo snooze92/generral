@@ -18,11 +18,20 @@ public abstract class HttpExtractionSourceType(SourceFetcherFactory fetchers, Ex
         HelpText = "URLs (Scriban templates), optionally with foreach variables and pagination",
     };
 
+    protected static readonly SourceField DetailsField = new()
+    {
+        Name = "details",
+        Label = "Details",
+        Type = SourceFieldType.TextArea,
+        HelpText = "Optional: one request per item (url templated from its fields, e.g. {{ fields.slug }}) with fields that add to or override the item's, e.g. poster",
+        Advanced = true,
+    };
+
     protected abstract DocumentFormat Format { get; }
 
     protected override CompiledExtraction? Read(SourceSettings settings)
     {
-        if (!TryStructured(settings, "requests", out var requests) | !TryStructured(settings, "fields", out var fields))
+        if (!TryStructured(settings, "requests", out var requests) | !TryStructured(settings, "fields", out var fields) | !TryStructured(settings, "details", out var details))
         {
             return null;
         }
@@ -35,6 +44,11 @@ public abstract class HttpExtractionSourceType(SourceFetcherFactory fetchers, Ex
                 ["items"] = settings["items"]?.DeepClone(),
                 ["fields"] = fields,
             };
+            if (details is not null && !(details is JsonValue text && text.GetValueKind() == JsonValueKind.String && string.IsNullOrWhiteSpace(text.GetValue<string>())))
+            {
+                definition["details"] = details;
+            }
+
             return engine.Compile(ExtractionDefinitionParser.FromJson(definition) with
             {
                 Format = Format,
@@ -44,7 +58,7 @@ public abstract class HttpExtractionSourceType(SourceFetcherFactory fetchers, Ex
         catch (ExtractionDefinitionException e)
         {
             var property = e.Message.Split([':', '.', '['], 2)[0];
-            settings.Fail(property is "requests" or "items" or "fields" or "htmlPath" ? property : "definition", e.Message);
+            settings.Fail(property is "requests" or "items" or "fields" or "htmlPath" or "details" ? property : "definition", e.Message);
             return null;
         }
     }

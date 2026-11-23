@@ -145,6 +145,36 @@ Engine details (decided in M1):
 - `pagination.next` is a CSS selector of the link to follow (its `href`); `page_param` works as for
   JSON.
 - `xpath:` selectors are not implemented yet.
+
+### Details requests
+
+`http-json` and `http-html` take an optional `details` setting: one request per item, for when the
+list page lacks something (typically images) that each event's own page has.
+
+```yaml
+details:
+  url: "https://en.wikipedia.org/api/rest_v1/page/summary/{{ fields.slug }}"  # Scriban, over the item's fields
+  format: json            # optional: json | html, default the source's format
+  # htmlPath: "$.parse.text"   # HTML details only, as the top-level htmlPath
+  optional: false         # true: a failed request / missing field leaves the item as is (one warning)
+  cache: 24h              # reuse the details of an unchanged item; 0 disables; at most 30d
+  fields:                 # same extractors, against the whole details document
+    poster: { path: "$.originalimage.source" }
+    overview: { path: "$.extract", optional: true }
+```
+
+- The URL template sees the item's fields by name and as `fields.*`, plus `vars`; it may be relative
+  to the list page. An empty URL means no details for that item.
+- Details fields add to or override the item's fields (`key` and `_raw` can't be set), then the
+  reserved fields are read. `text` fields see the item's fields overlaid with the details fields so
+  far. Relative image URLs resolve against the details URL.
+- Failures (HTTP error, invalid document or URL, missing non-optional field) are item errors
+  (`details: …`), never a failed fetch. Items with errors before details get no details request.
+- Bounded: 3 requests in flight, request starts at least `requestDelay` apart, at most 200 details
+  requests per fetch (further items get none, with a warning). Details count towards neither the
+  50-request cap nor the 1 h raw-response cache rule: they have their own in-memory cache keyed by
+  the details definition, URL and the item's extracted fields (so a changed list entry is
+  re-fetched). Responses after the 50th are listed in the preview without a body.
 - Requests carry the default User-Agent `Generral/<version> (+https://github.com/snooze92/generral)`
   (Wikimedia requires a descriptive one with a contact); a `User-Agent` header overrides it.
 
@@ -177,7 +207,7 @@ After extraction, these fields fill the event's core attributes. Everything else
 | `title` | **yes** | `Event.title` |
 | `start`, `end` | no | `Event.start/end` (UTC after timezone handling) |
 | `status` | no | `Event.status` (values normalised: `cancelled`/`canceled`, `postponed`, `ft`/`finished` → `completed`, …) |
-| `poster`, `fanart`, `thumb`, `banner`, `logo` | no | `Event.images` (relative URLs resolved against the request URL; non-HTTP(S) dropped) |
+| `poster`, `fanart`, `thumb`, `banner`, `logo` | no | `Event.images` (relative URLs resolved against the request URL, or the details URL; non-HTTP(S) dropped) |
 
 `start`/`end` accept a parsed date, an ISO-like string or a Unix timestamp (seconds or
 milliseconds). Keys must be unique within a fetch; later duplicates are item errors.
