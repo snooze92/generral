@@ -38,3 +38,20 @@ const useWanted = (
   });
 
 export default useWanted;
+
+/** How many unmonitored missing episodes the monitored filter hides (Missing only). */
+export const useHiddenUnmonitoredCount = (
+  kind: WantedKind,
+  isMonitoredFilter: boolean
+) => {
+  const enabled = isMonitoredFilter && kind === 'missing';
+  const { totalRecords } = usePagedApiQuery<WantedEpisode>({
+    path: PATHS[kind],
+    page: 1,
+    pageSize: 1,
+    queryParams: { monitored: false },
+    queryOptions: { enabled },
+  });
+
+  return enabled ? totalRecords : 0;
+};

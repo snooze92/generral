@@ -73,7 +73,7 @@ Mirrors Sonarr's Series where sensible.
 | `rootFolderPath` | string | |
 | `qualityProfileId` | int | |
 | `monitored` | bool | |
-| `monitorNewItems` | enum | `all`, `none`. Sonarr parity: whether newly created *seasons* get monitored. |
+| `monitorNewItems` | enum | `all`, `none`. Sonarr parity: whether newly created *seasons* get monitored. A new episode is monitored when its part sets `monitored`, else when this is `all` and its season is monitored; applying a mapping never changes the monitored flag of an existing episode. |
 | `seasonFolder` | bool | Sonarr parity. |
 | `tags` | int[] | Used for indexer/download client/notification/release-profile scoping (Sonarr semantics). |
 | `searchSettings` | object | Default query templates and match rules (overridable per mapping). See [06](06-indexers-and-search.md#per-series-search-settings). |

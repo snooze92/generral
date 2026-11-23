@@ -51,6 +51,22 @@ public class ImportUnitTests
         Assert.That(files, Is.EqualTo(new[] { "main.mkv", "prelims.mp4" }));
     }
 
+    [TestCase(new[] { "Main Card.mkv:600", "Prelims.mkv:500" }, "", "Main Card.mkv", TestName = "Main card by name")]
+    [TestCase(new[] { "ufc.334.mkv:600", "ufc.334.prelims.mkv:500" }, @"\bprelims?\b", "ufc.334.mkv", TestName = "Only one not excluded by mustNot")]
+    [TestCase(new[] { "a.mkv:1000", "b.mkv:400" }, "", "a.mkv", TestName = "Clearly largest")]
+    [TestCase(new[] { "a.mkv:1000", "b.mkv:600" }, "", null, TestName = "Ambiguous")]
+    [TestCase(new[] { "Gane vs Hokit.mkv:500", "Countdown.mkv:600" }, "", "Gane vs Hokit.mkv", TestName = "Named like the episode")]
+    public void Single_episode_picks_one_file_of_a_multi_file_release(string[] files, string mustNot, string? expected)
+    {
+        var infos = files.Select(f => f.Split(':')).Select(f => new FileInfo(Write("UFC 334/" + f[0], int.Parse(f[1], System.Globalization.CultureInfo.InvariantCulture)))).ToList();
+        var episode = new Generral.Core.Tv.Episode { Title = "UFC 334: Gane vs. Hokit" };
+        var terms = new Generral.Core.DecisionEngine.SearchTerms { MustNot = mustNot.Length > 0 ? [mustNot] : [] };
+
+        var picked = EpisodeImportService.PickFile(infos, new Generral.Core.DecisionEngine.SearchCandidate(episode, terms));
+
+        Assert.That(picked?.Name, Is.EqualTo(expected));
+    }
+
     [Test]
     public void Hardlink_falls_back_to_copy_across_filesystems()
     {

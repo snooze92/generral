@@ -86,7 +86,9 @@ function QueueRow({ item, series, episodes }: QueueRowProps) {
         />
       </TableRowCell>
 
-      <TableRowCell className={styles.size}>{formatBytes(size)}</TableRowCell>
+      <TableRowCell className={styles.size}>
+        {status === 'downloadingMetadata' && !size ? '-' : formatBytes(size)}
+      </TableRowCell>
 
       <TableRowCell className={styles.actions}>
         {item.trackedDownloadState === 'importBlocked' ? (

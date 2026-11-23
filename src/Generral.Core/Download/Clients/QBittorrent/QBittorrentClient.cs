@@ -246,7 +246,7 @@ public sealed class QBittorrentClient(IHttpClientFactory clients, TimeProvider t
             "pausedDL" or "stoppedDL" => (DownloadItemStatus.Paused, null, false),
             "queuedDL" or "checkingDL" or "checkingUP" or "checkingResumeData" or "allocating" or "moving" => (DownloadItemStatus.Queued, null, false),
             "metaDL" or "forcedMetaDL" => preferences.Dht
-                ? (DownloadItemStatus.Queued, "Downloading metadata", false)
+                ? (DownloadItemStatus.DownloadingMetadata, null, false)
                 : (DownloadItemStatus.Warning, "qBittorrent cannot resolve magnet link with DHT disabled", false),
             "downloading" or "forcedDL" => (DownloadItemStatus.Downloading, null, false),
             "stalledDL" => (DownloadItemStatus.Downloading, null, true),

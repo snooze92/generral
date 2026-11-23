@@ -255,6 +255,46 @@ public class DownloadApiTests
     }
 
     [Test]
+    public async Task Multi_file_release_imports_the_main_file_with_the_file_quality_and_reports_the_rest()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "generral-import-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var downloads = Directory.CreateDirectory(Path.Combine(root, "UFC 314")).FullName;
+            await File.WriteAllBytesAsync(Path.Combine(downloads, "UFC 314 Main Card 1080p WEB-DL.mkv"), new byte[3000]);
+            await File.WriteAllBytesAsync(Path.Combine(downloads, "UFC 314 Prelims 1080p WEB-DL.mkv"), new byte[2000]);
+            _qbit.SavePath = root + "/";
+            _tracker.Title = "UFC 314";
+            await CreateClientAsync();
+            var episodeId = await SeedAsync(Path.Combine(root, "tv", "UFC"));
+
+            var release = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/release?episodeId={episodeId}"))!.Single()!;
+            var grab = await _client.PostAsJsonAsync("/api/v1/release", new JsonObject { ["guid"] = (string)release["guid"]!, ["indexerId"] = (int)release["indexerId"]! });
+            _qbit.State = "stoppedUP";
+            var refresh = await RunAsync(RefreshMonitoredDownloadsHandler.CommandName);
+            var file = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/episodefile?seriesId=" + (int)(await _client.GetFromJsonAsync<JsonObject>($"/api/v1/episode/{episodeId}"))!["seriesId"]!))!.Single()!;
+            var imported = (await _client.GetFromJsonAsync<JsonObject>("/api/v1/history?eventType=downloadFolderImported"))!["records"]![0]!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That((string)release["quality"]!["quality"]!["name"]!, Is.EqualTo("Unknown"));
+                Assert.That(grab.IsSuccessStatusCode, Is.True);
+                Assert.That((string)refresh["message"]!, Does.Contain("1 imported"), (string?)refresh["message"]);
+                Assert.That((string)imported["data"]!["droppedPath"]!, Is.EqualTo(Path.Combine(downloads, "UFC 314 Main Card 1080p WEB-DL.mkv")));
+                Assert.That((long)file["size"]!, Is.EqualTo(3000));
+                Assert.That((string)file["quality"]!["quality"]!["name"]!, Is.EqualTo("WEBDL-1080p"), "from the file name");
+                Assert.That((string)imported["quality"]!["quality"]!["name"]!, Is.EqualTo("WEBDL-1080p"));
+                Assert.That((string)imported["data"]!["ignoredFiles"]!, Is.EqualTo("UFC 314 Prelims 1080p WEB-DL.mkv"));
+                Assert.That(File.Exists(Path.Combine(downloads, "UFC 314 Prelims 1080p WEB-DL.mkv")), "left alone");
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task Failed_import_shows_the_reason_in_the_queue()
     {
         var root = Path.Combine(Path.GetTempPath(), "generral-import-" + Guid.NewGuid().ToString("N"));
@@ -413,6 +453,8 @@ public class DownloadApiTests
 
         public int Downloads { get; private set; }
 
+        public string Title { get; set; } = "UFC.314.1080p.WEB-DL.h264-GRP";
+
         public string TorrentHash => TorrentInfoHash.FromTorrentFile(Torrent);
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -426,7 +468,7 @@ public class DownloadApiTests
             var xml = $"""
                 <?xml version="1.0" encoding="UTF-8"?>
                 <rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
-                <item><title>UFC.314.1080p.WEB-DL.h264-GRP</title><guid>ufc314</guid><pubDate>{DateTime.UtcNow.AddHours(-1):R}</pubDate>
+                <item><title>{Title}</title><guid>ufc314</guid><pubDate>{DateTime.UtcNow.AddHours(-1):R}</pubDate>
                 <size>{6L << 30}</size><link>https://tracker.example/dl/ufc314</link>
                 <torznab:attr name="seeders" value="80" /></item>
                 </channel></rss>

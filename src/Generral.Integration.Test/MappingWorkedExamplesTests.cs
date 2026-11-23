@@ -130,6 +130,8 @@ public class MappingWorkedExamplesTests
         await PostAsync("/api/v1/mapping", Mapping("RWC patches", seriesId, patchId, RwcMapping, 1), HttpStatusCode.Created);
         await WaitForCommandsAsync();
         var first = await EpisodesAsync(seriesId);
+        var walesFiji = first.Single(e => (string)e["title"]! == "Pool - Wales vs Fiji");
+        (await _client.PutAsJsonAsync($"/api/v1/episode/{(int)walesFiji["id"]!}", new JsonObject { ["monitored"] = false })).EnsureSuccessStatusCode();
 
         // Second refresh: the primary source now also has the patched match.
         await UpdateSourceAsync(wikiId, wiki + "\n- { key: m2, title: m2, start: 2027-10-02T19:00:00Z, home: Wales, away: Fiji }");
@@ -156,6 +158,8 @@ public class MappingWorkedExamplesTests
             Assert.That(Ids(second), Is.EqualTo(Ids(first)));
             Assert.That(links["Pool - Wales vs Fiji"], Has.Count.EqualTo(1), "taken over by the higher-priority mapping");
             Assert.That(links["Pool - Wales vs Fiji"], Is.EqualTo(links["Pool - France vs New Zealand"]));
+            Assert.That(second.Select(e => (bool)e["monitored"]!), Is.EqualTo(new[] { true, true, false }), "the takeover keeps the user's monitored choice");
+            Assert.That(renumbered.Single(e => (string)e["title"]! == "Pool - Wales vs Fiji")["monitored"]!.GetValue<bool>(), Is.False);
             Assert.That(preview["episodes"]!.AsArray().Select(e => $"{(string)e!["eventKey"]!} E{e["episodeNumber"]}→E{e["newEpisodeNumber"]}"),
                 Is.EqualTo(new[] { "m2 E3→E2", "m3 E2→E3" }));
             Assert.That(Numbers(stillSecond), Is.EqualTo(Numbers(second)), "the preview stores nothing");

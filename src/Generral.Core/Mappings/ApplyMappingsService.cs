@@ -164,14 +164,16 @@ public sealed class ApplyMappingsService(
             var poster = plan.SeasonPosters.GetValueOrDefault(number);
             if (!seasons.TryGetValue(number, out var season))
             {
-                db.Seasons.Add(new Season
+                season = new Season
                 {
                     SeriesId = series.Id,
                     SeasonNumber = number,
                     Title = title,
                     Monitored = series.MonitorNewItems == NewItemMonitorType.All,
                     Images = new ImageSet { Poster = poster },
-                });
+                };
+                db.Seasons.Add(season);
+                seasons[number] = season;
                 continue;
             }
 
@@ -201,7 +203,7 @@ public sealed class ApplyMappingsService(
             }
 
             await db.SaveChangesAsync(cancellationToken);
-            await SaveAsync(db, plan, mapping, episodes, cancellationToken);
+            await SaveAsync(db, plan, mapping, episodes, seasons, cancellationToken);
             if (transaction is not null)
             {
                 await transaction.CommitAsync(cancellationToken);
@@ -209,7 +211,7 @@ public sealed class ApplyMappingsService(
         }
         else
         {
-            await SaveAsync(db, plan, mapping, episodes, cancellationToken);
+            await SaveAsync(db, plan, mapping, episodes, seasons, cancellationToken);
         }
 
         var counts = plan.Rows.GroupBy(r => r.Change).ToDictionary(g => g.Key, g => g.Count());
@@ -277,14 +279,20 @@ public sealed class ApplyMappingsService(
         return claims;
     }
 
-    private static async Task SaveAsync(GenerralDbContext db, MappingPlan plan, Mapping mapping, Dictionary<int, Episode> episodes, CancellationToken cancellationToken)
+    /// <summary>
+    /// Only inserted episodes get a monitored state: the part's <c>monitored</c>, else monitored when the series monitors new items and the season
+    /// is monitored (Sonarr). Existing episodes keep the user's choice.
+    /// </summary>
+    private static async Task SaveAsync(
+        GenerralDbContext db, MappingPlan plan, Mapping mapping, Dictionary<int, Episode> episodes, Dictionary<int, Season> seasons, CancellationToken cancellationToken)
     {
+        var monitorNew = mapping.Series!.MonitorNewItems == NewItemMonitorType.All;
         foreach (var row in plan.Rows)
         {
             switch (row.Change)
             {
                 case MappingChange.New:
-                    var episode = new Episode { SeriesId = mapping.SeriesId, Title = "", Monitored = row.Monitored ?? true };
+                    var episode = new Episode { SeriesId = mapping.SeriesId, Title = "", Monitored = row.Monitored ?? (monitorNew && seasons.GetValueOrDefault(row.SeasonNumber!.Value)?.Monitored != false) };
                     row.ApplyTo(episode);
                     db.EpisodeLinks.Add(new EpisodeLink { MappingId = mapping.Id, EventId = row.Event.Id, PartKey = row.LinkPartKey, Episode = episode });
                     break;
