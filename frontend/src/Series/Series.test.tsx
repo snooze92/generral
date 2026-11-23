@@ -404,6 +404,39 @@ describe('Series details', () => {
     );
   });
 
+  it('edits the series images by URL', async () => {
+    const fetchMock = renderAt('/series/formula-1', {
+      'GET /api/v1/series': [
+        {
+          ...formula1,
+          images: [
+            { coverType: 'fanart', url: 'https://img.example.org/old.jpg', remoteUrl: 'https://img.example.org/old.jpg' },
+            { coverType: 'screenshot', url: 'https://img.example.org/s.jpg' },
+          ],
+        },
+      ],
+      'PUT /api/v1/series/1': ({ body }: MockRequest) => body,
+    });
+
+    await screen.findByText('Grand Prix 2');
+    fireEvent.click(screen.getByText('Edit Images'));
+
+    const dialog = await screen.findByRole('dialog');
+    const inputs = within(dialog).getAllByPlaceholderText('https://');
+    expect((inputs[1] as HTMLInputElement).value).toBe('https://img.example.org/old.jpg');
+    fireEvent.change(inputs[0], { target: { name: 'poster', value: ' https://img.example.org/p.jpg ' } });
+    fireEvent.change(inputs[1], { target: { name: 'fanart', value: '' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(requests(fetchMock, 'PUT', '/api/v1/series/1')).toHaveLength(1)
+    );
+    expect(requests(fetchMock, 'PUT', '/api/v1/series/1')[0].images).toEqual([
+      { coverType: 'screenshot', url: 'https://img.example.org/s.jpg' },
+      { coverType: 'poster', url: 'https://img.example.org/p.jpg', remoteUrl: 'https://img.example.org/p.jpg' },
+    ]);
+  });
+
   it('deletes the series after confirmation and goes back to the index', async () => {
     const fetchMock = renderAt('/series/formula-1', {
       'DELETE /api/v1/series/1': new Response(null, { status: 204 }),
