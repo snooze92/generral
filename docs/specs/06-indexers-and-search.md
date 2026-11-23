@@ -159,7 +159,7 @@ rejection carries a human-readable reason shown in interactive search and logs.
 | Already in queue / already imported | |
 | Retention / max age | Optional. |
 | Delay profile | `Later`. |
-| Indexer/download client tags | Sonarr tag semantics. |
+| Indexer/download client tags | Sonarr tag semantics: a tagged indexer is only searched for, and its releases only grabbed for, series sharing one of its tags (rejection *Series tags do not match any of the indexer tags*); untagged indexers serve every series. |
 
 ### Prioritisation
 

@@ -202,6 +202,26 @@ public class DownloadDecisionMakerTests
         });
     }
 
+    [TestCase(new int[0], new int[0], true)]
+    [TestCase(new[] { 7 }, new int[0], false)]
+    [TestCase(new[] { 7 }, new[] { 7 }, true)]
+    [TestCase(new[] { 7 }, new[] { 8 }, false)]
+    [TestCase(new int[0], new[] { 8 }, true)]
+    public void Tagged_indexers_only_serve_series_sharing_a_tag(int[] indexerTags, int[] seriesTags, bool approved)
+    {
+        var series = new Series { Id = 1, Title = "UFC", SortTitle = "ufc", CleanTitle = "ufc", TitleSlug = "ufc", Path = "/tv/UFC", RootFolderPath = "/tv", QualityProfileId = 1, Tags = [.. seriesTags] };
+        var episodes = UfcEpisodes();
+        episodes.ForEach(e => e.Series = series);
+        var context = Context(episodes, userInvoked: true) with
+        {
+            Indexers = new Dictionary<int, Indexer> { [1] = new() { Id = 1, Name = "Tracker", Implementation = "Torznab", Tags = [.. indexerTags] } },
+        };
+
+        var decision = _maker.GetDecision(Release("UFC 314 1080p WEB h264"), context);
+
+        Assert.That(decision.Rejections.Contains("Series tags do not match any of the indexer tags"), Is.EqualTo(!approved));
+    }
+
     [Test]
     public void Comparer_prefers_quality_then_revision_priority_seeders_size_age()
     {

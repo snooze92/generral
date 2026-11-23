@@ -101,7 +101,7 @@ function MappingPreviewTable({ preview }: MappingPreviewTableProps) {
       <Table columns={columns}>
         <TableBody>
           {preview.rows.map((row) => (
-            <PreviewRow key={row.event.id} row={row} />
+            <PreviewRow key={`${row.event.id}:${row.partKey ?? ''}`} row={row} />
           ))}
         </TableBody>
       </Table>

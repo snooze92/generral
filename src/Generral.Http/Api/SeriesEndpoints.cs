@@ -232,7 +232,7 @@ public static partial class SeriesEndpoints
     }
 
     /// <summary>Like Sonarr, changing a season's <c>monitored</c> sets it on all of the season's episodes. Seasons are not added or removed here.</summary>
-    private static async Task<IResult> Update(int id, SeriesResource resource, GenerralDbContext db, TagService tags, MetadataService metadata, TimeProvider time)
+    private static async Task<IResult> Update(int id, SeriesResource resource, GenerralDbContext db, TagService tags, MetadataService metadata, NotificationService notifications, TimeProvider time)
     {
         var series = await db.Series.SingleOrDefaultAsync(s => s.Id == id);
         if (series is null)
@@ -278,7 +278,7 @@ public static partial class SeriesEndpoints
 
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
-        await metadata.SyncSeriesAsync(series.Id);
+        await notifications.SyncMetadataAsync(metadata, series.Id);
 
         return Results.Accepted($"series/{series.Id}", await ToResourceAsync(db, series, time));
     }

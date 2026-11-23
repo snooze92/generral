@@ -109,11 +109,7 @@ public sealed class ApplyMappingsService(
     /// <summary>Rewrites the NFO files whose episodes changed (spec 08 § NFO files) and has media servers rescan the series.</summary>
     private static async Task SyncMetadataAsync(IServiceProvider services, int seriesId, CancellationToken cancellationToken)
     {
-        if (await services.GetRequiredService<MetadataService>().SyncSeriesAsync(seriesId, cancellationToken) > 0 &&
-            await services.GetRequiredService<GenerralDbContext>().Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seriesId, cancellationToken) is { } series)
-        {
-            await services.GetRequiredService<NotificationService>().UpdateMediaServersAsync(series, cancellationToken);
-        }
+        await services.GetRequiredService<NotificationService>().SyncMetadataAsync(services.GetRequiredService<MetadataService>(), seriesId, cancellationToken);
     }
 
     private async Task<T> WithSeriesLockAsync<T>(int seriesId, Func<Task<T>> action)

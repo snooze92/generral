@@ -27,7 +27,8 @@ if [ "$(id -u)" = "0" ]; then
     mkdir -p /config
     # Only fix ownership of /config itself and Generral's own files, not user media under /data.
     chown "$PUID:$PGID" /config
-    find /config -maxdepth 2 \( -name 'config.yaml' -o -name 'generral.db*' -o -name 'logs' -o -name 'asp' \) \
+    find /config -maxdepth 2 \( -name 'config.yaml' -o -name 'generral.db*' -o -name 'generral.restore' \
+        -o -name 'logs' -o -name 'asp' -o -name 'Backups' -o -name 'presets' \) \
         ! -user "$PUID" -exec chown -R "$PUID:$PGID" {} + 2>/dev/null || true
 
     echo "Starting Generral as uid=${PUID} gid=${PGID} umask=${UMASK}"

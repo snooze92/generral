@@ -150,6 +150,20 @@ public sealed class TorrentSeedingSpecification : IDecisionSpecification
     }
 }
 
+/// <summary>A tagged indexer only serves series with at least one of its tags (Sonarr's <c>IndexerTagSpecification</c>).</summary>
+public sealed class IndexerTagSpecification : IDecisionSpecification
+{
+    public string? Check(RemoteEpisode subject, DecisionContext context)
+    {
+        if (subject.Series is not { } series || !context.Indexers.TryGetValue(subject.Release.IndexerId, out var indexer) || indexer.Tags.Count == 0)
+        {
+            return null;
+        }
+
+        return indexer.Tags.Intersect(series.Tags).Any() ? null : "Series tags do not match any of the indexer tags";
+    }
+}
+
 public sealed class ReleaseRestrictionsSpecification : IDecisionSpecification
 {
     public string? Check(RemoteEpisode subject, DecisionContext context)

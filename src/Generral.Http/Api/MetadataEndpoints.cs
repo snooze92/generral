@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Generral.Core.Datastore;
 using Generral.Core.Extras.Metadata;
 using Generral.Core.Indexers;
+using Generral.Core.Notifications;
 using Generral.Core.Tv;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +57,7 @@ public static class MetadataEndpoints
             service.Find(resource.Implementation) is null ? ValidationFailure.BadRequest(UnknownImplementation(resource.Implementation)) : Results.Ok(new JsonObject()));
     }
 
-    private static async Task<IResult> Create(MetadataResource resource, GenerralDbContext db, MetadataService service, CancellationToken cancellationToken)
+    private static async Task<IResult> Create(MetadataResource resource, GenerralDbContext db, MetadataService service, NotificationService notifications, CancellationToken cancellationToken)
     {
         var definition = new MetadataDefinition { Name = "", Implementation = "" };
         if (await ApplyAsync(definition, resource, db, service, cancellationToken) is { } failure)
@@ -66,11 +67,11 @@ public static class MetadataEndpoints
 
         db.Metadata.Add(definition);
         await db.SaveChangesAsync(cancellationToken);
-        await SyncAllAsync(db, service, cancellationToken);
+        await SyncAllAsync(db, service, notifications, cancellationToken);
         return Results.Created($"metadata/{definition.Id}", ToResource(definition, service));
     }
 
-    private static async Task<IResult> Update(int id, MetadataResource resource, GenerralDbContext db, MetadataService service, CancellationToken cancellationToken)
+    private static async Task<IResult> Update(int id, MetadataResource resource, GenerralDbContext db, MetadataService service, NotificationService notifications, CancellationToken cancellationToken)
     {
         var definition = await db.Metadata.SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
         if (definition is null)
@@ -84,23 +85,23 @@ public static class MetadataEndpoints
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        await SyncAllAsync(db, service, cancellationToken);
+        await SyncAllAsync(db, service, notifications, cancellationToken);
         return Results.Accepted($"metadata/{definition.Id}", ToResource(definition, service));
     }
 
-    private static async Task<IResult> Delete(int id, GenerralDbContext db, MetadataService service, CancellationToken cancellationToken)
+    private static async Task<IResult> Delete(int id, GenerralDbContext db, MetadataService service, NotificationService notifications, CancellationToken cancellationToken)
     {
         if (await db.Metadata.Where(m => m.Id == id).ExecuteDeleteAsync(cancellationToken) == 0)
         {
             return Results.NotFound();
         }
 
-        await SyncAllAsync(db, service, cancellationToken);
+        await SyncAllAsync(db, service, notifications, cancellationToken);
         return Results.Ok(new JsonObject());
     }
 
     /// <summary>Writes (or removes) the files of every series, as Sonarr does when the metadata settings change.</summary>
-    private static async Task SyncAllAsync(GenerralDbContext db, MetadataService service, CancellationToken cancellationToken)
+    private static async Task SyncAllAsync(GenerralDbContext db, MetadataService service, NotificationService notifications, CancellationToken cancellationToken)
     {
         foreach (var seriesId in await db.Series.AsNoTracking().Select(s => s.Id).ToListAsync(cancellationToken))
         {

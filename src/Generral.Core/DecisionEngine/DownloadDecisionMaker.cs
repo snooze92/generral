@@ -23,6 +23,7 @@ public sealed class DownloadDecisionMaker(TimeProvider time)
         new UpgradeDiskSpecification(),
         new AcceptableSizeSpecification(),
         new TorrentSeedingSpecification(),
+        new IndexerTagSpecification(),
         new ReleaseRestrictionsSpecification(),
         new MonitoredEpisodeSpecification(),
         new BlocklistSpecification(),

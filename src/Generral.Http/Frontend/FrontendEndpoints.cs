@@ -102,12 +102,13 @@ public static class FrontendEndpoints
             .Replace(ThemePlaceholder, ui.Get().Theme, StringComparison.Ordinal)
             .Replace(InstanceNamePlaceholder, System.Net.WebUtility.HtmlEncode(settings.InstanceName), StringComparison.Ordinal);
 
-        // Absolute asset URLs ("/assets/…", "/Content/…") need the URL base when running behind a sub-path.
+        // Absolute asset URLs ("/assets/…", "/Content/…", "/favicon.svg") need the URL base when running behind a sub-path.
         if (settings.UrlBase.Length > 0)
         {
             html = html
                 .Replace("=\"/assets/", $"=\"{settings.UrlBase}/assets/", StringComparison.Ordinal)
-                .Replace("=\"/Content/", $"=\"{settings.UrlBase}/Content/", StringComparison.Ordinal);
+                .Replace("=\"/Content/", $"=\"{settings.UrlBase}/Content/", StringComparison.Ordinal)
+                .Replace("=\"/favicon.", $"=\"{settings.UrlBase}/favicon.", StringComparison.Ordinal);
         }
 
         context.Response.Headers.CacheControl = "no-cache, no-store";

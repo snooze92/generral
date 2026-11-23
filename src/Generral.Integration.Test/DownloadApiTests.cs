@@ -85,6 +85,7 @@ public class DownloadApiTests
         var search = await RunAsync("EpisodeSearch", new JsonObject { ["episodeIds"] = new JsonArray(episodeId) });
         var history = (await _client.GetFromJsonAsync<JsonObject>($"/api/v1/history?episodeId={episodeId}"))!;
         var add = _qbit.Requests.Single(r => r.Path == "/api/v2/torrents/add");
+        var grabbedEpisode = (await _client.GetFromJsonAsync<JsonObject>($"/api/v1/episode/{episodeId}"))!;
 
         _qbit.State = "downloading";
         await RunAsync(RefreshMonitoredDownloadsHandler.CommandName);
@@ -106,6 +107,7 @@ public class DownloadApiTests
             Assert.That((string)search["message"]!, Does.EndWith("1 grabbed"), (string?)search["message"]);
             Assert.That(_tracker.Downloads, Is.EqualTo(1), "the .torrent is fetched by Generral");
             Assert.That(add.Body, Does.Contain("name=torrents"));
+            Assert.That((bool)grabbedEpisode["numberLocked"]!, Is.True, "grabbing locks the number");
             Assert.That((int)history["totalRecords"]!, Is.EqualTo(1));
             var grabbed = history["records"]![0]!;
             Assert.That((string)grabbed["eventType"]!, Is.EqualTo("grabbed"));
@@ -334,12 +336,13 @@ public class DownloadApiTests
         return File.ReadAllBytes(b)[0] == 42;
     }
 
-    /// <summary>Plex NFO metadata and a webhook for every trigger, through the API.</summary>
+    /// <summary>The default Plex NFO metadata (seeded on a fresh install) and a webhook for every trigger, through the API.</summary>
     private async Task AddConnectionsAsync()
     {
+        var seeded = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/metadata"))!;
         var metadataSchema = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/metadata/schema"))!.Single()!.AsObject();
-        metadataSchema["name"] = "Plex NFO";
-        metadataSchema["enable"] = true;
+        metadataSchema["name"] = "Plex NFO (copy)";
+        metadataSchema["enable"] = false;
         var metadata = await _client.PostAsJsonAsync("/api/v1/metadata", metadataSchema);
         var schema = (await _client.GetFromJsonAsync<JsonArray>("/api/v1/notification/schema"))!;
         var webhook = schema.Single(s => (string)s!["implementation"]! == "Webhook")!.AsObject();
@@ -355,6 +358,7 @@ public class DownloadApiTests
         var (metadataBody, createdBody) = (await metadata.Content.ReadAsStringAsync(), await created.Content.ReadAsStringAsync());
         Assert.Multiple(() =>
         {
+            Assert.That(seeded.Select(m => ((string)m!["name"]!, (string)m["implementation"]!, (bool)m["enable"]!)), Is.EqualTo(new[] { ("Plex NFO", "PlexNfo", true) }));
             Assert.That(metadata.StatusCode, Is.EqualTo(HttpStatusCode.Created), metadataBody);
             Assert.That(created.StatusCode, Is.EqualTo(HttpStatusCode.Created), createdBody);
             Assert.That((bool)plex["supportsOnGrab"]!, Is.False);

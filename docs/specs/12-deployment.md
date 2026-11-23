@@ -22,14 +22,16 @@ See [`Dockerfile`](../../Dockerfile) and [`docker/entrypoint.sh`](../../docker/e
    If the context has no `frontend/`, the image is API-only.
 2. **backend** (`dotnet/sdk:10.0`, build platform): `dotnet publish` framework-dependent with
    `UseAppHost=false`, so one architecture-neutral build serves every platform and the SDK stage
-   isn't run under emulation.
+   isn't run under emulation. Native assets (SkiaSharp, SQLite) for anything but
+   `linux-musl-x64`/`linux-musl-arm64` are deleted: they were most of the image size.
 3. **runtime** (`dotnet/aspnet:10.0-alpine`): `tzdata icu-libs su-exec`, user `generral` (1000:1000),
    `/app` (binaries), `/app/UI` (SPA), `LICENSE` + `COPYRIGHT.md`, `HEALTHCHECK` on `/ping`,
    `CMD ["dotnet", "/app/Generral.Host.dll"]`. `ffmpeg` (ffprobe for MediaInfo) is added when
    MediaInfo lands (`Later`), to keep the image small until then.
 
 The entrypoint re-maps `generral` to `PUID`/`PGID`, applies `UMASK`, `chown`s only Generral's own
-files in `/config` (never `/data`), then `exec su-exec`s the app.
+files in `/config` (`config.yaml`, `generral.db*`, `generral.restore`, `logs/`, `asp/`, `Backups/`,
+`presets/`; never `/data`), then `exec su-exec`s the app.
 
 ## Configuration
 
@@ -137,4 +139,4 @@ generral/
 |----------|---------|-------|
 | `ci.yml` | PR, push to `main` | `dotnet build`, `dotnet format --verify-no-changes`, pending-migration check, `dotnet test` (unit + integration; Testcontainers from M2), `pnpm lint/typecheck/test`, `reuse lint` |
 | `ci.yml` → `docker` job | PR, push to `main` | amd64-only image build (GHA cache) and a `/ping` + non-root smoke test, so Dockerfile breakage shows up on the PR without paying for multi-arch builds |
-| `docker.yml` | push to `main` (→ `develop`, `sha-<short>`), tag `v*` (→ `X.Y.Z`, `X.Y`, `latest`), manual | `docker/setup-qemu` + `setup-buildx`, multi-arch `build-push-action` with GHA cache, push to GHCR, SBOM + provenance attestations, smoke test, Trivy scan (report only) |
+| `docker.yml` | push to `main` (→ `develop`, `sha-<short>`), tag `v*.*.*` (→ `X.Y.Z`, `X.Y`, `latest`; a pre-release tag like `v0.2.0-rc.1` gets only its own tag, not `latest`), manual | `docker/setup-qemu` + `setup-buildx`, multi-arch `build-push-action` with GHA cache, push to GHCR, SBOM + provenance attestations, smoke test, Trivy scan (report only) |

@@ -34,7 +34,10 @@ COPY src/ src/
 RUN dotnet publish src/Generral.Host/Generral.Host.csproj \
       -c Release --no-restore -p:UseAppHost=false \
       -p:Version="$VERSION" -p:SourceRevisionId="$COMMIT" \
-      -o /app
+      -o /app && \
+    # The runtime image is Alpine, so only the musl native assets (SkiaSharp, SQLite) are ever loaded.
+    find /app/runtimes -mindepth 1 -maxdepth 1 ! -name linux-musl-x64 ! -name linux-musl-arm64 -exec rm -rf {} + && \
+    find /app/runtimes -name '*.pdb' -delete
 
 # --- runtime ------------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-alpine AS runtime

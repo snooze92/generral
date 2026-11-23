@@ -119,7 +119,7 @@ public sealed class ReleaseSearchService(
         var (releases, timedOut) = await QueryIndexersAsync(indexers, interactive ? InteractiveIndexerTimeout : IndexerTimeout, async (indexer, found, token) =>
         {
             var done = new HashSet<(string, string)>();
-            foreach (var candidate in searched)
+            foreach (var candidate in searched.Where(c => indexer.Tags.Count == 0 || indexer.Tags.Intersect(c.Episode.Series?.Tags ?? []).Any()))
             {
                 foreach (var query in candidate.Terms.Queries)
                 {

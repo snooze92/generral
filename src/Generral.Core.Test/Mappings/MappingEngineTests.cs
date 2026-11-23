@@ -167,6 +167,26 @@ public class MappingEngineTests
     }
 
     [Test]
+    public void Episodes_with_a_file_keep_their_numbers_when_renumbering_even_without_the_lock_flag()
+    {
+        AddEvent("398", "UFC 398", Utc(2026, 2, 1));
+        AddEvent("401", "UFC 401", Utc(2026, 5, 1));
+        AddEvent("403", "UFC 403", Utc(2026, 7, 1));
+        Run(Ufc, InsertPolicy.RenumberUnlocked);
+        Episode("403").EpisodeFileId = 1;
+        AddEvent("397", "UFC 397", Utc(2026, 1, 1));
+        AddEvent("402", "UFC 402", Utc(2026, 6, 1));
+
+        Run(Ufc, InsertPolicy.RenumberUnlocked);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Numbers(), Is.EqualTo(new[] { "397 S2026E02", "398 S2026E01", "401 S2026E04", "402 S2026E05", "403 S2026E03" }));
+            Assert.That(Episode("403").NumberLocked, Is.True);
+        });
+    }
+
+    [Test]
     public void Filtered_out_and_gone_events_orphan_their_episode_and_keep_the_number()
     {
         AddEvent("401", "UFC 401", Utc(2026, 5, 1));

@@ -119,6 +119,28 @@ public class ImportUnitTests
         });
     }
 
+    [Test]
+    [Platform(Exclude = "Win")]
+    public void Chown_group_by_name_or_gid_to_the_current_group()
+    {
+        var file = Write("tv/UFC/a.mkv", 1);
+        var gid = uint.Parse(File.ReadAllText("/proc/self/status").Split('\n').Single(l => l.StartsWith("Gid:", StringComparison.Ordinal)).Split('\t')[1],
+            System.Globalization.CultureInfo.InvariantCulture);
+        var name = File.ReadAllLines("/etc/group").Select(l => l.Split(':')).FirstOrDefault(f => f.Length > 2 && f[2] == gid.ToString(System.Globalization.CultureInfo.InvariantCulture))?[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(UnixGroup.Resolve(gid.ToString(System.Globalization.CultureInfo.InvariantCulture)), Is.EqualTo(gid));
+            if (name is not null)
+            {
+                Assert.That(UnixGroup.Resolve(name), Is.EqualTo(gid));
+            }
+
+            Assert.That(UnixGroup.Resolve("no-such-group-generral"), Is.Null);
+            Assert.That(() => UnixGroup.Chown(file, gid), Throws.Nothing);
+        });
+    }
+
     private string Write(string relative, int size)
     {
         var path = Path.Combine(_root, relative);

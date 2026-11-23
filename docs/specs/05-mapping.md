@@ -157,7 +157,8 @@ episode or loses watch state. Rules:
      refreshed) as part of the same command. Never automatic: a preview + confirmation is required,
      or the mapping must explicitly opt in (`autoRenumber: true`).
 3. **Locking.** An episode's number becomes `numberLocked` when it gets a file, is grabbed, or
-   when its air date has passed. The user can lock/unlock manually.
+   when its air date has passed. The user can lock/unlock manually, but an episode with a file
+   keeps its number whatever the flag says.
 4. **Gone/filtered events.** If an event disappears or stops passing the filter, its episode becomes
    `orphaned` (see [03](03-domain-model.md#episode)). Its number is **not reused** by the default
    policies.

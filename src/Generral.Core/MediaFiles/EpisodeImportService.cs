@@ -268,6 +268,7 @@ public sealed partial class EpisodeImportService(
         foreach (var episode in episodes)
         {
             episode.EpisodeFileId = file.Id;
+            episode.NumberLocked = true;
         }
 
         RecordImported(item, series, episodes, file);
@@ -323,6 +324,7 @@ public sealed partial class EpisodeImportService(
         if (!upgrade)
         {
             await metadata.SyncSeriesAsync(series.Id, cancellationToken);
+            DeleteEmptyFolders(config, series, file.Path);
         }
 
         await notifications.NotifyAsync(
@@ -487,10 +489,58 @@ public sealed partial class EpisodeImportService(
 
             // Sonarr derives the file mode from the folder's, without the execute bits.
             File.SetUnixFileMode(file, folderMode & ~(UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute));
+
+            if (config.ChownGroup.Trim() is { Length: > 0 } group)
+            {
+                if (UnixGroup.Resolve(group) is not { } gid)
+                {
+                    logger.LogWarning("Unknown chown group {Group}", group);
+                    return;
+                }
+
+                if (createdFolder is not null)
+                {
+                    UnixGroup.Chown(createdFolder, gid);
+                }
+
+                UnixGroup.Chown(file, gid);
+            }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning("Couldn't set permissions on {Path}: {Message}", file, e.Message);
+        }
+    }
+
+    /// <summary>
+    /// <i>Delete Empty Folders</i>: after a file is removed (and its metadata with it), empty folders between it and the series folder
+    /// are deleted. The series folder itself stays, like in Sonarr.
+    /// </summary>
+    private void DeleteEmptyFolders(MediaManagementConfig config, Series series, string filePath)
+    {
+        if (!config.DeleteEmptyFolders)
+        {
+            return;
+        }
+
+        var seriesFolder = System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(series.Path)) + System.IO.Path.DirectorySeparatorChar;
+        for (var folder = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(filePath)); folder is not null; folder = System.IO.Path.GetDirectoryName(folder))
+        {
+            if (!folder.StartsWith(seriesFolder, StringComparison.Ordinal) || !Directory.Exists(folder) || Directory.EnumerateFileSystemEntries(folder).Any())
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(folder);
+                logger.LogInformation("Deleted empty folder {Folder}", folder);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning("Couldn't delete empty folder {Folder}: {Message}", folder, e.Message);
+                return;
+            }
         }
     }
 
