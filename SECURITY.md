@@ -1,7 +1,9 @@
 # Security policy
 
-Generral is in early development and has no stable release yet. Fixes go into `main` and the
-`develop` container image.
+## Supported versions
+
+Only the latest release (the `latest` container image) gets security fixes. Fixes also land in
+`main` and the `develop` image first.
 
 ## Reporting a vulnerability
 

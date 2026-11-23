@@ -1,0 +1,16 @@
+name: Feature request
+description: An idea or something Sonarr does that Generral should too
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The use case, e.g. the kind of events you want as a series.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How it could work
+      description: Including how Sonarr does it, if it's a Sonarr feature. Check the roadmap (docs/specs/13-roadmap.md) first.

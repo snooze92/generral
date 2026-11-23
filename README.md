@@ -26,10 +26,24 @@ Generral ships with no presets, sources or other content.
 
 ## Status
 
-**Early development, not usable yet.** The specs are the source of truth; start reading at
-[`docs/specs/README.md`](docs/specs/README.md). Progress is tracked against the
-[roadmap](docs/specs/13-roadmap.md). Issues and pull requests are closed until the first release;
-see [CONTRIBUTING.md](CONTRIBUTING.md).
+**v0.1.0, the first release (MVP).** It covers the [roadmap](docs/specs/13-roadmap.md)'s M0–M3:
+sources and mappings, Prowlarr-synced Torznab indexers, qBittorrent, import, Plex NFO + artwork and
+Plex/Webhook/Discord connections. Expect rough edges; see [CHANGELOG.md](CHANGELOG.md) for what's in
+and what isn't yet. The specs ([`docs/specs/README.md`](docs/specs/README.md)) describe the
+behaviour in detail. Bug reports and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Getting started
+
+1. Start the container (below) and sign in with the password from the log.
+2. *Settings → Media Management*: add a root folder (e.g. `/data/media/generral`).
+3. *Settings → Download Clients*: add qBittorrent (category `generral`).
+4. In Prowlarr: *Settings → Apps → +* → **Sonarr**, URL `http://generral:8990`, Generral's API key
+   (*Settings → General*). Indexers appear in *Settings → Indexers*.
+5. *Sources*: add where events come from (TheSportsDB, a JSON API, a web page, an iCal feed, …) and
+   *Test* it.
+6. *Series → Add New*: pick the source, write the mapping (with a live preview), then the options.
+7. In Plex: a *TV Shows* library on the root folder, agent **Plex NFO Series** (PMS ≥ 1.43.1). In
+   Generral, *Settings → Connect*: add Plex Media Server so Plex refreshes after each import.
 
 ## Running with Docker
 
@@ -37,12 +51,14 @@ see [CONTRIBUTING.md](CONTRIBUTING.md).
 docker run -d --name generral -p 8990:8990 \
   -e PUID=1000 -e PGID=1000 -e TZ=Europe/London \
   -v ./config:/config -v /srv/data:/data \
-  ghcr.io/snooze92/generral:develop
+  ghcr.io/snooze92/generral:latest
 docker logs generral   # first start: the initial user's password
 ```
 
 See [12 – Deployment](docs/specs/12-deployment.md) and
-[`docker/docker-compose.example.yml`](docker/docker-compose.example.yml).
+[`docker/docker-compose.example.yml`](docker/docker-compose.example.yml). Tags: `latest` (newest
+release), `X.Y.Z` / `X.Y`, and `develop` (every push to `main`). Images are `linux/amd64` and
+`linux/arm64`.
 
 ## Development
 
