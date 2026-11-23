@@ -22,7 +22,8 @@ public class MappingDefinitionParserTests
             airDate:  '{{ event.start | date.add "-2h" }}'
             runtime:  180
             images:
-              thumb: '{{ event.images.thumb ?? event.images.poster }}'
+              thumb:  '{{ event.images.thumb }}'
+              poster: '{{ event.images.poster }}'
             search:
               categories: [5000, 5060]
               queries: ['UFC {{ vars.number }}', 'UFC{{ vars.number }}']
@@ -40,7 +41,8 @@ public class MappingDefinitionParserTests
             Assert.That(definition.Episode.OnInsert, Is.EqualTo(InsertPolicy.RenumberUnlocked));
             Assert.That(definition.Absolute, Is.EqualTo("{{ vars.number }}"));
             Assert.That(definition.Runtime, Is.EqualTo("180"));
-            Assert.That(definition.Thumb, Does.StartWith("{{ event.images.thumb"));
+            Assert.That(definition.Thumb, Is.EqualTo("{{ event.images.thumb }}"));
+            Assert.That(definition.Poster, Is.EqualTo("{{ event.images.poster }}"));
             Assert.That(definition.Search.Queries, Has.Count.EqualTo(2));
             Assert.That(definition.Search.Must.Single(), Is.EqualTo(@"\bUFC ?{{ vars.number }}\b"));
             Assert.That(definition.Search.Settings.Select(s => s.Key), Is.EqualTo(new[] { "categories", "dateWindow" }));

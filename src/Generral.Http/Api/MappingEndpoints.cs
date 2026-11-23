@@ -86,6 +86,8 @@ public sealed record MappingPreviewRowResource
 
     public string? Thumb { get; init; }
 
+    public string? Poster { get; init; }
+
     public required JsonObject SearchTerms { get; init; }
 
     public bool NumberLocked { get; init; }
@@ -326,6 +328,7 @@ public static class MappingEndpoints
         AirDateUtc = row.AirDateUtc,
         Runtime = row.Runtime,
         Thumb = row.Thumb,
+        Poster = row.Poster,
         SearchTerms = row.SearchTerms,
         NumberLocked = row.NumberLocked,
         Monitored = row.Monitored,

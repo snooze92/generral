@@ -42,7 +42,8 @@ mapping:
   airDate: '{{ event.start }}'
   runtime: '{{ if part }}90{{ else }}300{{ end }}'
   images:
-    thumb: '{{ event.images.thumb ?? event.images.poster }}'
+    thumb: '{{ event.images.thumb }}'     # still: may show results, hidden in spoiler-free mode
+    poster: '{{ event.images.poster }}'   # pre-event promo art: kept in spoiler-free mode
 
   search:                             # see 06 – Indexers & search
     queries:
@@ -203,6 +204,10 @@ Sport is spoiler-sensitive. Defaults:
   for completed events in TheSportsDB) are listed in the UI with a ⚠ badge in the field picker.
 - A per-series setting `spoilerFree: true` (default) also strips the `event.fields.*` values tagged
   as spoilers from the template context for events whose `status = completed`.
+- Spoiler-free mode (UI setting, on by default; see [08](08-import-and-organisation.md#a-nfo-files-kodi-format-plex-nfo-agent-subset))
+  hides an aired episode's `overview` and `images.thumb` (stills) from NFO files, artwork and
+  notifications, but keeps `images.poster` (the event's promo poster, made before the event). So
+  map promo art to `poster`, not as a `thumb` fallback.
 
 ## Preview & dry-run
 

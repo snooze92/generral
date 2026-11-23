@@ -2,7 +2,7 @@ namespace Generral.Core.Tv;
 
 /// <summary>
 /// Spoiler-free mode for what leaves Generral (NFO files, artwork, notifications; spec 05 § Spoilers): once an episode's event has
-/// taken place, its overview and thumbnail may show results, so they are left out.
+/// taken place, its overview and thumbnail may show results, so they are left out. The poster (pre-event promo art) is kept.
 /// </summary>
 public static class SpoilerFilter
 {

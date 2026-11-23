@@ -141,9 +141,11 @@ public sealed class PlexNfoMetadata : IMetadataConsumer
 
     public IEnumerable<ImageFileResult> EpisodeImages(EpisodeFile file, IReadOnlyList<Episode> episodes, JsonObject settings)
     {
-        if (settings.Bool("episodeImages", true) && episodes.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.Images.Thumb)) is { } episode)
+        var url = episodes.Select(e => e.Images.Thumb).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u))
+                  ?? episodes.Select(e => e.Images.Poster).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u));
+        if (settings.Bool("episodeImages", true) && url is not null)
         {
-            yield return new ImageFileResult(Path.ChangeExtension(file.RelativePath, ".jpg"), episode.Images.Thumb!);
+            yield return new ImageFileResult(Path.ChangeExtension(file.RelativePath, ".jpg"), url);
         }
     }
 

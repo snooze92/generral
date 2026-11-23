@@ -17,7 +17,7 @@ public static class MappingDefinitionParser
     private static readonly string[] SeasonKeys = ["strategy", "value", "group", "title", "images"];
     private static readonly string[] SeasonImageKeys = ["poster"];
     private static readonly string[] EpisodeKeys = ["strategy", "order", "value", "onInsert"];
-    private static readonly string[] ImageKeys = ["thumb"];
+    private static readonly string[] ImageKeys = ["thumb", "poster"];
     private static readonly string[] SearchTemplateKeys = ["queries", "must", "mustNot", "any"];
     private static readonly string[] SearchSettingKeys = ["categories", "queryMode", "dateWindow", "searchSchedule"];
 
@@ -60,6 +60,7 @@ public static class MappingDefinitionParser
         var season = ParseSeason(root["season"]);
         var episode = ParseEpisode(root["episode"]);
         var parts = ParseParts(root["parts"]);
+        var images = root["images"] is { } imagesNode ? Strict(imagesNode, "images", ImageKeys) : null;
         var search = ParseSearch(root["search"]);
         if (search.Parts.Keys.FirstOrDefault(k => parts?.Any(p => p.Key == k) != true) is { } unknown)
         {
@@ -79,7 +80,8 @@ public static class MappingDefinitionParser
             Overview = Template(root["overview"], "overview"),
             AirDate = Template(root["airDate"], "airDate") ?? MappingDefinition.DefaultAirDate,
             Runtime = Template(root["runtime"], "runtime"),
-            Thumb = root["images"] is { } images ? Template(Strict(images, "images", ImageKeys)["thumb"], "images.thumb") : null,
+            Thumb = Template(images?["thumb"], "images.thumb"),
+            Poster = Template(images?["poster"], "images.poster"),
             Search = search,
         };
     }
