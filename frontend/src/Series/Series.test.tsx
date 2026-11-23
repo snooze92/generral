@@ -437,6 +437,52 @@ describe('Series details', () => {
     ]);
   });
 
+  it('edits the series options; the path is read-only once it has files', async () => {
+    const withoutFiles = { ...formula1, statistics: { ...formula1.statistics!, episodeFileCount: 0 } };
+    const fetchMock = renderAt('/series/formula-1', {
+      'GET /api/v1/series': [withoutFiles],
+      'GET /api/v1/qualityprofile': [
+        { id: 1, name: 'HD-1080p', items: [] },
+        { id: 4, name: 'Ultra-HD', items: [] },
+      ],
+      'PUT /api/v1/series/1': ({ body }: MockRequest) => body,
+    });
+
+    await screen.findByText('Grand Prix 2');
+    fireEvent.click(screen.getByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Edit - Formula 1')).toBeTruthy();
+    const path = within(dialog).getByDisplayValue('/tv/Formula 1') as HTMLInputElement;
+    expect(path.readOnly).toBe(false);
+    fireEvent.change(path, { target: { name: 'path', value: '/tv/F1' } });
+    fireEvent.click(await within(dialog).findByText('HD-1080p'));
+    fireEvent.click(await screen.findByText('Ultra-HD'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(requests(fetchMock, 'PUT', '/api/v1/series/1')).toHaveLength(1)
+    );
+    expect(requests(fetchMock, 'PUT', '/api/v1/series/1')[0]).toMatchObject({
+      id: 1,
+      title: 'Formula 1',
+      path: '/tv/F1',
+      qualityProfileId: 4,
+      tags: [1],
+    });
+  });
+
+  it('keeps the path read-only when the series has files', async () => {
+    renderAt('/series/formula-1');
+
+    await screen.findByText('Grand Prix 2');
+    fireEvent.click(screen.getByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    expect((within(dialog).getByDisplayValue('/tv/Formula 1') as HTMLInputElement).readOnly).toBe(true);
+    expect(within(dialog).getByText(/can't move existing files yet/)).toBeTruthy();
+  });
+
   it('deletes the series after confirmation and goes back to the index', async () => {
     const fetchMock = renderAt('/series/formula-1', {
       'DELETE /api/v1/series/1': new Response(null, { status: 204 }),

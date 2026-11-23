@@ -435,6 +435,7 @@ path = [
   "frontend/src/Series/Details/SeriesDetailsPath.tsx",
   "frontend/src/Series/Details/SeriesDetailsSeason.module.css",
   "frontend/src/Series/Details/SeriesDetailsSeason.tsx",
+  "frontend/src/Series/Edit/EditSeriesModal.tsx",
   "frontend/src/Series/Index/SeriesIndexTags.module.css",
   "frontend/src/Series/Index/SeriesIndexTags.tsx",
   "frontend/src/Series/Index/Table/SeriesStatusCell.module.css",
