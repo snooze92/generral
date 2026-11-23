@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MockRequest } from 'test/mockApi';
 import { renderSettingsPage, requests } from 'test/renderSettingsPage';
 import WantedPage from './WantedPage';
 
@@ -33,10 +34,10 @@ describe('Wanted', () => {
 
   it('lists missing episodes, searches the selected ones and all of them', async () => {
     const fetchMock = renderSettingsPage(<WantedPage kind="missing" />, {
-      'GET /api/v1/wanted/missing': paged([
-        episode(11, 3, 'Australian GP'),
-        episode(12, 4, 'Japanese GP'),
-      ]),
+      'GET /api/v1/wanted/missing': ({ url }: MockRequest) =>
+        url.searchParams.get('monitored') === 'false'
+          ? paged([episode(13, 5, 'Chinese GP'), episode(14, 6, 'Miami GP')])
+          : paged([episode(11, 3, 'Australian GP'), episode(12, 4, 'Japanese GP')]),
       'POST /api/v1/command': command,
     });
 
@@ -45,6 +46,11 @@ describe('Wanted', () => {
     );
     expect(row.getByText('Formula 1')).toBeTruthy();
     expect(row.getByText('2026x03')).toBeTruthy();
+    expect(
+      await screen.findByText(
+        '2 unmonitored missing episode(s) hidden by the Monitored filter'
+      )
+    ).toBeTruthy();
 
     const url = String(fetchMock.mock.calls.find(([input]) =>
       String(input).includes('/wanted/missing')

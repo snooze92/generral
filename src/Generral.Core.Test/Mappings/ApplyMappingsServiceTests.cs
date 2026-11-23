@@ -147,6 +147,62 @@ public class ApplyMappingsServiceTests
     }
 
     [Test]
+    public async Task Reapplying_keeps_the_monitored_flag_of_existing_episodes()
+    {
+        await Apply.ApplyAsync(_mappingId);
+        using (var db = Db())
+        {
+            db.Episodes.Single(e => e.Title == "401 (UFC)").Monitored = false;
+            db.Events.Single(e => e.Key == "402").Title = "402 renamed";
+            db.Mappings.Single().Definition += "\noverview: Live";
+            db.SaveChanges();
+        }
+
+        var second = await Apply.ApplyAsync(_mappingId);
+
+        using var check = Db();
+        Assert.Multiple(() =>
+        {
+            Assert.That(second.Changed, Is.EqualTo(3));
+            Assert.That(check.Episodes.OrderBy(e => e.AirDateUtc).Select(e => $"{e.Title} {e.Monitored}"),
+                Is.EqualTo(new[] { "399 (UFC) True", "401 (UFC) False", "402 renamed (UFC) True" }));
+        });
+    }
+
+    [Test]
+    public async Task New_episodes_are_monitored_only_when_the_series_monitors_new_items_and_the_season_is_monitored()
+    {
+        using (var db = Db())
+        {
+            db.Series.Single().MonitorNewItems = NewItemMonitorType.None;
+            db.SaveChanges();
+        }
+
+        await Apply.ApplyAsync(_mappingId);
+        using (var db = Db())
+        {
+            db.Series.Single().MonitorNewItems = NewItemMonitorType.All;
+            db.Seasons.Single(s => s.SeasonNumber == 2025).Monitored = true;
+            db.Events.Add(Ev(db.Sources.Single(), "398", Utc(2025, 11, 1)));
+            db.Events.Add(Ev(db.Sources.Single(), "403", Utc(2026, 7, 1)));
+            db.Events.Add(Ev(db.Sources.Single(), "404", Utc(2027, 1, 1)));
+            db.SaveChanges();
+        }
+
+        await Apply.ApplyAsync(_mappingId);
+
+        using var check = Db();
+        Assert.Multiple(() =>
+        {
+            Assert.That(check.Episodes.OrderBy(e => e.AirDateUtc).Select(e => $"{e.Title} {e.Monitored}"), Is.EqualTo(new[]
+            {
+                "398 (UFC) True", "399 (UFC) False", "401 (UFC) False", "402 (UFC) False", "403 (UFC) False", "404 (UFC) True",
+            }), "398: season monitored since; 403: its season was created unmonitored; 404: new monitored season");
+            Assert.That(check.Seasons.OrderBy(s => s.SeasonNumber).Select(s => s.Monitored), Is.EqualTo(new[] { true, false, true }));
+        });
+    }
+
+    [Test]
     public async Task Successful_source_refresh_enqueues_apply_for_its_mappings()
     {
         var queue = _services.GetRequiredService<CommandQueue>();

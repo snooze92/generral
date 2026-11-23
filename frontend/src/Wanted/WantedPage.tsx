@@ -28,7 +28,7 @@ import { SortDirection } from 'Helpers/Props/sortDirections';
 import { CheckInputChanged } from 'typings/inputs';
 import { SelectStateInputProps } from 'typings/props';
 import translate from 'Utilities/String/translate';
-import useWanted, { WantedKind } from './useWanted';
+import useWanted, { useHiddenUnmonitoredCount, WantedKind } from './useWanted';
 
 const columns: Column[] = [
   {
@@ -107,6 +107,11 @@ function WantedPage({ kind }: { kind: WantedKind }) {
     sortDirection,
     monitored: selectedFilterKey === 'monitored',
   });
+
+  const hiddenCount = useHiddenUnmonitoredCount(
+    kind,
+    selectedFilterKey === 'monitored'
+  );
 
   // Rows of other pages or filters don't stay selected.
   const selectedIds = useMemo(
@@ -218,6 +223,14 @@ function WantedPage({ kind }: { kind: WantedKind }) {
 
         {!isLoading && !error && !records.length ? (
           <PageMessage>{strings.noItems()}</PageMessage>
+        ) : null}
+
+        {hiddenCount ? (
+          <Alert kind={kinds.INFO}>
+            {translate('UnmonitoredMissingEpisodesHidden', {
+              count: hiddenCount,
+            })}
+          </Alert>
         ) : null}
 
         {records.length ? (
