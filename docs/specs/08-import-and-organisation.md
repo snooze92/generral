@@ -198,6 +198,13 @@ compares each file's URL with the tracked one, so a changed `images.thumb` rewri
 existing files too. Season poster files are only written for seasons that have a file (the season
 folder must exist).
 
+Image downloads (Generral User-Agent) go one at a time per host, at least 1 s apart. On a 429/503
+a `Retry-After` of at most 60 s is waited for once; otherwise the host is skipped for the rest of
+the sync (and for `Retry-After`, 60 s to 1 h, across syncs), with one warning per host
+("N image(s) from <host> deferred (rate limited), retried on next sync"). Missing images are
+retried by the next sync, at the latest after the next scheduled *Refresh Sources* (which applies
+the mappings, then syncs their series).
+
 Series images are set by URL in the UI (*Series → Edit Images*: poster, fanart, banner, logo).
 Season posters come from the mapping's `season.images.poster` template, rendered per event (like
 `season.title`, `season`/`episode` known): the season takes the first non-empty value in event

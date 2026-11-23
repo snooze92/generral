@@ -95,6 +95,7 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<IndexerStatusService>();
         services.AddSingleton<ReleaseSearchService>();
         services.AddSingleton<IMetadataConsumer, PlexNfoMetadata>();
+        services.AddSingleton<ImageDownloader>();
         services.AddScoped<MetadataService>();
         services.AddHttpClient(NotificationService.ClientName, NotificationService.ConfigureClient)
             .ConfigurePrimaryHttpMessageHandler(SourceFetcherFactory.CreateHandler);

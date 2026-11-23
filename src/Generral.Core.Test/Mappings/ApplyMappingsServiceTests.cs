@@ -54,6 +54,7 @@ public class ApplyMappingsServiceTests
         services.AddSingleton<ICommandHandler, ApplyMappingsHandler>();
         services.AddSingleton(new MappingEngine(new TemplateRenderer()));
         services.AddScoped<IUiSettingsService, UiSettingsService>();
+        services.AddSingleton<ImageDownloader>();
         services.AddScoped<MetadataService>();
         services.AddSingleton<NotificationProvider>();
         services.AddScoped<NotificationService>();
