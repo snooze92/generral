@@ -34,6 +34,7 @@ public sealed class PlexNfoMetadata : IMetadataConsumer
         new() { Order = 2, Name = "seriesImages", Label = "Series Images", Type = "checkbox", Value = true, HelpText = "poster.jpg, fanart.jpg, banner.jpg, clearlogo.png" },
         new() { Order = 3, Name = "seasonImages", Label = "Season Images", Type = "checkbox", Value = true, HelpText = "Season<number>.jpg in the season folder" },
         new() { Order = 4, Name = "episodeImages", Label = "Episode Images", Type = "checkbox", Value = true, HelpText = "<filename>.jpg" },
+        new() { Order = 5, Name = "generatePosters", Label = "Generate Missing Series/Season Posters", Type = "checkbox", Value = true, HelpText = "Draw a plain title poster when a series or season has no poster URL. Never replaces a downloaded image" },
     ];
 
     /// <summary>The <c>&lt;uniqueid type="generral"&gt;</c> of a series: <c>series-&lt;uuid&gt;</c>.</summary>
@@ -105,25 +106,38 @@ public sealed class PlexNfoMetadata : IMetadataConsumer
             yield break;
         }
 
+        var generate = settings.Bool("generatePosters", true);
         foreach (var (name, url) in new[] { ("poster.jpg", series.Images.Poster), ("fanart.jpg", series.Images.Fanart), ("banner.jpg", series.Images.Banner), ("clearlogo.png", series.Images.Logo) })
         {
-            if (!string.IsNullOrWhiteSpace(url))
+            var generated = generate && name == "poster.jpg" ? new GeneratedPoster(series.Title, series.Year?.ToString(CultureInfo.InvariantCulture)) : null;
+            if (!string.IsNullOrWhiteSpace(url) || generated is not null)
             {
-                yield return new ImageFileResult(name, url);
+                yield return new ImageFileResult(name, string.IsNullOrWhiteSpace(url) ? null : url, generated);
             }
         }
     }
 
-    public IEnumerable<ImageFileResult> SeasonImages(Season season, string seasonFolder, JsonObject settings)
+    public IEnumerable<ImageFileResult> SeasonImages(Series series, Season season, string seasonFolder, JsonObject settings)
     {
-        if (!settings.Bool("seasonImages", true) || string.IsNullOrWhiteSpace(season.Images.Poster) || seasonFolder.Length == 0)
+        var url = string.IsNullOrWhiteSpace(season.Images.Poster) ? null : season.Images.Poster;
+        var generate = settings.Bool("generatePosters", true);
+        if (!settings.Bool("seasonImages", true) || (url is null && !generate) || seasonFolder.Length == 0)
         {
             yield break;
         }
 
         var name = season.SeasonNumber == 0 ? "season-specials-poster.jpg" : $"Season{season.SeasonNumber.ToString("00", CultureInfo.InvariantCulture)}.jpg";
-        yield return new ImageFileResult(Path.Combine(seasonFolder, name), season.Images.Poster);
+        yield return new ImageFileResult(Path.Combine(seasonFolder, name), url, generate ? new GeneratedPoster(SeasonHeading(season), series.Title) : null);
     }
+
+    /// <summary>The season title, else <c>Specials</c>, the year (year-numbered seasons) or <c>Season N</c>.</summary>
+    private static string SeasonHeading(Season season) => season switch
+    {
+        { Title: { Length: > 0 } title } when !string.IsNullOrWhiteSpace(title) => title,
+        { SeasonNumber: 0 } => "Specials",
+        { SeasonNumber: >= 1000 and var year } => year.ToString(CultureInfo.InvariantCulture),
+        var other => $"Season {other.SeasonNumber.ToString(CultureInfo.InvariantCulture)}",
+    };
 
     public IEnumerable<ImageFileResult> EpisodeImages(EpisodeFile file, IReadOnlyList<Episode> episodes, JsonObject settings)
     {

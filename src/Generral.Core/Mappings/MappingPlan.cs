@@ -112,6 +112,9 @@ public sealed class MappingPlanRow
 
     public string? SeasonTitle { get; internal set; }
 
+    /// <summary>Rendered <c>season.images.poster</c>.</summary>
+    public string? SeasonPoster { get; internal set; }
+
     public int? EpisodeNumber { get; internal set; }
 
     public int? AbsoluteEpisodeNumber { get; internal set; }
@@ -181,4 +184,8 @@ public sealed class MappingPlanRow
 
 /// <param name="Rows">One row per event, or per event and part (including parts that are no longer produced).</param>
 /// <param name="Seasons">Season number → display name (<c>season.title</c>), for every season an applied row uses.</param>
-public sealed record MappingPlan(IReadOnlyList<MappingPlanRow> Rows, SeriesType SeriesType, IReadOnlyDictionary<int, string?> Seasons);
+public sealed record MappingPlan(IReadOnlyList<MappingPlanRow> Rows, SeriesType SeriesType, IReadOnlyDictionary<int, string?> Seasons)
+{
+    /// <summary>Season number → poster URL (<c>season.images.poster</c>, first non-empty in event order); seasons without one are absent.</summary>
+    public IReadOnlyDictionary<int, string> SeasonPosters { get; init; } = new Dictionary<int, string>();
+}

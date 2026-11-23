@@ -44,7 +44,7 @@ public sealed class MetadataService(
         var changes = 0;
 
         var definitions = await db.Metadata.AsNoTracking().Where(m => m.Enable).ToListAsync(cancellationToken);
-        var wanted = new List<(MetadataFile File, string? Contents, string? Url)>();
+        var wanted = new List<(MetadataFile File, string? Contents, ImageFileResult? Image)>();
         if (definitions.Count > 0 && Directory.Exists(series.Path))
         {
             var now = time.GetUtcNow().UtcDateTime;
@@ -79,15 +79,15 @@ public sealed class MetadataService(
                     wanted.Add((Track(MetadataType.SeriesMetadata, nfo.RelativePath), nfo.Contents, null));
                 }
 
-                wanted.AddRange(consumer.SeriesImages(series, definition.Settings).Select(i => (Track(MetadataType.SeriesImage, i.RelativePath), (string?)null, (string?)i.Url)));
+                wanted.AddRange(consumer.SeriesImages(series, definition.Settings).Select(i => (Track(MetadataType.SeriesImage, i.RelativePath), (string?)null, (ImageFileResult?)i)));
 
                 foreach (var season in seasons)
                 {
                     var folder = files.Where(f => f.SeasonNumber == season.SeasonNumber).Select(f => Path.GetDirectoryName(f.RelativePath) ?? "").FirstOrDefault();
                     if (folder is not null)
                     {
-                        wanted.AddRange(consumer.SeasonImages(season, folder, definition.Settings)
-                            .Select(i => (Track(MetadataType.SeasonImage, i.RelativePath, season.SeasonNumber), (string?)null, (string?)i.Url)));
+                        wanted.AddRange(consumer.SeasonImages(series, season, folder, definition.Settings)
+                            .Select(i => (Track(MetadataType.SeasonImage, i.RelativePath, season.SeasonNumber), (string?)null, (ImageFileResult?)i)));
                     }
                 }
 
@@ -100,7 +100,7 @@ public sealed class MetadataService(
                     }
 
                     wanted.AddRange(consumer.EpisodeImages(file, fileEpisodes, definition.Settings)
-                        .Select(i => (Track(MetadataType.EpisodeImage, i.RelativePath, file.SeasonNumber, file.Id), (string?)null, (string?)i.Url)));
+                        .Select(i => (Track(MetadataType.EpisodeImage, i.RelativePath, file.SeasonNumber, file.Id), (string?)null, (ImageFileResult?)i)));
                 }
             }
         }
@@ -113,17 +113,37 @@ public sealed class MetadataService(
             changes++;
         }
 
-        foreach (var (file, contents, url) in wanted.DistinctBy(w => w.File.RelativePath))
+        foreach (var (file, contents, image) in wanted.DistinctBy(w => w.File.RelativePath))
         {
             var tracked = existing.FirstOrDefault(f => f.RelativePath == file.RelativePath);
-            var hash = contents is not null ? Hash(contents) : url;
+            var hash = contents is not null ? Hash(contents) : image!.Url ?? image.Generated!.Key;
             var path = Path.Combine(series.Path, file.RelativePath);
             if (tracked is not null && tracked.Hash == hash && File.Exists(path))
             {
                 continue;
             }
 
-            if (!await WriteAsync(path, contents, url, cancellationToken))
+            // A generated poster never replaces a real image: one downloaded earlier (its URL since removed) or one put there by hand.
+            var mayGenerate = image?.Generated is not null && (!File.Exists(path) || IsGenerated(tracked));
+            if (image is { Url: null } && !mayGenerate)
+            {
+                continue;
+            }
+
+            if (contents is not null || image!.Url is not null)
+            {
+                if (!await WriteAsync(path, contents, image?.Url, cancellationToken))
+                {
+                    if (!mayGenerate || !await WriteGeneratedAsync(path, image!.Generated!, cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    // Not the URL: the download is retried on the next sync.
+                    hash = image.Generated!.Key;
+                }
+            }
+            else if (!await WriteGeneratedAsync(path, image.Generated!, cancellationToken))
             {
                 continue;
             }
@@ -175,6 +195,23 @@ public sealed class MetadataService(
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning("Couldn't write {Path}: {Error}", path, e.Message);
+            return false;
+        }
+    }
+
+    private static bool IsGenerated(MetadataFile? tracked) => tracked?.Hash?.StartsWith("generated:", StringComparison.Ordinal) == true;
+
+    private async Task<bool> WriteGeneratedAsync(string path, GeneratedPoster poster, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await File.WriteAllBytesAsync(path, PosterGenerator.Render(poster), cancellationToken);
+            logger.LogDebug("Generated {Path}", path);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or DllNotFoundException or TypeInitializationException)
+        {
+            logger.LogWarning("Couldn't generate {Path}: {Error}", path, e.Message);
             return false;
         }
     }

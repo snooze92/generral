@@ -47,10 +47,14 @@ public sealed class SourceFetcherFactory(IHttpClientFactory clients, SourceRespo
 /// <summary>
 /// Fetches source documents over HTTP for one fetch: applies the extra headers, waits the request delay
 /// between network requests, serves and fills the raw-response cache, and records a summary of each response.
+/// Safe for concurrent use (details requests): request starts stay at least the request delay apart.
 /// </summary>
 public sealed class SourceDocumentFetcher : IDocumentFetcher
 {
     public const int BodyLimit = 64 * 1024;
+
+    /// <summary>Responses after this many are recorded without their body (details requests can be numerous).</summary>
+    public const int BodyCount = 50;
 
     private readonly HttpClient _client;
     private readonly SourceResponseCache _cache;
@@ -58,6 +62,7 @@ public sealed class SourceDocumentFetcher : IDocumentFetcher
     private readonly ILogger _logger;
     private readonly SourceRequestSettings _settings;
     private readonly List<RawResponse> _responses = [];
+    private readonly SemaphoreSlim _pacing = new(1);
     private bool _requested;
 
     internal SourceDocumentFetcher(HttpClient client, SourceResponseCache cache, TimeProvider time, ILogger logger, SourceRequestSettings settings)
@@ -69,7 +74,16 @@ public sealed class SourceDocumentFetcher : IDocumentFetcher
         _settings = settings;
     }
 
-    public IReadOnlyList<RawResponse> Responses => _responses;
+    public IReadOnlyList<RawResponse> Responses
+    {
+        get
+        {
+            lock (_responses)
+            {
+                return [.. _responses];
+            }
+        }
+    }
 
     /// <exception cref="HttpRequestException">Network error, blocked address or non-success status.</exception>
     /// <exception cref="TimeoutException">No response within <see cref="SourceFetcherFactory.Timeout"/>.</exception>
@@ -83,12 +97,21 @@ public sealed class SourceDocumentFetcher : IDocumentFetcher
             return new FetchedDocument(url, cached.Content);
         }
 
-        if (_requested && _settings.RequestDelay > TimeSpan.Zero)
+        await _pacing.WaitAsync(cancellationToken);
+        try
         {
-            await Task.Delay(_settings.RequestDelay, _time, cancellationToken);
+            if (_requested && _settings.RequestDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(_settings.RequestDelay, _time, cancellationToken);
+            }
+
+            _requested = true;
+        }
+        finally
+        {
+            _pacing.Release();
         }
 
-        _requested = true;
         var response = await SendAsync(url, cancellationToken);
         Record(url, response, fromCache: false);
         if ((int)response.Status is < 200 or > 299)
@@ -126,9 +149,13 @@ public sealed class SourceDocumentFetcher : IDocumentFetcher
 
     private void Record(Uri url, CachedResponse response, bool fromCache)
     {
-        var truncated = response.Content.Length > BodyLimit;
-        _responses.Add(new RawResponse(url, (int)response.Status, response.ContentType,
-            truncated ? response.Content[..BodyLimit] : response.Content, truncated, fromCache));
+        lock (_responses)
+        {
+            var limit = _responses.Count < BodyCount ? BodyLimit : 0;
+            var truncated = response.Content.Length > limit;
+            _responses.Add(new RawResponse(url, (int)response.Status, response.ContentType,
+                truncated ? response.Content[..limit] : response.Content, truncated, fromCache));
+        }
     }
 
     private static string? ContentType(MediaTypeHeaderValue? value) => value?.MediaType;

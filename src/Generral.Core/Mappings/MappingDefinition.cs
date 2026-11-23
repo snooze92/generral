@@ -66,6 +66,12 @@ public sealed record SeasonDefinition
 
     /// <summary>Optional display name (<c>&lt;namedseason&gt;</c>).</summary>
     public string? Title { get; init; }
+
+    /// <summary>
+    /// Season poster URL template (<c>season.images.poster</c>), rendered per event like <see cref="Title"/>: the season takes the first
+    /// non-empty value in event order (earliest first).
+    /// </summary>
+    public string? Poster { get; init; }
 }
 
 public enum EpisodeStrategy

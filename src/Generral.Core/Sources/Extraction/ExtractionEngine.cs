@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -22,6 +24,12 @@ public sealed record ExtractionOptions
 
     /// <summary>The raw item is kept under <c>_raw</c> up to this many characters of JSON.</summary>
     public int RawLimit { get; init; } = 16 * 1024;
+
+    /// <summary>Cap on details requests per extraction (cached details don't count). Items over it get no details.</summary>
+    public int MaxDetailsRequests { get; init; } = 200;
+
+    /// <summary>Details requests in flight at once (the fetcher still spaces them by the request delay).</summary>
+    public int DetailsConcurrency { get; init; } = 3;
 }
 
 /// <summary>
@@ -29,7 +37,8 @@ public sealed record ExtractionOptions
 /// selects items and extracts fields. Template models: URLs see the <c>foreach</c> variables; field
 /// <c>text</c> templates see the previous fields, plus <c>vars</c> (the <c>foreach</c> variables) and <c>request.url</c>.
 /// </summary>
-public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? time = null)
+/// <remarks>An optional <c>details</c> request per item (URL templated from the item's fields) adds or overrides fields; see § Details requests.</remarks>
+public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? time = null, DetailsCache? detailsCache = null)
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
@@ -62,7 +71,8 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             html ? null : CompilePath(definition.Items, "items"),
             html ? HtmlExtraction.CompileSelector(definition.Items, "items") : null,
             definition.HtmlPath is { } htmlPath ? CompilePath(htmlPath, "htmlPath") : null,
-            definition.Fields.Select(f => CompileField(f, html)).ToList());
+            definition.Fields.Select(f => CompileField(f, html, "fields")).ToList(),
+            definition.Details is { } details ? CompileDetails(details, definition.Format) : null);
     }
 
     public Task<ExtractionResult> ExtractAsync(ExtractionDefinition definition, IDocumentFetcher fetcher, ExtractionOptions? options = null, CancellationToken cancellationToken = default)
@@ -82,7 +92,12 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             }
         }
 
-        return new ExtractionResult(run.Items, run.Urls, run.Warnings);
+        if (extraction.Details is { } details)
+        {
+            await AddDetailsAsync(details, fetcher, run, cancellationToken);
+        }
+
+        return Finish(run);
     }
 
     /// <summary>Extracts the items of an in-memory document (no requests, no pagination).</summary>
@@ -91,7 +106,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
     {
         var run = new Run(options ?? new ExtractionOptions());
         AddItems(extraction, SelectItems(extraction.Items!, document), url, new Dictionary<string, object?>(), run, cancellationToken);
-        return new ExtractionResult(run.Items, run.Urls, run.Warnings);
+        return Finish(run);
     }
 
     private async Task FetchPagesAsync(CompiledExtraction extraction, CompiledRequest request, Uri firstUrl, IReadOnlyDictionary<string, object?> vars, IDocumentFetcher fetcher, Run run, CancellationToken cancellationToken)
@@ -116,7 +131,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             seen.Add(url);
             run.Urls.Add(url);
             var document = await fetcher.FetchAsync(url, cancellationToken);
-            var root = ParseDocument(extraction, document);
+            var root = ParseDocument(extraction.Format, extraction.HtmlPath, document);
             var items = root is IDocument html ? HtmlExtraction.SelectItems(extraction.ItemSelector!, html) : SelectItems(extraction.Items!, (JsonNode?)root);
             if (!AddItems(extraction, items, document.Url, vars, run, cancellationToken) || pagination is null)
             {
@@ -168,12 +183,19 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
         return true;
     }
 
-    private ExtractedItem ExtractItem(CompiledExtraction extraction, object? item, int index, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
+    private PendingItem ExtractItem(CompiledExtraction extraction, object? item, int index, Uri? url, IReadOnlyDictionary<string, object?> vars, Run run, CancellationToken cancellationToken)
     {
-        var values = new Dictionary<string, object?>();
-        var fields = new JsonObject();
-        var errors = new List<string>();
-        foreach (var field in extraction.Fields)
+        var pending = new PendingItem(index, url, vars);
+        EvaluateFields(extraction.Fields, pending, pending.Values, pending.Fields, pending.Errors, url, item, cancellationToken);
+        pending.Fields[ReservedFields.Raw] = Raw(item, run.Options.RawLimit);
+        return pending;
+    }
+
+    /// <summary>Evaluates <paramref name="fields"/> in order against <paramref name="node"/> (a JSON node or an HTML element), into <paramref name="values"/>.</summary>
+    private static void EvaluateFields(
+        IReadOnlyList<CompiledField> fields, PendingItem item, Dictionary<string, object?> values, JsonObject json, List<string> errors, Uri? url, object? node, CancellationToken cancellationToken)
+    {
+        foreach (var field in fields)
         {
             var definition = field.Definition;
             object? value = null;
@@ -182,15 +204,15 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             {
                 if (field.Path is not null)
                 {
-                    value = Select(field.Path, (JsonNode?)item);
+                    value = Select(field.Path, (JsonNode?)node);
                 }
                 else if (field.Selector is not null)
                 {
-                    value = HtmlExtraction.Select(field, (IElement)item!);
+                    value = HtmlExtraction.Select(field, (IElement)node!);
                 }
                 else if (field.Text is not null)
                 {
-                    value = RenderText(field.Text, values, vars, url, cancellationToken);
+                    value = RenderText(field.Text, item.Values, ReferenceEquals(values, item.Values) ? null : values, item.Vars, url, cancellationToken);
                 }
 
                 foreach (var filter in field.Filters)
@@ -214,32 +236,182 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             }
 
             values[definition.Name] = value;
-            fields[definition.Name] = FieldValues.ToJson(value);
+            json[definition.Name] = FieldValues.ToJson(value);
         }
-
-        fields[ReservedFields.Raw] = Raw(item, run.Options.RawLimit);
-        ExtractedEvent? extracted = null;
-        if (errors.Count == 0)
-        {
-            extracted = ReservedFields.ToEvent(values, fields, run.Options.Timezone, url, errors);
-            if (extracted is not null && !run.Keys.Add(extracted.Key))
-            {
-                errors.Add($"key: duplicate key '{extracted.Key}'");
-                extracted = null;
-            }
-        }
-
-        return new ExtractedItem(index, url, fields, extracted, errors);
     }
 
-    private static object? RenderText(CompiledTemplate template, Dictionary<string, object?> values, IReadOnlyDictionary<string, object?> vars, Uri? url, CancellationToken cancellationToken)
+    private static ExtractionResult Finish(Run run)
     {
+        var items = new List<ExtractedItem>(run.Items.Count);
+        foreach (var pending in run.Items)
+        {
+            ExtractedEvent? extracted = null;
+            if (pending.Errors.Count == 0)
+            {
+                extracted = ReservedFields.ToEvent(pending.Values, pending.Fields, run.Options.Timezone, pending.Url, pending.Errors);
+                if (extracted is not null && !run.Keys.Add(extracted.Key))
+                {
+                    pending.Errors.Add($"key: duplicate key '{extracted.Key}'");
+                    extracted = null;
+                }
+            }
+
+            items.Add(new ExtractedItem(pending.Index, pending.Url, pending.Fields, extracted, pending.Errors));
+        }
+
+        return new ExtractionResult(items, run.Urls, run.Warnings);
+    }
+
+    /// <summary>
+    /// One details request per item without errors, at most <see cref="ExtractionOptions.DetailsConcurrency"/> at a time. Details of an
+    /// unchanged item (same fields and URL) come from the <see cref="DetailsCache"/>. Failures are item errors (or ignored when optional).
+    /// </summary>
+    private async Task AddDetailsAsync(CompiledDetails details, IDocumentFetcher fetcher, Run run, CancellationToken cancellationToken)
+    {
+        var requests = 0;
+        var skipped = 0;
+        var optionalFailures = new List<string>();
+        using var slots = new SemaphoreSlim(Math.Max(1, run.Options.DetailsConcurrency));
+        var tasks = run.Items.Where(i => i.Errors.Count == 0).Select(async item =>
+        {
+            string? text;
+            try
+            {
+                text = RenderText(details.Url, item.Values, null, item.Vars, item.Url, cancellationToken)?.ToString()?.Trim();
+            }
+            catch (TemplateException e)
+            {
+                Fail(item, $"url: {e.Message}");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            if (!(item.Url is null ? Uri.TryCreate(text, UriKind.Absolute, out var url) : Uri.TryCreate(item.Url, text, out url)) || url.Scheme is not ("http" or "https"))
+            {
+                Fail(item, $"invalid URL '{text}'");
+                return;
+            }
+
+            var cacheKey = details.CacheKey(url, item.Fields);
+            if (details.Definition.Cache > TimeSpan.Zero && detailsCache?.TryGet(cacheKey) is { } cached)
+            {
+                Merge(item, cached.Select(f => KeyValuePair.Create(f.Key, FieldValues.FromJson(f.Value))));
+                return;
+            }
+
+            if (Interlocked.Increment(ref requests) > run.Options.MaxDetailsRequests)
+            {
+                Interlocked.Increment(ref skipped);
+                return;
+            }
+
+            await slots.WaitAsync(cancellationToken);
+            object? root;
+            try
+            {
+                var document = await fetcher.FetchAsync(url, cancellationToken);
+                root = ParseDocument(details.Format, details.HtmlPath, document);
+            }
+            catch (Exception e) when (e is HttpRequestException or TimeoutException or ExtractionException)
+            {
+                Fail(item, e.Message);
+                return;
+            }
+            finally
+            {
+                slots.Release();
+            }
+
+            var values = new Dictionary<string, object?>();
+            var json = new JsonObject();
+            var errors = new List<string>();
+            EvaluateFields(details.Fields, item, values, json, errors, url, root is IDocument html ? html.DocumentElement : root, cancellationToken);
+            if (errors.Count > 0)
+            {
+                foreach (var error in errors)
+                {
+                    Fail(item, $"fields.{error}");
+                }
+
+                return;
+            }
+
+            foreach (var name in values.Keys.Where(ReservedFields.ImageFields.Contains).ToList())
+            {
+                // Relative image URLs belong to the details page, not to the list page the item came from.
+                if (FieldValues.ToText(values[name])?.Trim() is { Length: > 0 } image && Uri.TryCreate(url, image, out var absolute))
+                {
+                    values[name] = absolute.AbsoluteUri;
+                    json[name] = absolute.AbsoluteUri;
+                }
+            }
+
+            if (details.Definition.Cache > TimeSpan.Zero)
+            {
+                detailsCache?.Set(cacheKey, json, details.Definition.Cache);
+            }
+
+            Merge(item, values);
+        }).ToList();
+
+        await Task.WhenAll(tasks);
+
+        if (skipped > 0)
+        {
+            run.Warnings.Add($"{skipped} item(s) got no details: details request limit ({run.Options.MaxDetailsRequests}) reached");
+        }
+
+        if (optionalFailures.Count > 0)
+        {
+            run.Warnings.Add($"Details failed for {optionalFailures.Count} item(s) (optional), e.g. {optionalFailures[0]}");
+        }
+
+        void Fail(PendingItem item, string error)
+        {
+            if (details.Definition.Optional)
+            {
+                lock (optionalFailures)
+                {
+                    optionalFailures.Add(error);
+                }
+
+                return;
+            }
+
+            item.Errors.Add($"details: {error}");
+        }
+    }
+
+    private static void Merge(PendingItem item, IEnumerable<KeyValuePair<string, object?>> values)
+    {
+        foreach (var (name, value) in values)
+        {
+            item.Values[name] = value;
+            item.Fields[name] = FieldValues.ToJson(value);
+        }
+    }
+
+    /// <param name="values">The item's fields, by name and as <c>fields.*</c>.</param>
+    /// <param name="details">The details fields extracted so far (details <c>text</c> fields), which win over the item's.</param>
+    private static object? RenderText(CompiledTemplate template, Dictionary<string, object?> values, Dictionary<string, object?>? details, IReadOnlyDictionary<string, object?> vars, Uri? url, CancellationToken cancellationToken)
+    {
+        var fields = details is null ? values : new Dictionary<string, object?>(values);
+        foreach (var (name, value) in details ?? [])
+        {
+            fields[name] = value;
+        }
+
         var model = new Dictionary<string, object?>
         {
+            ["fields"] = fields,
             ["vars"] = vars,
             ["request"] = new Dictionary<string, object?> { ["url"] = url?.AbsoluteUri },
         };
-        foreach (var (name, value) in values)
+        foreach (var (name, value) in fields)
         {
             model[name] = value;
         }
@@ -282,9 +454,9 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             : throw new ExtractionException($"Invalid next page URL '{text}'");
     }
 
-    private static object? ParseDocument(CompiledExtraction extraction, FetchedDocument document)
+    private static object? ParseDocument(DocumentFormat format, JsonPath? htmlPath, FetchedDocument document)
     {
-        if (extraction.Format == DocumentFormat.Html && extraction.HtmlPath is null)
+        if (format == DocumentFormat.Html && htmlPath is null)
         {
             return HtmlExtraction.Parse(document.Content);
         }
@@ -299,12 +471,12 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             throw new ExtractionException($"{document.Url}: invalid JSON ({e.Message})", e);
         }
 
-        if (extraction.HtmlPath is null)
+        if (htmlPath is null)
         {
             return root;
         }
 
-        return Select(extraction.HtmlPath, root) is string text
+        return Select(htmlPath, root) is string text
             ? HtmlExtraction.Parse(text)
             : throw new ExtractionException($"{document.Url}: htmlPath matched no string");
     }
@@ -385,9 +557,34 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
             next is not null && html ? HtmlExtraction.CompileSelector(next, $"{location}.pagination.next") : null);
     }
 
-    private CompiledField CompileField(FieldDefinition field, bool html)
+    private CompiledDetails CompileDetails(DetailsDefinition details, DocumentFormat sourceFormat)
     {
-        var location = $"fields.{field.Name}";
+        var format = details.Format ?? sourceFormat;
+        var html = format == DocumentFormat.Html;
+        foreach (var reserved in new[] { ReservedFields.Key, ReservedFields.Raw })
+        {
+            if (details.Fields.Any(f => f.Name == reserved))
+            {
+                throw new ExtractionDefinitionException($"details.fields.{reserved}: can't be set by details");
+            }
+        }
+
+        if (!html && details.HtmlPath is not null)
+        {
+            throw new ExtractionDefinitionException("details.htmlPath: only applies to HTML details");
+        }
+
+        return new CompiledDetails(
+            details,
+            CompileTemplate(details.Url, "details.url"),
+            format,
+            details.HtmlPath is { } htmlPath ? CompilePath(htmlPath, "details.htmlPath") : null,
+            details.Fields.Select(f => CompileField(f, html, "details.fields")).ToList());
+    }
+
+    private CompiledField CompileField(FieldDefinition field, bool html, string parent)
+    {
+        var location = $"{parent}.{field.Name}";
         if (html ? field.Path is not null : field.Selector is not null)
         {
             throw new ExtractionDefinitionException(html ? $"{location}.path: HTML sources use 'selector'" : $"{location}.selector: JSON sources use 'path'");
@@ -433,7 +630,7 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
     {
         public ExtractionOptions Options { get; } = options;
 
-        public List<ExtractedItem> Items { get; } = [];
+        public List<PendingItem> Items { get; } = [];
 
         public List<Uri> Urls { get; } = [];
 
@@ -445,7 +642,8 @@ public sealed class ExtractionEngine(TemplateRenderer renderer, TimeProvider? ti
 
 public sealed class CompiledExtraction
 {
-    internal CompiledExtraction(DocumentFormat format, IReadOnlyList<CompiledRequest> requests, JsonPath? items, CssSelector? itemSelector, JsonPath? htmlPath, IReadOnlyList<CompiledField> fields)
+    internal CompiledExtraction(
+        DocumentFormat format, IReadOnlyList<CompiledRequest> requests, JsonPath? items, CssSelector? itemSelector, JsonPath? htmlPath, IReadOnlyList<CompiledField> fields, CompiledDetails? details)
     {
         Format = format;
         Requests = requests;
@@ -453,6 +651,7 @@ public sealed class CompiledExtraction
         ItemSelector = itemSelector;
         HtmlPath = htmlPath;
         Fields = fields;
+        Details = details;
     }
 
     internal DocumentFormat Format { get; }
@@ -468,6 +667,44 @@ public sealed class CompiledExtraction
     internal JsonPath? HtmlPath { get; }
 
     internal IReadOnlyList<CompiledField> Fields { get; }
+
+    internal CompiledDetails? Details { get; }
+}
+
+internal sealed class CompiledDetails(DetailsDefinition definition, CompiledTemplate url, DocumentFormat format, JsonPath? htmlPath, IReadOnlyList<CompiledField> fields)
+{
+    /// <summary>Changes with the details definition, so that editing it doesn't reuse stale details.</summary>
+    private readonly string _definitionKey = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(definition)));
+
+    public DetailsDefinition Definition { get; } = definition;
+
+    public CompiledTemplate Url { get; } = url;
+
+    public DocumentFormat Format { get; } = format;
+
+    public JsonPath? HtmlPath { get; } = htmlPath;
+
+    public IReadOnlyList<CompiledField> Fields { get; } = fields;
+
+    /// <summary>Definition, URL and the item's fields (raw item included): an item whose list entry changed is fetched again.</summary>
+    public string CacheKey(Uri url, JsonObject itemFields) =>
+        _definitionKey + "|" + url.AbsoluteUri + "|" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(itemFields.ToJsonString())));
+}
+
+/// <summary>An item being extracted: fields first, then details, then the event.</summary>
+internal sealed class PendingItem(int index, Uri? url, IReadOnlyDictionary<string, object?> vars)
+{
+    public int Index { get; } = index;
+
+    public Uri? Url { get; } = url;
+
+    public IReadOnlyDictionary<string, object?> Vars { get; } = vars;
+
+    public Dictionary<string, object?> Values { get; } = [];
+
+    public JsonObject Fields { get; } = [];
+
+    public List<string> Errors { get; } = [];
 }
 
 internal sealed record CompiledRequest(RequestDefinition Definition, CompiledTemplate Url, IReadOnlyList<KeyValuePair<string, CompiledTemplate>> Foreach, JsonPath? Next, CssSelector? NextSelector);

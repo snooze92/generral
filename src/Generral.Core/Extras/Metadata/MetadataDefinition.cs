@@ -60,4 +60,6 @@ public class MetadataFile
 
 public sealed record MetadataFileResult(string RelativePath, string Contents);
 
-public sealed record ImageFileResult(string RelativePath, string Url);
+/// <param name="Url">The image to download; null to write <paramref name="Generated"/>.</param>
+/// <param name="Generated">Drawn when there is no URL, or when its download fails and the file doesn't exist yet.</param>
+public sealed record ImageFileResult(string RelativePath, string? Url, GeneratedPoster? Generated = null);

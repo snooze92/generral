@@ -161,13 +161,28 @@ public sealed class ApplyMappingsService(
         var seasons = await db.Seasons.Where(s => s.SeriesId == series.Id).ToDictionaryAsync(s => s.SeasonNumber, cancellationToken);
         foreach (var (number, title) in plan.Seasons)
         {
+            var poster = plan.SeasonPosters.GetValueOrDefault(number);
             if (!seasons.TryGetValue(number, out var season))
             {
-                db.Seasons.Add(new Season { SeriesId = series.Id, SeasonNumber = number, Title = title, Monitored = series.MonitorNewItems == NewItemMonitorType.All });
+                db.Seasons.Add(new Season
+                {
+                    SeriesId = series.Id,
+                    SeasonNumber = number,
+                    Title = title,
+                    Monitored = series.MonitorNewItems == NewItemMonitorType.All,
+                    Images = new ImageSet { Poster = poster },
+                });
+                continue;
             }
-            else if (title is not null)
+
+            if (title is not null)
             {
                 season.Title = title;
+            }
+
+            if (poster is not null)
+            {
+                season.Images = season.Images with { Poster = poster };
             }
         }
 

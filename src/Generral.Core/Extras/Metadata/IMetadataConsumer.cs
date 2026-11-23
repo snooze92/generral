@@ -29,7 +29,7 @@ public interface IMetadataConsumer
     IEnumerable<ImageFileResult> SeriesImages(Series series, JsonObject settings);
 
     /// <param name="seasonFolder">The season's folder relative to the series folder, empty without season folders.</param>
-    IEnumerable<ImageFileResult> SeasonImages(Season season, string seasonFolder, JsonObject settings);
+    IEnumerable<ImageFileResult> SeasonImages(Series series, Season season, string seasonFolder, JsonObject settings);
 
     IEnumerable<ImageFileResult> EpisodeImages(EpisodeFile file, IReadOnlyList<Episode> episodes, JsonObject settings);
 }

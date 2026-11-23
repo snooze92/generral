@@ -17,6 +17,33 @@ public sealed record ExtractionDefinition
 
     /// <summary>Evaluated in order: <see cref="FieldDefinition.Text"/> templates see the fields before them.</summary>
     public required IReadOnlyList<FieldDefinition> Fields { get; init; }
+
+    /// <summary>Optional per-item request whose fields are added to (or override) the item's.</summary>
+    public DetailsDefinition? Details { get; init; }
+}
+
+/// <summary>One request per item, its URL templated from the item's fields (docs/specs/04-sources.md § Details requests).</summary>
+public sealed record DetailsDefinition
+{
+    public static readonly TimeSpan DefaultCache = TimeSpan.FromHours(24);
+    public static readonly TimeSpan MaxCache = TimeSpan.FromDays(30);
+
+    /// <summary>Scriban template over the item's fields (by name and as <c>fields.*</c>) and <c>vars</c>. Empty = no details for that item.</summary>
+    public required string Url { get; init; }
+
+    /// <summary>Format of the details documents; null = the source's.</summary>
+    public DocumentFormat? Format { get; init; }
+
+    public string? HtmlPath { get; init; }
+
+    /// <summary>Evaluated after the item's fields, against the whole details document.</summary>
+    public required IReadOnlyList<FieldDefinition> Fields { get; init; }
+
+    /// <summary>A failed details request (or a missing details field) leaves the item as is instead of making it an item error.</summary>
+    public bool Optional { get; init; }
+
+    /// <summary>How long the extracted details of an unchanged item (same fields, same URL) are reused. Zero disables it.</summary>
+    public TimeSpan Cache { get; init; } = DefaultCache;
 }
 
 public sealed record RequestDefinition

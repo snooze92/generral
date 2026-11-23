@@ -107,7 +107,7 @@ public sealed record MappingPreviewRowResource
 /// <summary>The preview's summary bar (docs/specs/05-mapping.md § Preview &amp; dry-run).</summary>
 public sealed record MappingPreviewSummary(int Events, int Kept, int Episodes, int New, int Changed, int Unchanged, int Orphaned, int Filtered, int Errors, int Renumbered, int Duplicates);
 
-public sealed record MappingPreviewSeasonResource(int SeasonNumber, string? Title);
+public sealed record MappingPreviewSeasonResource(int SeasonNumber, string? Title, string? Poster = null);
 
 public sealed record MappingPreviewResource(
     IReadOnlyList<MappingPreviewRowResource> Rows,
@@ -303,7 +303,7 @@ public static class MappingEndpoints
             rows,
             summary,
             plan.SeriesType,
-            plan.Seasons.OrderBy(s => s.Key).Select(s => new MappingPreviewSeasonResource(s.Key, s.Value)).ToList(),
+            plan.Seasons.OrderBy(s => s.Key).Select(s => new MappingPreviewSeasonResource(s.Key, s.Value, plan.SeasonPosters.GetValueOrDefault(s.Key))).ToList(),
             rows.SelectMany(r => r.Errors.Select(e => $"{r.Event.Key}{(r.PartKey is null ? "" : $"/{r.PartKey}")}: {e}")).ToList()));
     }
 

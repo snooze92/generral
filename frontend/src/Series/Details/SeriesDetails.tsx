@@ -19,6 +19,7 @@ import { getSeriesStatusDetails } from 'Series/SeriesStatus';
 import { useToggleSeriesMonitored } from 'Series/useSeries';
 import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
+import EditSeriesImagesModal from './EditSeriesImagesModal';
 import SeriesDetailsPath from './SeriesDetailsPath';
 import SeriesDetailsSeason from './SeriesDetailsSeason';
 import styles from './SeriesDetails.module.css';
@@ -46,6 +47,7 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
   const { toggleSeriesMonitored, isTogglingSeriesMonitored } =
     useToggleSeriesMonitored(id);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isEditImagesOpen, setIsEditImagesOpen] = useState(false);
   const { search, isSearching } = useSearchCommand();
 
   // The latest season starts expanded, like Sonarr.
@@ -94,6 +96,15 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
           isSpinning={isSearching}
           isDisabled={!monitored}
           onPress={() => search({ name: 'SeriesSearch', seriesId: id })}
+        />
+
+        <ToolbarItem
+          id="edit-images"
+          priority={1}
+          groupId="left"
+          label={translate('EditImages')}
+          iconName={icons.POSTER}
+          onPress={() => setIsEditImagesOpen(true)}
         />
 
         <ToolbarItem
@@ -259,6 +270,12 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
             </Alert>
           ) : null}
         </div>
+
+        <EditSeriesImagesModal
+          isOpen={isEditImagesOpen}
+          series={series}
+          onModalClose={() => setIsEditImagesOpen(false)}
+        />
 
         <DeleteSeriesModal
           isOpen={isDeleteOpen}
