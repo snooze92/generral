@@ -58,6 +58,15 @@ are met (`canBeRemoved`). Recycle bin cleanup (`CleanUpRecycleBin`) runs daily.
 choose series/season/episode(s), quality and release group for each file (with suggestions from
 part rules and the source filename), then import with *Move* or *Copy/Hardlink*.
 
+*Implementation:* `GET /manualimport?folder=&seriesId=` lists the folder's video files (same
+selection as automatic import). With `seriesId`, each file is matched against the rules of the
+series' active episodes and gets the episode when exactly one matches; otherwise the rejection says
+why (no match, several). Without `seriesId` (or a download), files say *Unknown Series*. With
+`downloadId`, files are assigned as for automatic import. Rejections only explain a missing
+assignment: once the user picks series and episodes the file is importable, except the files a
+release deliberately skipped (`assignable: false`). A missing folder is a validation failure. The
+folder is typed (no file browser yet); release group and languages aren't editable yet.
+
 **Library import** (existing files, `Later`): scan a root folder for existing
 `Series/Season X/…SxxEyy…` files and link them to episodes, so an existing hand-curated sports
 library can be adopted.

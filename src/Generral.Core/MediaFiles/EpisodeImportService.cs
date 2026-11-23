@@ -148,6 +148,23 @@ public sealed partial class EpisodeImportService(
     }
 
     /// <summary>
+    /// Manual import of a folder for a series: each file gets the one active episode whose rules match its name (spec 08 § Manual import);
+    /// files matching none or several are left for the user to assign.
+    /// </summary>
+    public async Task<List<LocalEpisodeFile>> SuggestAsync(string path, int seriesId, CancellationToken cancellationToken = default)
+    {
+        var files = VideoFiles(path);
+        var episodeIds = await db.Episodes.AsNoTracking().Where(e => e.SeriesId == seriesId && e.Status == EpisodeStatus.Active).Select(e => e.Id).ToListAsync(cancellationToken);
+        var candidates = (await ReleaseSearchCandidatesAsync(episodeIds, cancellationToken)).Where(c => c.HasRules).ToList();
+        return files.Select(f => candidates.Where(c => ReleaseTitleMatcher.Check(c.Terms, f.Name) is null).Take(2).ToList() switch
+        {
+            [var one] => new LocalEpisodeFile(f.FullName, f.Length, [one.Episode.Id], null),
+            [] => new LocalEpisodeFile(f.FullName, f.Length, [], "Matches none of the series' episodes: choose the episode"),
+            _ => new LocalEpisodeFile(f.FullName, f.Length, [], "Matches several episodes: choose the episode"),
+        }).ToList();
+    }
+
+    /// <summary>
     /// The file of a multi-file release (e.g. <c>Main Card.mkv</c> + <c>Prelims.mkv</c>) for its single episode: the only one matching the episode's
     /// rules, else the only one not excluded by its <c>mustNot</c> rules, else the only one named like the episode title, else the only "main card", else the
     /// largest when at least twice the size of the next. Null when still ambiguous.

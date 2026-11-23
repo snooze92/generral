@@ -84,6 +84,7 @@ export const GROUPS: SidebarGroup[] = [
         children: [
           { title: () => translate('Missing'), to: '/wanted/missing' },
           { title: () => translate('CutoffUnmet'), to: '/wanted/cutoffunmet' },
+          { title: () => translate('ManualImport'), to: '/wanted/manualimport' },
         ],
       },
     ],

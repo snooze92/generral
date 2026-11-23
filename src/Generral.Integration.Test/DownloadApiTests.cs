@@ -325,6 +325,56 @@ public class DownloadApiTests
         }
     }
 
+    [Test]
+    public async Task Manual_import_of_a_folder_suggests_episodes_from_the_series_rules_and_imports_user_assignments()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "generral-import-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var folder = Directory.CreateDirectory(Path.Combine(root, "in")).FullName;
+            await File.WriteAllBytesAsync(Path.Combine(folder, "ufc.314.main.card.1080p.web-dl.mkv"), new byte[3000]);
+            await File.WriteAllBytesAsync(Path.Combine(folder, "some.other.fight.720p.hdtv.mkv"), new byte[2500]);
+            var episodeId = await SeedAsync(Path.Combine(root, "tv", "UFC"));
+            var seriesId = (int)(await _client.GetFromJsonAsync<JsonObject>($"/api/v1/episode/{episodeId}"))!["seriesId"]!;
+
+            var unknown = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/manualimport?folder={Uri.EscapeDataString(folder)}"))!;
+            var suggested = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/manualimport?folder={Uri.EscapeDataString(folder)}&seriesId={seriesId}"))!;
+            var missing = await _client.GetAsync($"/api/v1/manualimport?folder={Uri.EscapeDataString(Path.Combine(root, "nope"))}");
+            var other = suggested.Single(f => ((string)f!["path"]!).EndsWith("some.other.fight.720p.hdtv.mkv", StringComparison.Ordinal))!;
+            var imported = await RunAsync("ManualImport", new JsonObject
+            {
+                ["importMode"] = "copy",
+                ["files"] = new JsonArray(new JsonObject
+                {
+                    ["path"] = (string)other["path"]!,
+                    ["seriesId"] = seriesId,
+                    ["episodeIds"] = new JsonArray(episodeId),
+                    ["quality"] = new JsonObject { ["quality"] = new JsonObject { ["id"] = 7 }, ["revision"] = new JsonObject { ["version"] = 1 } },
+                }),
+            });
+            var file = (await _client.GetFromJsonAsync<JsonArray>($"/api/v1/episodefile?seriesId={seriesId}"))!.Single()!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(unknown.Select(f => (string)f!["rejections"]![0]!["reason"]!), Is.All.EqualTo("Unknown Series"));
+                Assert.That(unknown.Select(f => (bool)f!["assignable"]!), Is.All.True);
+                var main = suggested.Single(f => ((string)f!["path"]!).Contains("main.card", StringComparison.Ordinal))!;
+                Assert.That(main["episodes"]!.AsArray().Select(e => (int)e!["id"]!), Is.EqualTo(new[] { episodeId }), "matches the episode's rules");
+                Assert.That(main["rejections"]!.AsArray(), Is.Empty);
+                Assert.That(other["episodes"]!.AsArray(), Is.Empty);
+                Assert.That((string)other["rejections"]![0]!["reason"]!, Does.StartWith("Matches none of the series' episodes"));
+                Assert.That(missing.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That((string)imported["status"]!, Is.EqualTo("completed"), (string?)imported["message"]);
+                Assert.That((string)file["quality"]!["quality"]!["name"]!, Is.EqualTo("Bluray-1080p"), "the quality the user picked");
+                Assert.That(File.Exists((string)other["path"]!), "copied, not moved");
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     /// <summary>Writing through one path changes the other only when both are the same inode.</summary>
     private static bool IsHardLink(string a, string b)
     {
