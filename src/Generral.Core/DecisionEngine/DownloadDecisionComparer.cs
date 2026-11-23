@@ -45,6 +45,19 @@ public sealed class DownloadDecisionComparer : IComparer<DownloadDecision>
             .SelectMany(g => g.OrderByDescending(d => d, Instance))
             .ToList();
 
+    /// <summary>
+    /// Interactive search's default order: approved, then rejected matches, then unmatched releases; within each, best quality
+    /// (in the profile's order, then revision) first, then most seeders, then the usual tie-breakers.
+    /// </summary>
+    public static List<DownloadDecision> InteractiveOrder(IEnumerable<DownloadDecision> decisions) =>
+        decisions
+            .OrderBy(d => d.Approved ? 0 : d.RemoteEpisode.Episodes.Count > 0 ? 1 : 2)
+            .ThenByDescending(d => QualityIndex(d.RemoteEpisode))
+            .ThenByDescending(d => d.RemoteEpisode.Quality.Revision)
+            .ThenByDescending(d => d.RemoteEpisode.Release.Seeders ?? 0)
+            .ThenByDescending(d => d, Instance)
+            .ToList();
+
     public static int QualityIndex(RemoteEpisode remote) =>
         remote.QualityProfile?.GetIndex(remote.Quality.Quality.Id).Index ?? 0;
 

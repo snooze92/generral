@@ -53,16 +53,11 @@ public sealed class ReleaseSearchService(
     /// <summary>In memory: after a restart RSS sync runs at the first scheduler check.</summary>
     public DateTime? LastRssSync { get; private set; }
 
-    /// <summary>Interactive search: every decision, nothing grabbed. Accepted first, then rejected matches, then unmatched releases, each best first.</summary>
+    /// <summary>Interactive search: every decision, nothing grabbed, in <see cref="DownloadDecisionComparer.InteractiveOrder"/>.</summary>
     public async Task<InteractiveSearchResult> InteractiveSearchAsync(int episodeId, CancellationToken cancellationToken = default)
     {
         var (decisions, _, timedOut) = await SearchAsync(e => e.Id == episodeId, interactive: true, userInvoked: true, cancellationToken);
-        return new InteractiveSearchResult(
-            decisions
-                .OrderBy(d => d.Approved ? 0 : d.RemoteEpisode.Episodes.Count > 0 ? 1 : 2)
-                .ThenByDescending(d => d, DownloadDecisionComparer.Instance)
-                .ToList(),
-            timedOut);
+        return new InteractiveSearchResult(DownloadDecisionComparer.InteractiveOrder(decisions), timedOut);
     }
 
     /// <summary>Automatic search (EpisodeSearch, SeasonSearch, SeriesSearch, MissingEpisodeSearch): grabs the best accepted releases.</summary>

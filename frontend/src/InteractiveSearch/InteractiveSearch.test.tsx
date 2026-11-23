@@ -3,6 +3,7 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderSettingsPage, requests } from 'test/renderSettingsPage';
 import InteractiveSearchModal from './InteractiveSearchModal';
+import { setReleaseSort } from './useReleases';
 
 const quality = {
   quality: { id: 3, name: 'WEBDL-1080p', source: 'web', resolution: 1080 },
@@ -38,6 +39,63 @@ function release(guid: string, changes = {}) {
 describe('Interactive search', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    setReleaseSort('releaseWeight', 'ascending');
+  });
+
+  function titles() {
+    return screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelector('td:nth-child(3)')?.textContent);
+  }
+
+  it('keeps the server order by default, sorts by header and warns about timed-out indexers', async () => {
+    renderSettingsPage(
+      <InteractiveSearchModal
+        isOpen={true}
+        episodeId={11}
+        title="2026x3"
+        onModalClose={() => {}}
+      />,
+      {
+        'GET /api/v1/release': () =>
+          new Response(
+            JSON.stringify([
+              release('Small', { releaseWeight: 1, size: 1024 }),
+              release('Best', { releaseWeight: 0, size: 2048 }),
+              release('Rejected', {
+                releaseWeight: 2,
+                size: 4096,
+                approved: false,
+                rejections: ['Too big'],
+              }),
+            ]),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Generral-Timed-Out-Indexers': 'LimeTorrents',
+              },
+            }
+          ),
+      }
+    );
+
+    await screen.findByText('Formula1.2026.Round03.Best.1080p.WEB');
+    expect(
+      screen.getByText(
+        'Some indexers timed out, their results are missing: LimeTorrents'
+      )
+    ).toBeTruthy();
+    const order = (...names: string[]) =>
+      names.map((name) => `Formula1.2026.Round03.${name}.1080p.WEB`);
+    expect(titles()).toEqual(order('Best', 'Small', 'Rejected'));
+
+    fireEvent.click(screen.getByRole('columnheader', { name: 'Size' }));
+    expect(titles()).toEqual(order('Small', 'Best', 'Rejected'));
+
+    fireEvent.click(screen.getByRole('columnheader', { name: 'Size' }));
+    expect(titles()).toEqual(order('Rejected', 'Best', 'Small'));
   });
 
   it('lists releases with rejections and grabs one', async () => {
