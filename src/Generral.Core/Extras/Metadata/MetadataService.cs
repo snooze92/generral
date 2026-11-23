@@ -116,7 +116,7 @@ public sealed class MetadataService(
         foreach (var (file, contents, image) in wanted.DistinctBy(w => w.File.RelativePath))
         {
             var tracked = existing.FirstOrDefault(f => f.RelativePath == file.RelativePath);
-            var hash = contents is not null ? Hash(contents) : image!.Url ?? image.Generated!.Key;
+            var hash = contents is not null ? Hash(contents) : image!.Url is { } url ? (image.FitWide ? WidePoster.Key(url) : url) : image.Generated!.Key;
             var path = Path.Combine(series.Path, file.RelativePath);
             if (tracked is not null && tracked.Hash == hash && File.Exists(path))
             {
@@ -132,7 +132,7 @@ public sealed class MetadataService(
 
             if (contents is not null || image!.Url is not null)
             {
-                if (!await WriteAsync(path, contents, image?.Url, deferred, cancellationToken))
+                if (!await WriteAsync(path, contents, image?.Url, image?.FitWide == true, deferred, cancellationToken))
                 {
                     if (!mayGenerate || !await WriteGeneratedAsync(path, image!.Generated!, cancellationToken))
                     {
@@ -174,7 +174,7 @@ public sealed class MetadataService(
         return changes;
     }
 
-    private async Task<bool> WriteAsync(string path, string? contents, string? url, Dictionary<string, int> deferred, CancellationToken cancellationToken)
+    private async Task<bool> WriteAsync(string path, string? contents, string? url, bool fitWide, Dictionary<string, int> deferred, CancellationToken cancellationToken)
     {
         try
         {
@@ -196,7 +196,7 @@ public sealed class MetadataService(
                 return false;
             }
 
-            await File.WriteAllBytesAsync(path, bytes, cancellationToken);
+            await File.WriteAllBytesAsync(path, fitWide ? FitWide(uri, bytes) : bytes, cancellationToken);
             logger.LogDebug("Downloaded {Url} to {Path}", uri, path);
             return true;
         }
@@ -205,6 +205,25 @@ public sealed class MetadataService(
             logger.LogWarning("Couldn't write {Path}: {Error}", path, e.Message);
             return false;
         }
+    }
+
+    private byte[] FitWide(Uri uri, byte[] bytes)
+    {
+        try
+        {
+            if (WidePoster.Fit(bytes) is { } fitted)
+            {
+                return fitted;
+            }
+
+            logger.LogDebug("Couldn't decode {Url}, written as downloaded", uri);
+        }
+        catch (Exception e) when (e is DllNotFoundException or TypeInitializationException)
+        {
+            logger.LogDebug("Couldn't fit {Url} to 16:9, written as downloaded: {Error}", uri, e.Message);
+        }
+
+        return bytes;
     }
 
     private static bool IsGenerated(MetadataFile? tracked) => tracked?.Hash?.StartsWith("generated:", StringComparison.Ordinal) == true;

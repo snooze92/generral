@@ -185,6 +185,73 @@ public class MetadataArtworkTests
         Assert.That(bitmap.Height, Is.EqualTo(PosterGenerator.Height));
     }
 
+    [Test]
+    public void Portrait_posters_are_fitted_into_16_9_and_landscape_images_kept()
+    {
+        var fitted = WidePoster.Fit(Jpeg(20, 30, SKColors.Red))!;
+        using (var bitmap = SKBitmap.Decode(fitted))
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That((bitmap.Width, bitmap.Height), Is.EqualTo((WidePoster.Width, WidePoster.Height)));
+                Assert.That(bitmap.GetPixel(WidePoster.Width / 2, WidePoster.Height / 2).Red, Is.GreaterThan(200), "the whole poster in the middle");
+                Assert.That(bitmap.GetPixel(10, WidePoster.Height / 2).Red, Is.InRange(60, 180), "darkened copy on the sides");
+            });
+        }
+
+        var landscape = Jpeg(32, 18, SKColors.Blue);
+        Assert.Multiple(() =>
+        {
+            Assert.That(WidePoster.Fit(landscape), Is.SameAs(landscape));
+            Assert.That(WidePoster.Fit(RealJpeg), Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task Episode_posters_are_fitted_once_and_thumbs_kept()
+    {
+        var thumb = Path.Combine(_seriesPath, "Season 2026", "XFL - S2026E01.jpg");
+        _handler.Body = Jpeg(20, 30, SKColors.Red);
+        await SyncAsync();
+        Assert.That(File.ReadAllBytes(thumb), Is.EqualTo(_handler.Body), "thumbs are written unchanged");
+
+        using (var db = Db())
+        {
+            db.Episodes.Single().Images = new ImageSet { Poster = "https://img.example.org/e1-poster.jpg" };
+            var tracked = db.MetadataFiles.Single(f => f.Type == MetadataType.EpisodeImage);
+            tracked.Hash = "https://img.example.org/e1-poster.jpg";
+            db.SaveChanges();
+        }
+
+        await SyncAsync();
+        using (var bitmap = SKBitmap.Decode(thumb))
+        {
+            Assert.That((bitmap.Width, bitmap.Height), Is.EqualTo((WidePoster.Width, WidePoster.Height)), "a raw poster tracked before is re-rendered");
+        }
+
+        var requests = _handler.RequestedUrls.Count;
+        await SyncAsync();
+        Assert.That(_handler.RequestedUrls, Has.Count.EqualTo(requests), "only once");
+
+        using (var db = Db())
+        {
+            db.Metadata.Single().Settings = new JsonObject { ["seriesMetadata"] = false, ["episodeMetadata"] = false, ["widePosters"] = false };
+            db.SaveChanges();
+        }
+
+        await SyncAsync();
+        Assert.That(File.ReadAllBytes(thumb), Is.EqualTo(_handler.Body), "the setting turns it off");
+    }
+
+    private static byte[] Jpeg(int width, int height, SKColor color)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        bitmap.Erase(color);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
+        return data.ToArray();
+    }
+
     private async Task SyncAsync()
     {
         using var scope = _services.CreateScope();
@@ -199,6 +266,8 @@ public class MetadataArtworkTests
 
         public bool RateLimited { get; set; }
 
+        public byte[] Body { get; set; } = RealJpeg;
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestedUrls.Add(request.RequestUri!.AbsoluteUri);
@@ -207,7 +276,7 @@ public class MetadataArtworkTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
             }
 
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(RealJpeg) });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Body) });
         }
     }
 

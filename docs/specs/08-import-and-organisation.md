@@ -188,7 +188,7 @@ Plex local-asset file names:
 | Series banner | `banner.jpg` | |
 | Clear logo | `clearlogo.png` | |
 | Season poster | `Season XX/SeasonNN.jpg` (`Season2025.jpg`; `season-specials-poster.jpg` for specials) | Mapping `season.images.poster` |
-| Episode thumb | `<episode base name>.jpg` | Mapping `images.thumb`, else `images.poster` |
+| Episode thumb | `<episode base name>.jpg` | Mapping `images.thumb`, else `images.poster` (fitted to 16:9, below) |
 
 Images are cached in `/config/MediaCover/<seriesId>/` (Sonarr parity, served to the UI at
 `/MediaCover/...`) and copied to the library on import and when they change. *M3b: no cache yet.
@@ -220,6 +220,15 @@ hash `generated:v<N>:…`, so it is redrawn when the title changes and replaced 
 appears; it never overwrites a file that exists and wasn't generated (a downloaded image whose URL
 was later removed, or a hand-placed one). A failed download falls back to the generated poster only
 when no file exists yet, and is retried on the next sync.
+
+**Wide episode posters** (Plex NFO setting *Fit episode posters to 16:9 (blurred background)*,
+default on): Plex shows episode images 16:9 and crops portrait posters, so when an episode image
+comes from `images.poster` (not `images.thumb`), a 1920×1080 JPEG is written instead: the whole
+poster centred at full height over a copy scaled to cover the frame, Gaussian-blurred (sigma 40) and
+darkened by 50%. Images already landscape (width/height ≥ 1.5) and thumbs are written unchanged; an
+image that can't be decoded is written as downloaded. The file is tracked with the hash
+`wide-v<N>:<url>`, so raw posters written before (and fitted files, when the drawing changes) are
+redrawn once on the next sync; turning the setting off writes the raw poster again.
 
 ## Rename & organise existing files
 

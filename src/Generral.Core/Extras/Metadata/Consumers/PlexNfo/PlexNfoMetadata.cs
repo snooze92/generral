@@ -35,6 +35,7 @@ public sealed class PlexNfoMetadata : IMetadataConsumer
         new() { Order = 3, Name = "seasonImages", Label = "Season Images", Type = "checkbox", Value = true, HelpText = "Season<number>.jpg in the season folder" },
         new() { Order = 4, Name = "episodeImages", Label = "Episode Images", Type = "checkbox", Value = true, HelpText = "<filename>.jpg" },
         new() { Order = 5, Name = "generatePosters", Label = "Generate Missing Series/Season Posters", Type = "checkbox", Value = true, HelpText = "Draw a plain title poster when a series or season has no poster URL. Never replaces a downloaded image" },
+        new() { Order = 6, Name = "widePosters", Label = "Fit Episode Posters to 16:9 (Blurred Background)", Type = "checkbox", Value = true, HelpText = "Plex shows episode images 16:9 and crops portrait posters: draw the whole poster over a blurred copy instead. Episode thumbs are kept as they are" },
     ];
 
     /// <summary>The <c>&lt;uniqueid type="generral"&gt;</c> of a series: <c>series-&lt;uuid&gt;</c>.</summary>
@@ -141,11 +142,19 @@ public sealed class PlexNfoMetadata : IMetadataConsumer
 
     public IEnumerable<ImageFileResult> EpisodeImages(EpisodeFile file, IReadOnlyList<Episode> episodes, JsonObject settings)
     {
-        var url = episodes.Select(e => e.Images.Thumb).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u))
-                  ?? episodes.Select(e => e.Images.Poster).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u));
-        if (settings.Bool("episodeImages", true) && url is not null)
+        if (!settings.Bool("episodeImages", true))
         {
-            yield return new ImageFileResult(Path.ChangeExtension(file.RelativePath, ".jpg"), url);
+            yield break;
+        }
+
+        var name = Path.ChangeExtension(file.RelativePath, ".jpg");
+        if (episodes.Select(e => e.Images.Thumb).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u)) is { } thumb)
+        {
+            yield return new ImageFileResult(name, thumb);
+        }
+        else if (episodes.Select(e => e.Images.Poster).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u)) is { } poster)
+        {
+            yield return new ImageFileResult(name, poster, FitWide: settings.Bool("widePosters", true));
         }
     }
 
