@@ -14,6 +14,7 @@ import SeriesTagList from 'Components/SeriesTagList';
 import useEpisodes from 'Episode/useEpisodes';
 import { icons, kinds, sizes } from 'Helpers/Props';
 import DeleteSeriesModal from 'Series/Delete/DeleteSeriesModal';
+import EditSeriesModal from 'Series/Edit/EditSeriesModal';
 import Series from 'Series/Series';
 import { getSeriesStatusDetails } from 'Series/SeriesStatus';
 import { useToggleSeriesMonitored } from 'Series/useSeries';
@@ -47,6 +48,7 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
   const { toggleSeriesMonitored, isTogglingSeriesMonitored } =
     useToggleSeriesMonitored(id);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isEditImagesOpen, setIsEditImagesOpen] = useState(false);
   const { search, isSearching } = useSearchCommand();
 
@@ -96,6 +98,15 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
           isSpinning={isSearching}
           isDisabled={!monitored}
           onPress={() => search({ name: 'SeriesSearch', seriesId: id })}
+        />
+
+        <ToolbarItem
+          id="edit"
+          priority={1}
+          groupId="left"
+          label={translate('Edit')}
+          iconName={icons.EDIT}
+          onPress={() => setIsEditOpen(true)}
         />
 
         <ToolbarItem
@@ -270,6 +281,12 @@ function SeriesDetails({ series }: SeriesDetailsProps) {
             </Alert>
           ) : null}
         </div>
+
+        <EditSeriesModal
+          isOpen={isEditOpen}
+          series={series}
+          onModalClose={() => setIsEditOpen(false)}
+        />
 
         <EditSeriesImagesModal
           isOpen={isEditImagesOpen}

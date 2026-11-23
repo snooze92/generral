@@ -241,6 +241,12 @@ public static partial class SeriesEndpoints
         }
 
         var failures = await ValidateAsync(resource, id, db, tags);
+        if (!Blank(resource.Path) && TrimPath(resource.Path!) != series.Path && await db.EpisodeFiles.AnyAsync(f => f.SeriesId == id))
+        {
+            // Files would be left behind in the old folder: moving them is not implemented yet.
+            failures.Add(new ValidationFailure("path", "The path can't be changed while the series has episode files"));
+        }
+
         if (failures.Count > 0)
         {
             return ValidationFailure.BadRequest([.. failures]);

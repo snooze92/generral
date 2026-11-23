@@ -141,6 +141,38 @@ public class SeriesApiTests
     }
 
     [Test]
+    public async Task The_path_can_change_until_the_series_has_files()
+    {
+        var seed = await SeedAsync();
+        var series = (await _client.GetFromJsonAsync<JsonObject>($"/api/v1/series/{seed.SeriesId}"))!;
+
+        series["path"] = "/tv/Cup Moved";
+        var moved = await _client.PutAsJsonAsync($"/api/v1/series/{seed.SeriesId}", series);
+
+        using (var scope = _host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<GenerralDbContext>();
+            db.EpisodeFiles.Add(new Core.MediaFiles.EpisodeFile { SeriesId = seed.SeriesId, SeasonNumber = 2026, RelativePath = "a.mkv", Path = "/tv/Cup Moved/a.mkv" });
+            await db.SaveChangesAsync();
+        }
+
+        series["path"] = "/tv/Cup Again";
+        var blocked = await _client.PutAsJsonAsync($"/api/v1/series/{seed.SeriesId}", series);
+        var failures = await blocked.Content.ReadFromJsonAsync<JsonArray>();
+        series["path"] = "/tv/Cup Moved";
+        var unchangedPath = await _client.PutAsJsonAsync($"/api/v1/series/{seed.SeriesId}", series);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved.StatusCode, Is.EqualTo(HttpStatusCode.Accepted));
+            Assert.That(blocked.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That((string)failures![0]!["propertyName"]!, Is.EqualTo("path"));
+            Assert.That((string)failures[0]!["errorMessage"]!, Does.Contain("has episode files"));
+            Assert.That(unchangedPath.StatusCode, Is.EqualTo(HttpStatusCode.Accepted), "other changes still save");
+        });
+    }
+
+    [Test]
     public async Task Statistics_count_episodes_like_Sonarr()
     {
         var seed = await SeedAsync();
