@@ -11,6 +11,7 @@ using Generral.Core.Tv;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SkiaSharp;
 
 namespace Generral.Core.Test.Extras;
@@ -22,6 +23,8 @@ public class MetadataArtworkTests
     private SqliteConnection _connection = null!;
     private ServiceProvider _services = null!;
     private FakeHandler _handler = null!;
+    private FakeTime _time = null!;
+    private ListLoggerProvider _logs = null!;
     private string _seriesPath = null!;
     private int _seriesId;
 
@@ -36,9 +39,11 @@ public class MetadataArtworkTests
 
         var services = new ServiceCollection().AddLogging();
         services.AddDbContext<GenerralDbContext>(o => o.UseSqlite(_connection));
-        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<TimeProvider>(_time = new FakeTime(DateTime.UtcNow));
+        services.AddSingleton<ILoggerProvider>(_logs = new ListLoggerProvider());
         services.AddScoped<IUiSettingsService, UiSettingsService>();
         services.AddSingleton<IMetadataConsumer, PlexNfoMetadata>();
+        services.AddSingleton<ImageDownloader>();
         services.AddScoped<MetadataService>();
         services.AddHttpClient(SourceFetcherFactory.ClientName).ConfigurePrimaryHttpMessageHandler(() => _handler);
         _services = services.BuildServiceProvider();
@@ -139,6 +144,40 @@ public class MetadataArtworkTests
     }
 
     [Test]
+    public async Task Rate_limited_images_are_deferred_with_one_warning_and_retried_on_the_next_sync()
+    {
+        using (var db = Db())
+        {
+            var file = db.EpisodeFiles.Single();
+            for (var i = 2; i <= 4; i++)
+            {
+                var extra = new EpisodeFile { SeriesId = _seriesId, SeasonNumber = 2026, RelativePath = Path.Combine("Season 2026", $"XFL - S2026E0{i}.mkv"), Path = "" };
+                db.EpisodeFiles.Add(extra);
+                db.SaveChanges();
+                db.Episodes.Add(new Episode { SeriesId = _seriesId, SeasonNumber = 2026, EpisodeNumber = i, Title = $"XFL {i}", EpisodeFileId = extra.Id, AirDateUtc = DateTime.UtcNow.AddDays(7), Images = new ImageSet { Thumb = $"https://img.example.org/e{i}.jpg" } });
+            }
+
+            db.SaveChanges();
+        }
+
+        _handler.RateLimited = true;
+        await SyncAsync();
+        var thumbs = Directory.GetFiles(Path.Combine(_seriesPath, "Season 2026"), "XFL - *.jpg");
+        Assert.Multiple(() =>
+        {
+            Assert.That(thumbs, Is.Empty);
+            Assert.That(_handler.RequestedUrls, Has.Count.EqualTo(1), "the host is left alone after a 429 without Retry-After");
+            Assert.That(_logs.Messages.Where(m => m.Contains("rate limited")), Is.EqualTo(new[] { "4 image(s) from img.example.org deferred (rate limited), retried on next sync" }));
+            Assert.That(_logs.Messages.Where(m => m.StartsWith("Couldn't write", StringComparison.Ordinal)), Is.Empty);
+        });
+
+        _handler.RateLimited = false;
+        _time.Advance(ImageDownloader.MaxRetryAfter);
+        await SyncAsync();
+        Assert.That(Directory.GetFiles(Path.Combine(_seriesPath, "Season 2026"), "XFL - *.jpg"), Has.Length.EqualTo(4));
+    }
+
+    [Test]
     public void Long_titles_still_render()
     {
         var jpeg = PosterGenerator.Render(new GeneratedPoster(string.Concat(Enumerable.Repeat("Supercalifragilistic Championship ", 12)), "A caption"));
@@ -158,10 +197,44 @@ public class MetadataArtworkTests
     {
         public List<string> RequestedUrls { get; } = [];
 
+        public bool RateLimited { get; set; }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestedUrls.Add(request.RequestUri!.AbsoluteUri);
+            if (RateLimited)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+            }
+
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(RealJpeg) });
+        }
+    }
+
+    private sealed class ListLoggerProvider : ILoggerProvider, ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public ILogger CreateLogger(string categoryName) => this;
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (IsEnabled(logLevel))
+            {
+                lock (Messages)
+                {
+                    Messages.Add(formatter(state, exception));
+                }
+            }
+        }
+
+        public void Dispose()
+        {
         }
     }
 }

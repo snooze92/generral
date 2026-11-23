@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Generral.Core.Configuration;
 using Generral.Core.Datastore;
-using Generral.Core.Sources.Http;
 using Generral.Core.Tv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -22,7 +21,7 @@ public sealed class MetadataService(
     GenerralDbContext db,
     IEnumerable<IMetadataConsumer> consumers,
     IUiSettingsService uiSettings,
-    IHttpClientFactory clients,
+    ImageDownloader images,
     TimeProvider time,
     ILogger<MetadataService> logger)
 {
@@ -105,6 +104,7 @@ public sealed class MetadataService(
             }
         }
 
+        var deferred = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var wantedPaths = wanted.Select(w => w.File.RelativePath).ToHashSet(StringComparer.Ordinal);
         foreach (var stale in existing.Where(f => !wantedPaths.Contains(f.RelativePath)))
         {
@@ -132,7 +132,7 @@ public sealed class MetadataService(
 
             if (contents is not null || image!.Url is not null)
             {
-                if (!await WriteAsync(path, contents, image?.Url, cancellationToken))
+                if (!await WriteAsync(path, contents, image?.Url, deferred, cancellationToken))
                 {
                     if (!mayGenerate || !await WriteGeneratedAsync(path, image!.Generated!, cancellationToken))
                     {
@@ -166,10 +166,15 @@ public sealed class MetadataService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        foreach (var (host, count) in deferred)
+        {
+            logger.LogWarning("{Count} image(s) from {Host} deferred (rate limited), retried on next sync", count, host);
+        }
+
         return changes;
     }
 
-    private async Task<bool> WriteAsync(string path, string? contents, string? url, CancellationToken cancellationToken)
+    private async Task<bool> WriteAsync(string path, string? contents, string? url, Dictionary<string, int> deferred, CancellationToken cancellationToken)
     {
         try
         {
@@ -185,9 +190,12 @@ public sealed class MetadataService(
                 return false;
             }
 
-            using var response = await clients.CreateClient(SourceFetcherFactory.ClientName).GetAsync(uri, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            if (deferred.ContainsKey(uri.Host) || await images.GetAsync(uri, cancellationToken) is not { } bytes)
+            {
+                deferred[uri.Host] = deferred.GetValueOrDefault(uri.Host) + 1;
+                return false;
+            }
+
             await File.WriteAllBytesAsync(path, bytes, cancellationToken);
             logger.LogDebug("Downloaded {Url} to {Path}", uri, path);
             return true;
